@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar.js";
 import ChatPanel from "../components/workspace/ChatPanel.js";
 import BottomBar from "../components/workspace/BottomBar.js";
 import type { ChatMessage } from "../components/workspace/ChatPanel.js";
 import type { PlanActMode } from "../components/workspace/PlanActToggle.js";
 import type { ThinkingBudget } from "../lib/models.js";
+import { streamChat, getApiKey } from "../lib/chat.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
   {
@@ -57,19 +58,99 @@ export default function Workspace() {
   const [agentMessages, setAgentMessages] = useState<ChatMessage[]>(INITIAL_AGENT_MESSAGES);
   const [mobileTab, setMobileTab] = useState<"ask" | "agent">("ask");
 
-  const handleAskSend = (msg: string) => {
-    setAskMessages((prev) => [
-      ...prev,
-      { id: `a-${Date.now()}`, role: "user", content: msg },
-    ]);
-  };
+  const [askStreamingId, setAskStreamingId] = useState<string | null>(null);
+  const [agentStreamingId, setAgentStreamingId] = useState<string | null>(null);
 
-  const handleAgentSend = (msg: string) => {
-    setAgentMessages((prev) => [
-      ...prev,
-      { id: `g-${Date.now()}`, role: "user", content: msg },
-    ]);
-  };
+  const [askLoading, setAskLoading] = useState(false);
+  const [agentLoading, setAgentLoading] = useState(false);
+
+  const handleAskSend = useCallback((msg: string) => {
+    const userMsg: ChatMessage = { id: `a-${Date.now()}`, role: "user", content: msg };
+    const assistantMsg: ChatMessage = {
+      id: `a-${Date.now() + 1}`,
+      role: "assistant",
+      content: "",
+      label: askModel,
+    };
+
+    setAskMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setAskStreamingId(assistantMsg.id);
+    setAskLoading(true);
+
+    const history = [...askMessages, userMsg].map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    }));
+
+    streamChat(askProvider, askModel, history, askThinking, {
+      onToken: (token) => {
+        setAskMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsg.id ? { ...m, content: m.content + token } : m
+          )
+        );
+      },
+      onDone: () => {
+        setAskStreamingId(null);
+        setAskLoading(false);
+      },
+      onError: (error) => {
+        setAskMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsg.id
+              ? { ...m, content: `[Greška: ${error}]` }
+              : m
+          )
+        );
+        setAskStreamingId(null);
+        setAskLoading(false);
+      },
+    });
+  }, [askProvider, askModel, askThinking, askMessages]);
+
+  const handleAgentSend = useCallback((msg: string) => {
+    const userMsg: ChatMessage = { id: `g-${Date.now()}`, role: "user", content: msg };
+    const assistantMsg: ChatMessage = {
+      id: `g-${Date.now() + 1}`,
+      role: "assistant",
+      content: "",
+      label: agentModel,
+    };
+
+    setAgentMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setAgentStreamingId(assistantMsg.id);
+    setAgentLoading(true);
+
+    const history = [...agentMessages, userMsg].map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    }));
+
+    streamChat(agentProvider, agentModel, history, agentThinking, {
+      onToken: (token) => {
+        setAgentMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsg.id ? { ...m, content: m.content + token } : m
+          )
+        );
+      },
+      onDone: () => {
+        setAgentStreamingId(null);
+        setAgentLoading(false);
+      },
+      onError: (error) => {
+        setAgentMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsg.id
+              ? { ...m, content: `[Greška: ${error}]` }
+              : m
+          )
+        );
+        setAgentStreamingId(null);
+        setAgentLoading(false);
+      },
+    });
+  }, [agentProvider, agentModel, agentThinking, agentMessages]);
 
   return (
     <div className="h-full flex flex-col">
@@ -130,8 +211,12 @@ export default function Workspace() {
             onThinkingChange={setAskThinking}
             onPlanActChange={setAskPlanAct}
             messages={askMessages}
-            inputPlaceholder="Pitaj bilo šta..."
+            inputPlaceholder={
+              getApiKey(askProvider) ? "Pitaj bilo šta..." : "Prvo unesi API key..."
+            }
             onSend={handleAskSend}
+            loading={askLoading}
+            streamingMessageId={askStreamingId}
           />
         </div>
 
@@ -155,8 +240,12 @@ export default function Workspace() {
             onThinkingChange={setAgentThinking}
             onPlanActChange={setAgentPlanAct}
             messages={agentMessages}
-            inputPlaceholder="Naredi agentu šta da napravi..."
+            inputPlaceholder={
+              getApiKey(agentProvider) ? "Naredi agentu šta da napravi..." : "Prvo unesi API key..."
+            }
             onSend={handleAgentSend}
+            loading={agentLoading}
+            streamingMessageId={agentStreamingId}
           />
         </div>
       </div>

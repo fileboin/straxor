@@ -29,6 +29,8 @@ interface Props {
   inputPlaceholder: string;
   onSend: (message: string) => void;
   loading?: boolean;
+  streamingMessageId?: string | null;
+  onApiKeyChange?: () => void;
 }
 
 export default function ChatPanel({
@@ -49,6 +51,8 @@ export default function ChatPanel({
   inputPlaceholder,
   onSend,
   loading,
+  streamingMessageId,
+  onApiKeyChange,
 }: Props) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -99,6 +103,7 @@ export default function ChatPanel({
             onProviderChange={onProviderChange}
             onModelChange={onModelChange}
             onThinkingChange={onThinkingChange}
+            onApiKeyChange={onApiKeyChange}
           />
         </div>
       </div>
@@ -121,7 +126,12 @@ export default function ChatPanel({
                 {msg.label}
               </div>
             )}
-            <div className="whitespace-pre-wrap">{msg.content}</div>
+            <div className="whitespace-pre-wrap">
+              {msg.content}
+              {streamingMessageId === msg.id && (
+                <span className="inline-block w-2 h-4 ml-0.5 bg-accent animate-pulse" />
+              )}
+            </div>
           </div>
         ))}
         <div ref={messagesEndRef} />

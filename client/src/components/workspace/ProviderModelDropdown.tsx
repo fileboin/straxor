@@ -6,6 +6,8 @@ import {
   type Model,
   type ThinkingBudget,
 } from "../../lib/models.js";
+import ApiKeyInput from "./ApiKeyInput.js";
+import { getApiKey } from "../../lib/chat.js";
 
 interface Props {
   providerId: string;
@@ -14,6 +16,7 @@ interface Props {
   onProviderChange: (providerId: string) => void;
   onModelChange: (modelId: string) => void;
   onThinkingChange: (budget: ThinkingBudget) => void;
+  onApiKeyChange?: () => void;
 }
 
 export default function ProviderModelDropdown({
@@ -23,10 +26,12 @@ export default function ProviderModelDropdown({
   onProviderChange,
   onModelChange,
   onThinkingChange,
+  onApiKeyChange,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"providers" | "models">("providers");
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
+  const [showKeyInput, setShowKeyInput] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const currentProvider = PROVIDERS.find((p) => p.id === providerId);
@@ -119,28 +124,73 @@ export default function ProviderModelDropdown({
           </div>
 
           {/* Provider list */}
-          {view === "providers" && (
+          {view === "providers" && !showKeyInput && (
             <div className="overflow-y-auto flex-1">
-              {PROVIDERS.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => handleProviderClick(p)}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-left hover:bg-surface-2 transition-colors ${
-                    p.id === providerId ? "bg-surface-2" : ""
-                  }`}
-                >
-                  <span className="text-[13px] text-text">{p.name}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
-                      p.status === "ready"
-                        ? "bg-green-500/10 text-green-500"
-                        : "bg-yellow-500/10 text-yellow-500"
+              {PROVIDERS.map((p) => {
+                const hasKey = !!getApiKey(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => handleProviderClick(p)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-left hover:bg-surface-2 transition-colors ${
+                      p.id === providerId ? "bg-surface-2" : ""
                     }`}
                   >
-                    {p.status === "ready" ? "Ready" : "Needs Setup"}
-                  </span>
-                </button>
-              ))}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[13px] text-text">{p.name}</span>
+                      {hasKey && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {p.status === "needs-setup" && !hasKey && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedProvider(p);
+                            setShowKeyInput(true);
+                          }}
+                          className="text-[10px] px-1.5 py-0.5 rounded-md bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 transition-colors"
+                        >
+                          Setup
+                        </button>
+                      )}
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
+                          p.status === "ready" || hasKey
+                            ? "bg-green-500/10 text-green-500"
+                            : "bg-yellow-500/10 text-yellow-500"
+                        }`}
+                      >
+                        {p.status === "ready" || hasKey ? "Ready" : "Needs Setup"}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* API Key Input */}
+          {view === "providers" && showKeyInput && selectedProvider && (
+            <div className="flex-1">
+              <ApiKeyInput
+                providerId={selectedProvider.id}
+                providerName={selectedProvider.name}
+                onKeySaved={() => {
+                  setShowKeyInput(false);
+                  onApiKeyChange?.();
+                }}
+              />
+              <button
+                onClick={() => {
+                  setShowKeyInput(false);
+                  setSelectedProvider(null);
+                }}
+                className="w-full px-3 py-2 text-[12px] text-text-muted hover:text-text hover:bg-surface-2 transition-colors"
+              >
+                ← Nazad na providere
+              </button>
             </div>
           )}
 
