@@ -358,11 +358,13 @@
   .project-card:hover .project-arrow { color: var(--text-secondary); }
 
   /* ═══════════════════════════════════════════════
-     PAGE 3 — WORKSPACE (two-panel)
+     PAGE 3 — WORKSPACE (dual AI panels)
      ═══════════════════════════════════════════════ */
   .workspace-page {
     padding-top: 56px;
     height: 100vh;
+    display: flex;
+    flex-direction: column;
   }
   .workspace-topbar {
     display: flex;
@@ -372,6 +374,7 @@
     border-bottom: 1px solid var(--border);
     background: var(--surface);
     height: 48px;
+    flex-shrink: 0;
   }
   .workspace-topbar-left {
     display: flex;
@@ -393,10 +396,7 @@
     transition: all 0.15s;
   }
   .back-btn:hover { color: var(--text); border-color: var(--border-light); }
-  .workspace-project-name {
-    font-size: 14px;
-    font-weight: 600;
-  }
+  .workspace-project-name { font-size: 14px; font-weight: 600; }
   .workspace-project-tag {
     font-size: 11px;
     color: var(--text-muted);
@@ -422,42 +422,96 @@
   }
   .status-text { font-size: 12px; color: var(--text-muted); }
 
+  /* Panels container */
+  .workspace-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
   .workspace-panels {
     display: flex;
-    height: calc(100vh - 56px - 48px);
+    flex: 1;
+    overflow: hidden;
   }
   .panel {
     flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-width: 0;
   }
   .panel + .panel { border-left: 1px solid var(--border); }
+
+  /* Panel header with model selector */
   .panel-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 16px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
+    flex-shrink: 0;
+    gap: 8px;
   }
-  .panel-title {
+  .panel-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 12px;
+    flex-shrink: 0;
+  }
+  .panel-icon.ask { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+  .panel-icon.agent { background: var(--accent-dim); color: var(--accent); }
+  .panel-title {
+    font-size: 13px;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-secondary);
+    letter-spacing: -0.2px;
   }
   .panel-badge {
-    font-size: 11px;
-    padding: 2px 8px;
+    font-size: 10px;
+    padding: 2px 7px;
     border-radius: 6px;
     background: var(--accent-dim);
     color: var(--accent);
     font-weight: 500;
   }
+  .panel-badge.blue { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
 
-  /* Chat panel */
+  /* Model selector dropdown */
+  .model-select {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 22px;
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23666' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+  }
+  .model-select:hover { border-color: var(--border-light); color: var(--text); }
+  .model-select:focus { outline: none; border-color: var(--accent); }
+  .model-select option { background: var(--surface-2); color: var(--text); }
+
+  /* Chat area */
   .chat-messages {
     flex: 1;
     overflow-y: auto;
@@ -485,46 +539,72 @@
     border: 1px solid var(--border);
     border-bottom-left-radius: 4px;
   }
+  .chat-msg.assistant.blue-accent {
+    border-color: rgba(59, 130, 246, 0.2);
+    background: rgba(59, 130, 246, 0.05);
+  }
   .chat-msg .msg-label {
     font-size: 11px;
     font-weight: 600;
     margin-bottom: 4px;
     opacity: 0.6;
   }
+  .chat-msg code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    background: rgba(0,0,0,0.3);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .chat-msg pre {
+    margin-top: 8px;
+    padding: 10px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 8px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  /* Chat input area */
   .chat-input-area {
-    padding: 12px 16px;
+    padding: 10px 12px;
     border-top: 1px solid var(--border);
     background: var(--surface);
+    flex-shrink: 0;
   }
   .chat-input-wrap {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
+    padding: 6px 10px;
     border-radius: var(--radius-xl);
     border: 1px solid var(--border);
     background: var(--surface-2);
     transition: border-color 0.15s;
   }
   .chat-input-wrap:focus-within { border-color: var(--accent); }
+  .chat-input-wrap.blue-focus:focus-within { border-color: #3b82f6; }
   .chat-input {
     flex: 1;
     border: none;
     background: transparent;
     color: var(--text);
-    font-size: 14px;
+    font-size: 13px;
     font-family: inherit;
     outline: none;
   }
   .chat-input::placeholder { color: var(--text-muted); }
   .chat-send {
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     border: none;
     background: var(--accent);
     color: #fff;
-    font-size: 16px;
+    font-size: 14px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -532,19 +612,74 @@
     transition: background 0.15s;
     flex-shrink: 0;
   }
-  .chat-send:hover { background: var(--accent-hover); }
+  .chat-send.blue { background: #3b82f6; }
+  .chat-send:hover { opacity: 0.85; }
 
-  /* Terminal panel */
-  .terminal-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px 16px;
-    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  /* ── BOTTOM BAR: Terminal / Files tabs ── */
+  .bottom-bar {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .bottom-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .bottom-tab {
+    padding: 8px 14px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
     font-size: 12px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s;
+  }
+  .bottom-tab:hover { color: var(--text-secondary); }
+  .bottom-tab.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+  .bottom-tab-count {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-left: 4px;
+  }
+  .bottom-bar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bottom-bar-toggle {
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .bottom-bar-toggle:hover { color: var(--text-secondary); }
+
+  .bottom-content {
+    height: 160px;
+    overflow-y: auto;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 11.5px;
     line-height: 1.8;
     color: var(--text-secondary);
     background: var(--bg);
+    padding: 10px 14px;
   }
+  .bottom-content.collapsed { display: none; }
   .terminal-line { white-space: pre-wrap; }
   .terminal-line .prompt { color: var(--accent); }
   .terminal-line .cmd { color: var(--text); }
@@ -554,7 +689,7 @@
   .terminal-cursor {
     display: inline-block;
     width: 7px;
-    height: 14px;
+    height: 13px;
     background: var(--accent);
     animation: blink 1s infinite;
     vertical-align: middle;
@@ -565,24 +700,24 @@
     50% { opacity: 0; }
   }
 
-  /* File tree */
+  /* File tree (inside bottom tab) */
   .file-tree {
-    padding: 8px 0;
     font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 12px;
+    font-size: 11.5px;
+    padding: 4px 0;
   }
   .file-tree-item {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 16px;
+    padding: 3px 14px;
     color: var(--text-secondary);
     cursor: pointer;
     transition: background 0.1s;
   }
   .file-tree-item:hover { background: var(--surface-2); }
   .file-tree-item.folder { color: var(--text); font-weight: 500; }
-  .file-tree-indent { display: inline-block; width: 16px; }
+  .file-tree-icon { width: 14px; text-align: center; font-size: 11px; }
 
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; }
@@ -590,7 +725,7 @@
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
 
-  /* Responsive: stack panels on mobile */
+  /* Responsive */
   @media (max-width: 768px) {
     .workspace-panels { flex-direction: column; }
     .panel + .panel { border-left: none; border-top: 1px solid var(--border); }
@@ -720,7 +855,7 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════
-     PAGE 3 — WORKSPACE (two-panel)
+     PAGE 3 — WORKSPACE (dual AI panels)
      ═══════════════════════════════════════════════ -->
 <div id="page-workspace" class="page workspace-page">
   <div class="workspace-topbar">
@@ -737,58 +872,148 @@
     </div>
   </div>
 
-  <div class="workspace-panels">
-    <!-- LEFT: Chat / Agent -->
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">Agent</span>
-        <span class="panel-badge">3 poruke</span>
+  <div class="workspace-body">
+    <div class="workspace-panels">
+
+      <!-- ── LEFT: Ask Panel (brzi AI chat) ── -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-header-left">
+            <div class="panel-icon ask">?</div>
+            <span class="panel-title">Ask</span>
+            <span class="panel-badge blue">chat</span>
+          </div>
+          <select class="model-select">
+            <option>Claude Sonnet 4</option>
+            <option>GPT-4o</option>
+            <option>DeepSeek R1</option>
+            <option>Gemini 2.5 Pro</option>
+          </select>
+        </div>
+        <div class="chat-messages">
+          <div class="chat-msg user">
+            <div class="msg-label">Ti</div>
+            Koji je najbolji način da napravim responsive navbar sa Tailwind-om? Treba da radi na mobile i desktop.
+          </div>
+          <div class="chat-msg assistant blue-accent">
+            <div class="msg-label">Claude Sonnet 4</div>
+            Za responsive navbar koristi <code>hidden md:flex</code> za desktop linkove i hamburger meni za mobile. Evo osnove:
+            <pre>&lt;nav className="flex items-center
+  justify-between p-4"&gt;
+  &lt;div className="text-lg font-bold"&gt;
+    Logo
+  &lt;/div&gt;
+  &lt;div className="hidden md:flex
+    gap-6"&gt;
+    &lt;a href="#"&gt;Home&lt;/a&gt;
+    &lt;a href="#"&gt;About&lt;/a&gt;
+  &lt;/div&gt;
+  &lt;button className="md:hidden"&gt;
+    ☰
+  &lt;/button&gt;
+&lt;/nav&gt;</pre>
+            Za kompleksniji meni, razmotri <code>@headlessui/react</code> za accessible dropdown-ove i Dialog komponentu.
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <div class="chat-input-wrap blue-focus">
+            <input class="chat-input" placeholder=" Pitaj bilo šta..." disabled>
+            <button class="chat-send blue">↑</button>
+          </div>
+        </div>
       </div>
-      <div class="chat-messages">
-        <div class="chat-msg user">
-          <div class="msg-label">Ti</div>
-          Napravi landing page sa hero sekcijom, features gridom i CTA dugmetom. Koristi Tailwind.
+
+      <!-- ── RIGHT: Agent Panel (build/code) ── -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-header-left">
+            <div class="panel-icon agent">⚡</div>
+            <span class="panel-title">Agent</span>
+            <span class="panel-badge">build</span>
+          </div>
+          <select class="model-select">
+            <option>Opus 4.6</option>
+            <option>Claude Sonnet 4</option>
+            <option>GPT-4o</option>
+            <option>DeepSeek Coder</option>
+          </select>
         </div>
-        <div class="chat-msg assistant">
-          <div class="msg-label">Straxor</div>
-          Kreiram React komponente. Počinjem sa Hero.tsx, zatim Features.tsx i CTA.tsx. Koristim Tailwind classes i dark theme.
+        <div class="chat-messages">
+          <div class="chat-msg user">
+            <div class="msg-label">Ti</div>
+            Napravi landing page sa hero sekcijom, features gridom i CTA dugmetom. Koristi Tailwind.
+          </div>
+          <div class="chat-msg assistant">
+            <div class="msg-label">Opus 4.6</div>
+            Kreiram strukturu projekta. Vite + React + Tailwind.
+            <pre>$ npm create vite@latest . -- --template react-ts
+$ npm install -D tailwindcss @tailwindcss/vite</pre>
+          </div>
+          <div class="chat-msg assistant">
+            <div class="msg-label">Opus 4.6</div>
+            Generišem komponente...
+            <pre>✦ src/components/Hero.tsx     — created
+✦ src/components/Features.tsx  — created
+✦ src/components/CTA.tsx       — created
+✦ src/App.tsx                  — updated</pre>
+            Sve komponente su mobile-first sa dark theme. Testiram build...
+            <pre>$ npm run build
+✓ built in 1.2s</pre>
+            Build prolazi. Želiš li da vidim preview ili da dodam nešto?
+          </div>
         </div>
-        <div class="chat-msg assistant">
-          <div class="msg-label">Straxor</div>
-          Hero gotov. Dodajem features sekciju sa 3 kartice u gridu. Testiram layout na mobile viewportu.
-        </div>
-      </div>
-      <div class="chat-input-area">
-        <div class="chat-input-wrap">
-          <input class="chat-input" placeholder=" opiši šta želiš da napraviš..." disabled>
-          <button class="chat-send">↑</button>
+        <div class="chat-input-area">
+          <div class="chat-input-wrap">
+            <input class="chat-input" placeholder=" Naredi agentu šta da napravi..." disabled>
+            <button class="chat-send">↑</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- RIGHT: Terminal / Files -->
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">Terminal</span>
-        <span class="panel-badge" style="background:var(--accent-dim);color:var(--accent)">bash</span>
+    <!-- ── BOTTOM BAR: Terminal + Files (collapsible) ── -->
+    <div class="bottom-bar" id="bottomBar">
+      <div class="bottom-tabs">
+        <button class="bottom-tab active" onclick="switchBottomTab('terminal', this)">
+          Terminal <span class="bottom-tab-count">12</span>
+        </button>
+        <button class="bottom-tab" onclick="switchBottomTab('files', this)">
+          Datoteke <span class="bottom-tab-count">5</span>
+        </button>
+        <div class="bottom-bar-right">
+          <button class="bottom-bar-toggle" onclick="toggleBottomBar()" title="Skupi/proširi">▾</button>
+        </div>
       </div>
-      <div class="terminal-content">
-        <div class="terminal-line"><span class="prompt">$</span> <span class="cmd">npm create vite@latest straxor-landing -- --template react-ts</span></div>
-        <div class="terminal-line"><span class="output">✓ Scaffolding project in straxor-landing...</span></div>
+
+      <div class="bottom-content" id="bottom-terminal">
+        <div class="terminal-line"><span class="prompt">~/straxor-landing $</span> <span class="cmd">npm create vite@latest . -- --template react-ts</span></div>
+        <div class="terminal-line"><span class="output">✓ Scaffolding project in ...</span></div>
         <div class="terminal-line"><span class="success">✓ Done.</span></div>
         <div class="terminal-line">&nbsp;</div>
-        <div class="terminal-line"><span class="prompt">$</span> <span class="cmd">cd straxor-landing && npm install</span></div>
-        <div class="terminal-line"><span class="output">added 142 packages in 8s</span></div>
+        <div class="terminal-line"><span class="prompt">~/straxor-landing $</span> <span class="cmd">npm install && npm install -D tailwindcss @tailwindcss/vite</span></div>
+        <div class="terminal-line"><span class="output">added 145 packages in 9s</span></div>
         <div class="terminal-line">&nbsp;</div>
-        <div class="terminal-line"><span class="prompt">$</span> <span class="cmd">npm install -D tailwindcss @tailwindcss/vite</span></div>
-        <div class="terminal-line"><span class="output">added 3 packages in 4s</span></div>
+        <div class="terminal-line"><span class="prompt">~/straxor-landing $</span> <span class="cmd">npm run build</span></div>
+        <div class="terminal-line"><span class="output">vite v6.0.0 building for production...</span></div>
+        <div class="terminal-line"><span class="success">✓ built in 1.24s</span></div>
         <div class="terminal-line">&nbsp;</div>
-        <div class="terminal-line"><span class="prompt">$</span> <span class="cmd">cat src/App.tsx</span></div>
-        <div class="terminal-line"><span class="output">import Hero from './components/Hero'</span></div>
-        <div class="terminal-line"><span class="output">import Features from './components/Features'</span></div>
-        <div class="terminal-line"><span class="output">import CTA from './components/CTA'</span></div>
-        <div class="terminal-line">&nbsp;</div>
-        <div class="terminal-line"><span class="prompt">$</span> <span class="terminal-cursor"></span></div>
+        <div class="terminal-line"><span class="prompt">~/straxor-landing $</span> <span class="terminal-cursor"></span></div>
+      </div>
+
+      <div class="bottom-content collapsed" id="bottom-files">
+        <div class="file-tree">
+          <div class="file-tree-item folder"><span class="file-tree-icon">📁</span> src/</div>
+          <div class="file-tree-item"><span class="file-tree-indent"></span><span class="file-tree-icon">📄</span> App.tsx</div>
+          <div class="file-tree-item"><span class="file-tree-indent"></span><span class="file-tree-icon">📄</span> main.tsx</div>
+          <div class="file-tree-item"><span class="file-tree-indent"></span><span class="file-tree-icon">📄</span> index.css</div>
+          <div class="file-tree-item folder"><span class="file-tree-indent"></span><span class="file-tree-icon">📁</span> components/</div>
+          <div class="file-tree-item"><span class="file-tree-indent"></span><span class="file-tree-indent"></span><span class="file-tree-icon">📄</span> Hero.tsx</div>
+          <div class="file-tree-item"><span class="file-tree-indent"></span><span class="file-tree-indent"></span><span class="file-tree-icon">📄</span> Features.tsx</div>
+          <div class="file-tree-item"><span class="file-tree-indent"></span><span class="file-tree-indent"></span><span class="file-tree-icon">📄</span> CTA.tsx</div>
+          <div class="file-tree-item"><span class="file-tree-icon">📄</span> index.html</div>
+          <div class="file-tree-item"><span class="file-tree-icon">📄</span> package.json</div>
+          <div class="file-tree-item"><span class="file-tree-icon">📄</span> vite.config.ts</div>
+        </div>
       </div>
     </div>
   </div>
@@ -804,6 +1029,23 @@
 
   function toggleTheme() {
     document.documentElement.classList.toggle('light');
+  }
+
+  function switchBottomTab(tab, btn) {
+    document.querySelectorAll('.bottom-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('bottom-terminal').classList.toggle('collapsed', tab !== 'terminal');
+    document.getElementById('bottom-files').classList.toggle('collapsed', tab !== 'files');
+  }
+
+  function toggleBottomBar() {
+    const content = document.querySelector('.bottom-content:not(.collapsed)') || document.getElementById('bottom-terminal');
+    const bar = document.getElementById('bottomBar');
+    const isHidden = content.style.display === 'none';
+    bar.querySelectorAll('.bottom-content').forEach(c => c.style.display = '');
+    if (!isHidden) {
+      bar.querySelectorAll('.bottom-content').forEach(c => c.style.display = 'none');
+    }
   }
 </script>
 
