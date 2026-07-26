@@ -39,6 +39,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
   const [status, setStatus] = useState<ProvisionStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState("");
+  const [connectedMachineId, setConnectedMachineId] = useState<string | null>(null);
 
   const handleConnect = async () => {
     if (!host || !username || (!password && authType === "password") || (!privateKey && authType === "key")) {
@@ -108,7 +109,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
             setStatusMessage(event.message);
 
             if (event.status === "ready") {
-              onConnected(machine.id);
+              setConnectedMachineId(machine.id);
               return;
             }
             if (event.status === "error") {
@@ -142,7 +143,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
         )}
         {status === "ready" && (
           <button
-            onClick={() => onConnected("")}
+            onClick={() => onConnected(connectedMachineId || "")}
             className="w-full py-2 text-sm font-medium rounded-lg bg-accent text-white hover:opacity-85 transition-colors"
           >
             Nastavi

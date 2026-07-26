@@ -4,11 +4,20 @@ import InputToolbar from "./InputToolbar.js";
 import PlanActToggle, { type PlanActMode } from "./PlanActToggle.js";
 import type { ThinkingBudget } from "../../lib/models.js";
 
+export interface ToolCall {
+  id: string;
+  name: string;
+  args: Record<string, unknown> | string;
+  result?: string;
+  status: "pending" | "running" | "completed" | "error";
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   label?: string;
+  toolCalls?: ToolCall[];
 }
 
 interface Props {
@@ -31,6 +40,54 @@ interface Props {
   loading?: boolean;
   streamingMessageId?: string | null;
   onApiKeyChange?: () => void;
+}
+
+function ToolCallCard({ tool }: { tool: ToolCall }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const argsStr = typeof tool.args === "string"
+    ? tool.args
+    : JSON.stringify(tool.args, null, 2);
+
+  const statusIcon =
+    tool.status === "running" ? "⟳" :
+    tool.status === "completed" ? "✓" :
+    tool.status === "error" ? "✗" : "○";
+
+  const statusColor =
+    tool.status === "running" ? "text-accent-blue animate-spin" :
+    tool.status === "completed" ? "text-green-500" :
+    tool.status === "error" ? "text-red-500" : "text-text-muted";
+
+  return (
+    <div className="mt-1.5 border border-border rounded-lg overflow-hidden text-[12px]">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-2 px-2.5 py-1.5 bg-surface hover:bg-surface-2 transition-colors text-left"
+      >
+        <span className={`text-[11px] shrink-0 ${statusColor}`}>{statusIcon}</span>
+        <span className="font-mono text-text-muted truncate">{tool.name}</span>
+        <span className="ml-auto text-text-muted text-[10px] shrink-0">
+          {expanded ? "▾" : "▸"}
+        </span>
+      </button>
+      {expanded && (
+        <div className="border-t border-border">
+          <div className="px-2.5 py-1.5">
+            <div className="text-[10px] text-text-muted uppercase tracking-wider mb-0.5">args</div>
+            <pre className="whitespace-pre-wrap break-all text-text font-mono text-[11px] max-h-32 overflow-y-auto">{argsStr}</pre>
+          </div>
+          {tool.result && (
+            <div className="px-2.5 py-1.5 border-t border-border">
+              <div className="text-[10px] text-text-muted uppercase tracking-wider mb-0.5">result</div>
+              <pre className="whitespace-pre-wrap break-all text-text font-mono text-[11px] max-h-40 overflow-y-auto">{tool.result}</pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function ChatPanel({
@@ -128,10 +185,21 @@ export default function ChatPanel({
             )}
             <div className="whitespace-pre-wrap">
               {msg.content}
-              {streamingMessageId === msg.id && (
+              {streamingMessageId === msg.id && !msg.toolCalls?.length && (
                 <span className="inline-block w-2 h-4 ml-0.5 bg-accent animate-pulse" />
               )}
             </div>
+            {/* Tool calls */}
+            {msg.toolCalls && msg.toolCalls.length > 0 && (
+              <div className="mt-1">
+                {msg.toolCalls.map((tc) => (
+                  <ToolCallCard key={tc.id} tool={tc} />
+                ))}
+                {streamingMessageId === msg.id && (
+                  <span className="inline-block w-2 h-4 mt-1 bg-accent animate-pulse" />
+                )}
+              </div>
+            )}
           </div>
         ))}
         <div ref={messagesEndRef} />

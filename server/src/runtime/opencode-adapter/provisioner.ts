@@ -101,7 +101,7 @@ export async function isPortAvailable(ssh: SSHClient, port: number): Promise<boo
 
 export async function startOpenCodeServe(
   ssh: SSHClient,
-  port: number = 3000
+  port: number = 4096
 ): Promise<void> {
   // Kill any existing opencode process
   await ssh.exec("pkill -f 'opencode serve' 2>/dev/null || true");

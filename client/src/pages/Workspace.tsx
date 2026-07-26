@@ -3,10 +3,11 @@ import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar.js";
 import ChatPanel from "../components/workspace/ChatPanel.js";
 import BottomBar from "../components/workspace/BottomBar.js";
 import SshInput from "../components/workspace/SshInput.js";
-import type { ChatMessage } from "../components/workspace/ChatPanel.js";
+import type { ChatMessage, ToolCall } from "../components/workspace/ChatPanel.js";
 import type { PlanActMode } from "../components/workspace/PlanActToggle.js";
 import type { ThinkingBudget } from "../lib/models.js";
 import { streamChat, hasApiKey } from "../lib/chat.js";
+import { streamAgentMessage } from "../lib/agent.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
   {
@@ -19,26 +20,6 @@ const INITIAL_ASK_MESSAGES: ChatMessage[] = [
     role: "assistant",
     label: "Claude Sonnet 4",
     content: 'Za responsive navbar koristi hidden md:flex za desktop linkove i hamburger meni za mobile.\n\nZa kompleksniji meni, razmotri @headlessui/react za accessible dropdown-ove.',
-  },
-];
-
-const INITIAL_AGENT_MESSAGES: ChatMessage[] = [
-  {
-    id: "g1",
-    role: "user",
-    content: "Napravi landing page sa hero sekcijom, features gridom i CTA dugmetom.",
-  },
-  {
-    id: "g2",
-    role: "assistant",
-    label: "Opus 4.6",
-    content: "Kreiram strukturu projekta. Vite + React + Tailwind.\n\n$ npm create vite@latest . -- --template react-ts\n$ npm install -D tailwindcss @tailwindcss/vite",
-  },
-  {
-    id: "g3",
-    role: "assistant",
-    label: "Opus 4.6",
-    content: "Generišem komponente...\n\n✦ src/components/Hero.tsx — created\n✦ src/components/Features.tsx — created\n✦ src/components/CTA.tsx — created\n\nBuild prolazi. Želiš li da vidim preview?",
   },
 ];
 
@@ -56,7 +37,7 @@ export default function Workspace() {
   const [agentPlanAct, setAgentPlanAct] = useState<PlanActMode>("act");
 
   const [askMessages, setAskMessages] = useState<ChatMessage[]>(INITIAL_ASK_MESSAGES);
-  const [agentMessages, setAgentMessages] = useState<ChatMessage[]>(INITIAL_AGENT_MESSAGES);
+  const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([]);
   const [mobileTab, setMobileTab] = useState<"ask" | "agent">("ask");
 
   const [askStreamingId, setAskStreamingId] = useState<string | null>(null);
@@ -69,18 +50,17 @@ export default function Workspace() {
   const [showSshModal, setShowSshModal] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
+  // Agent session state
+  const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
+  const [agentMachineId, setAgentMachineId] = useState<string | null>(null);
+
   // API key status
   const [askHasKey, setAskHasKey] = useState(false);
-  const [agentHasKey, setAgentHasKey] = useState(false);
 
   // Check API key status when provider changes
   useEffect(() => {
     hasApiKey(askProvider).then(setAskHasKey);
   }, [askProvider]);
-
-  useEffect(() => {
-    hasApiKey(agentProvider).then(setAgentHasKey);
-  }, [agentProvider]);
 
   const handleAskSend = useCallback((msg: string) => {
     const userMsg: ChatMessage = { id: `a-${Date.now()}`, role: "user", content: msg };
@@ -127,29 +107,77 @@ export default function Workspace() {
   }, [askProvider, askModel, askThinking, askMessages]);
 
   const handleAgentSend = useCallback((msg: string) => {
+    if (!agentMachineId) {
+      setAgentMessages((prev) => [
+        ...prev,
+        {
+          id: `g-err-${Date.now()}`,
+          role: "assistant",
+          content: "⚠ Nema povezanog VPS-a. Klikni 'Connect VPS' za povezivanje.",
+          label: "System",
+        },
+      ]);
+      return;
+    }
+
     const userMsg: ChatMessage = { id: `g-${Date.now()}`, role: "user", content: msg };
     const assistantMsg: ChatMessage = {
       id: `g-${Date.now() + 1}`,
       role: "assistant",
       content: "",
       label: agentModel,
+      toolCalls: [],
     };
 
     setAgentMessages((prev) => [...prev, userMsg, assistantMsg]);
     setAgentStreamingId(assistantMsg.id);
     setAgentLoading(true);
 
-    const history = [...agentMessages, userMsg].map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    }));
-
-    streamChat(agentProvider, agentModel, history, agentThinking, {
-      onToken: (token) => {
+    streamAgentMessage(agentMachineId, msg, agentSessionId, {
+      onSession: (sessionId) => {
+        setAgentSessionId(sessionId);
+      },
+      onText: (content) => {
         setAgentMessages((prev) =>
           prev.map((m) =>
-            m.id === assistantMsg.id ? { ...m, content: m.content + token } : m
+            m.id === assistantMsg.id
+              ? { ...m, content: m.content + content }
+              : m
           )
+        );
+      },
+      onToolCall: (id, name, args) => {
+        setAgentMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== assistantMsg.id) return m;
+            const existing = m.toolCalls || [];
+            // Update if already exists, otherwise add
+            const idx = existing.findIndex((tc) => tc.id === id);
+            const tc: ToolCall = { id, name, args, status: "running" };
+            const updated = [...existing];
+            if (idx >= 0) {
+              updated[idx] = { ...updated[idx], status: "running", args };
+            } else {
+              updated.push(tc);
+            }
+            return { ...m, toolCalls: updated };
+          })
+        );
+      },
+      onToolResult: (id, result, status) => {
+        setAgentMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== assistantMsg.id) return m;
+            const existing = m.toolCalls || [];
+            const idx = existing.findIndex((tc) => tc.id === id);
+            const updated = [...existing];
+            if (idx >= 0) {
+              updated[idx] = { ...updated[idx], result, status };
+            } else {
+              updated.push({ id, name: "tool", args: {}, result, status });
+            }
+            return { ...m, toolCalls: updated };
+          })
         );
       },
       onDone: () => {
@@ -160,7 +188,7 @@ export default function Workspace() {
         setAgentMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsg.id
-              ? { ...m, content: `[Greška: ${error}]` }
+              ? { ...m, content: m.content + `\n\n[Greška: ${error}]` }
               : m
           )
         );
@@ -168,7 +196,13 @@ export default function Workspace() {
         setAgentLoading(false);
       },
     });
-  }, [agentProvider, agentModel, agentThinking, agentMessages]);
+  }, [agentMachineId, agentSessionId, agentModel]);
+
+  const handleVpsConnected = useCallback((machineId: string) => {
+    setAgentMachineId(machineId);
+    setVpsStatus("ready");
+    setShowSshModal(false);
+  }, []);
 
   return (
     <div className="h-full flex flex-col relative">
@@ -261,7 +295,9 @@ export default function Workspace() {
             onPlanActChange={setAgentPlanAct}
             messages={agentMessages}
             inputPlaceholder={
-              agentHasKey ? "Naredi agentu šta da napravi..." : "Prvo unesi API key..."
+              agentMachineId
+                ? "Naredi agentu šta da napravi..."
+                : "Poveži VPS za agenta..."
             }
             onSend={handleAgentSend}
             loading={agentLoading}
@@ -278,10 +314,7 @@ export default function Workspace() {
           <div className="w-full max-w-md mx-4">
             <SshInput
               projectId="placeholder-project-id"
-              onConnected={() => {
-                setVpsStatus("ready");
-                setShowSshModal(false);
-              }}
+              onConnected={handleVpsConnected}
               onCancel={() => setShowSshModal(false)}
             />
           </div>

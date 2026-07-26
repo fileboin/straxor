@@ -209,7 +209,7 @@ router.post("/:id/provision", requireAuth, async (req, res) => {
     }
 
     // Start opencode serve
-    const opencodePort = machine.opencodePort || 3000;
+    const opencodePort = machine.opencodePort || 4096;
 
     try {
       await startOpenCodeServe(ssh, opencodePort);
