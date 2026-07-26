@@ -1,5 +1,6 @@
 import { Client } from "ssh2";
 import type { ConnectConfig } from "ssh2";
+import type { Duplex } from "stream";
 
 export interface SSHConfig {
   host: string;
@@ -12,6 +13,7 @@ export interface SSHConfig {
 export interface SSHClient {
   client: Client;
   exec: (command: string) => Promise<{ stdout: string; stderr: string; code: number }>;
+  execStream: (command: string) => Promise<Duplex>;
   close: () => void;
 }
 
@@ -54,9 +56,22 @@ export function connectSSH(config: SSHConfig): Promise<SSHClient> {
         });
       };
 
+      const execStream = (command: string): Promise<Duplex> => {
+        return new Promise((execResolve, execReject) => {
+          client.exec(command, (err, stream) => {
+            if (err) {
+              execReject(err);
+              return;
+            }
+            execResolve(stream);
+          });
+        });
+      };
+
       resolve({
         client,
         exec,
+        execStream,
         close: () => client.end(),
       });
     });
