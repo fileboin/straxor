@@ -725,10 +725,65 @@
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
 
-  /* Responsive */
+  /* Responsive: mobile panel tabs */
+  .mobile-panel-tabs {
+    display: none;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .mobile-panel-tabs-inner {
+    display: flex;
+  }
+  .mobile-panel-tab {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .mobile-panel-tab:hover { color: var(--text-secondary); }
+  .mobile-panel-tab.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+  .mobile-panel-tab .tab-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .mobile-panel-tab .tab-dot.ask { background: #3b82f6; }
+  .mobile-panel-tab .tab-dot.agent { background: var(--accent); }
+  .mobile-panel-tab .tab-dot.active-dot { animation: pulse 2s infinite; }
+
   @media (max-width: 768px) {
-    .workspace-panels { flex-direction: column; }
-    .panel + .panel { border-left: none; border-top: 1px solid var(--border); }
+    .workspace-topbar { padding: 8px 12px; height: 44px; }
+    .workspace-project-name { font-size: 13px; }
+    .status-text { display: none; }
+    .workspace-topbar-right .btn-ghost { display: none; }
+
+    .mobile-panel-tabs { display: block; }
+
+    .workspace-panels {
+      flex-direction: column;
+    }
+    .panel + .panel { border-left: none; border-top: none; }
+    .panel { display: none; }
+    .panel.mobile-active { display: flex; }
+
+    .bottom-bar { display: none; }
   }
 </style>
 </head>
@@ -873,10 +928,24 @@
   </div>
 
   <div class="workspace-body">
+    <!-- Mobile panel switcher -->
+    <div class="mobile-panel-tabs">
+      <div class="mobile-panel-tabs-inner">
+        <button class="mobile-panel-tab active" onclick="switchMobilePanel('ask', this)">
+          <span class="tab-dot ask active-dot"></span>
+          Ask
+        </button>
+        <button class="mobile-panel-tab" onclick="switchMobilePanel('agent', this)">
+          <span class="tab-dot agent"></span>
+          Agent
+        </button>
+      </div>
+    </div>
+
     <div class="workspace-panels">
 
       <!-- ── LEFT: Ask Panel (brzi AI chat) ── -->
-      <div class="panel">
+      <div class="panel mobile-active" id="panel-ask">
         <div class="panel-header">
           <div class="panel-header-left">
             <div class="panel-icon ask">?</div>
@@ -924,7 +993,7 @@
       </div>
 
       <!-- ── RIGHT: Agent Panel (build/code) ── -->
-      <div class="panel">
+      <div class="panel" id="panel-agent">
         <div class="panel-header">
           <div class="panel-header-left">
             <div class="panel-icon agent">⚡</div>
@@ -1046,6 +1115,13 @@ $ npm install -D tailwindcss @tailwindcss/vite</pre>
     if (!isHidden) {
       bar.querySelectorAll('.bottom-content').forEach(c => c.style.display = 'none');
     }
+  }
+
+  function switchMobilePanel(panel, btn) {
+    document.querySelectorAll('.mobile-panel-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.workspace-panels .panel').forEach(p => p.classList.remove('mobile-active'));
+    document.getElementById('panel-' + panel).classList.add('mobile-active');
   }
 </script>
 
