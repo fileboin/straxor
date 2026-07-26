@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import ProviderModelDropdown from "./ProviderModelDropdown.js";
+import InputToolbar from "./InputToolbar.js";
 import type { ThinkingBudget } from "../../lib/models.js";
 
 export interface ChatMessage {
@@ -126,6 +127,7 @@ export default function ChatPanel({
             iconColor === "blue" ? "focus-within:border-accent-blue" : ""
           }`}
         >
+          <InputToolbar onAction={() => {}} />
           <input
             type="text"
             value={input}
