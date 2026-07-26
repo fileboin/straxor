@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../lib/auth.js";
 import { Link } from "react-router-dom";
+import { useTheme } from "../lib/theme.js";
 
 export default function Login() {
   const { login } = useAuth();
+  const { toggleTheme, theme } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -25,39 +27,66 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-center mb-8">Straxor</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-3 rounded-lg bg-gray-900 border border-gray-800 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
-            required
-          />
-          <input
-            type="password"
-            placeholder="Lozinka"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-3 rounded-lg bg-gray-900 border border-gray-800 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
-            required
-          />
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-accent rounded-xl flex items-center justify-center font-extrabold text-white text-sm">
+              S
+            </div>
+            <span className="text-2xl font-extrabold tracking-tight">Straxor</span>
+          </div>
+          <button
+            onClick={toggleTheme}
+            className="w-9 h-9 rounded-xl border border-border bg-surface-2 flex items-center justify-center text-text-secondary hover:text-text transition-colors"
+          >
+            {theme === "dark" ? "☀" : "☾"}
+          </button>
+        </div>
+        <p className="text-sm text-text-secondary mb-6">AI-powered development platform</p>
+
+        <div className="flex mb-6 border border-border rounded-xl overflow-hidden">
+          <button className="flex-1 py-2 text-[13px] font-medium bg-accent-dim text-accent">
+            Prijavi se
+          </button>
+          <Link
+            to="/register"
+            className="flex-1 py-2 text-[13px] font-medium text-text-muted hover:text-text-secondary transition-colors text-center"
+          >
+            Registruj se
+          </Link>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Email</label>
+            <input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-surface-2 text-text text-sm placeholder-text-muted outline-none focus:border-accent transition-colors"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Lozinka</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-surface-2 text-text text-sm placeholder-text-muted outline-none focus:border-accent transition-colors"
+              required
+            />
+          </div>
+          {error && <p className="text-danger text-sm">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 font-medium transition-colors"
+            className="w-full py-2.5 rounded-xl bg-accent hover:opacity-90 disabled:opacity-50 text-white text-sm font-semibold transition-opacity"
           >
             {loading ? "Prijavljivanje..." : "Prijavi se"}
           </button>
         </form>
-        <p className="text-center text-gray-500 text-sm mt-6">
-          Nemaš nalog?{" "}
-          <Link to="/register" className="text-blue-500 hover:underline">
-            Registruj se
-          </Link>
-        </p>
       </div>
     </div>
   );

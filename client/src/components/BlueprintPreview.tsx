@@ -29,7 +29,7 @@ export default function BlueprintPreview({
   const templateInfo = TEMPLATES.find((t) => t.id === template)!;
 
   return (
-    <div className="rounded-xl border border-gray-700 overflow-hidden">
+    <div className="rounded-xl border border-border overflow-hidden">
       <div
         className="h-32 flex items-end p-4"
         style={{ backgroundColor: color }}
@@ -39,23 +39,23 @@ export default function BlueprintPreview({
         </div>
       </div>
 
-      <div className="p-4 bg-gray-900 space-y-4">
+      <div className="p-4 bg-surface space-y-4">
         <div>
           <h3 className="font-semibold text-lg">{name || "Naziv projekta"}</h3>
           {description && (
-            <p className="text-sm text-gray-400 mt-1">{description}</p>
+            <p className="text-sm text-text-muted mt-1">{description}</p>
           )}
         </div>
 
         <div className="flex items-center gap-2 text-sm">
           <span>{templateInfo.icon}</span>
-          <span className="text-gray-300">{templateInfo.name}</span>
-          <span className="text-gray-600">·</span>
-          <span className="text-gray-500">{templateInfo.description}</span>
+          <span className="text-text-secondary">{templateInfo.name}</span>
+          <span className="text-text-muted">·</span>
+          <span className="text-text-muted">{templateInfo.description}</span>
         </div>
 
         <div>
-          <p className="text-xs text-gray-500 mb-2">Primarna boja</p>
+          <p className="text-xs text-text-muted mb-2">Primarna boja</p>
           <div className="flex gap-2">
             {PRESET_COLORS.map((c) => (
               <button
@@ -68,8 +68,8 @@ export default function BlueprintPreview({
                 style={{ backgroundColor: c }}
               />
             ))}
-            <label className="w-7 h-7 rounded-full border border-gray-600 flex items-center justify-center cursor-pointer overflow-hidden">
-              <span className="text-xs text-gray-500">+</span>
+            <label className="w-7 h-7 rounded-full border border-border flex items-center justify-center cursor-pointer overflow-hidden relative">
+              <span className="text-xs text-text-muted">+</span>
               <input
                 type="color"
                 value={color}

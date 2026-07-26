@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { useAuth } from "../lib/auth.js";
+import { useTheme } from "../lib/theme.js";
 import {
   fetchProjects,
   createProject,
@@ -9,11 +10,14 @@ import {
 } from "../lib/projects.js";
 import TemplateSelector from "../components/TemplateSelector.js";
 import BlueprintPreview from "../components/BlueprintPreview.js";
+import { useNavigate } from "react-router-dom";
 
 type Step = "info" | "template" | "blueprint";
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
+  const { toggleTheme, theme } = useTheme();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [step, setStep] = useState<Step>("info");
@@ -77,11 +81,17 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface">
         <h1 className="text-lg font-bold">Straxor</h1>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-400">{user?.email}</span>
-          <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-300">
+          <button
+            onClick={toggleTheme}
+            className="w-8 h-8 rounded-lg border border-border bg-surface-2 flex items-center justify-center text-text-secondary hover:text-text transition-colors text-sm"
+          >
+            {theme === "dark" ? "☀" : "☾"}
+          </button>
+          <span className="text-sm text-text-secondary hidden sm:inline">{user?.email}</span>
+          <button onClick={logout} className="text-sm text-text-muted hover:text-text transition-colors">
             Odjavi se
           </button>
         </div>
@@ -92,36 +102,36 @@ export default function Dashboard() {
           <h2 className="text-xl font-semibold">Projekti</h2>
           <button
             onClick={() => setShowCreate(true)}
-            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-medium transition-colors"
+            className="px-4 py-2 rounded-xl bg-accent hover:opacity-90 text-sm font-semibold text-white transition-opacity"
           >
             + Novi projekat
           </button>
         </div>
 
         {showCreate && (
-          <div className="mb-6 rounded-lg border border-gray-800 bg-gray-900 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
+          <div className="mb-6 rounded-xl border border-border bg-surface overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
                 {(["info", "template", "blueprint"] as Step[]).map((s, i) => (
                   <div key={s} className="flex items-center gap-2">
                     <span
                       className={`w-6 h-6 rounded-full text-xs flex items-center justify-center font-medium ${
                         step === s
-                          ? "bg-blue-600 text-white"
+                          ? "bg-accent text-white"
                           : i < ["info", "template", "blueprint"].indexOf(step)
-                          ? "bg-gray-700 text-gray-300"
-                          : "bg-gray-800 text-gray-500"
+                          ? "bg-surface-3 text-text-secondary"
+                          : "bg-surface-2 text-text-muted"
                       }`}
                     >
                       {i + 1}
                     </span>
-                    {i < 2 && <div className="w-6 h-px bg-gray-700" />}
+                    {i < 2 && <div className="w-6 h-px bg-border" />}
                   </div>
                 ))}
               </div>
               <button
                 onClick={resetCreate}
-                className="text-gray-500 hover:text-gray-300 text-sm"
+                className="text-text-muted hover:text-text text-sm transition-colors"
               >
                 ✕
               </button>
@@ -141,7 +151,7 @@ export default function Dashboard() {
                     placeholder="Naziv projekta"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-700 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-bg border border-border text-text text-sm placeholder-text-muted outline-none focus:border-accent transition-colors"
                     autoFocus
                     required
                   />
@@ -150,11 +160,11 @@ export default function Dashboard() {
                     placeholder="Opis (opcionalno)"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-700 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-bg border border-border text-text text-sm placeholder-text-muted outline-none focus:border-accent transition-colors"
                   />
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-medium transition-colors"
+                    className="px-4 py-2 rounded-xl bg-accent hover:opacity-90 text-sm font-semibold text-white transition-opacity"
                   >
                     Dalje →
                   </button>
@@ -167,13 +177,13 @@ export default function Dashboard() {
                   <div className="flex gap-2">
                     <button
                       onClick={handleBack}
-                      className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm transition-colors"
+                      className="px-4 py-2 rounded-xl bg-surface-3 hover:bg-border text-sm text-text-secondary transition-colors"
                     >
                       ← Nazad
                     </button>
                     <button
                       onClick={handleNext}
-                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-medium transition-colors"
+                      className="px-4 py-2 rounded-xl bg-accent hover:opacity-90 text-sm font-semibold text-white transition-opacity"
                     >
                       Dalje →
                     </button>
@@ -190,18 +200,18 @@ export default function Dashboard() {
                     color={color}
                     onColorChange={setColor}
                   />
-                  {error && <p className="text-red-500 text-sm">{error}</p>}
+                  {error && <p className="text-danger text-sm">{error}</p>}
                   <div className="flex gap-2">
                     <button
                       onClick={handleBack}
-                      className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm transition-colors"
+                      className="px-4 py-2 rounded-xl bg-surface-3 hover:bg-border text-sm text-text-secondary transition-colors"
                     >
                       ← Nazad
                     </button>
                     <button
                       onClick={handleCreate}
                       disabled={submitting}
-                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-sm font-medium transition-colors"
+                      className="px-4 py-2 rounded-xl bg-accent hover:opacity-90 disabled:opacity-50 text-sm font-semibold text-white transition-opacity"
                     >
                       {submitting ? "Kreiranje..." : "Potvrdi i kreiraj"}
                     </button>
@@ -213,9 +223,9 @@ export default function Dashboard() {
         )}
 
         {loading ? (
-          <p className="text-gray-500">Učitavanje...</p>
+          <p className="text-text-muted">Učitavanje...</p>
         ) : projects.length === 0 ? (
-          <p className="text-gray-500 text-center py-12">
+          <p className="text-text-muted text-center py-12">
             Nema projekata. Klikni "+ Novi projekat" za početak.
           </p>
         ) : (
@@ -223,22 +233,29 @@ export default function Dashboard() {
             {projects.map((p) => (
               <li
                 key={p.id}
-                className="flex items-center gap-3 p-4 rounded-lg bg-gray-900 border border-gray-800"
+                onClick={() => navigate(`/project/${p.id}`)}
+                className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface hover:bg-surface-2 cursor-pointer transition-colors"
               >
                 <div
-                  className="w-3 h-3 rounded-full shrink-0"
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{ backgroundColor: p.color }}
                 />
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium truncate">{p.name}</h3>
+                  <h3 className="font-medium text-sm truncate">{p.name}</h3>
                   {p.description && (
-                    <p className="text-sm text-gray-400 truncate">{p.description}</p>
+                    <p className="text-xs text-text-muted truncate">{p.description}</p>
                   )}
                 </div>
-                <span className="text-xs text-gray-600 shrink-0">{p.template}</span>
+                <span className="text-[11px] text-text-muted px-2 py-0.5 rounded-md bg-surface-3 shrink-0">
+                  {p.template}
+                </span>
+                <span className="text-text-muted text-sm shrink-0">→</span>
                 <button
-                  onClick={() => handleDelete(p.id)}
-                  className="text-sm text-gray-500 hover:text-red-500 transition-colors shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(p.id);
+                  }}
+                  className="text-sm text-text-muted hover:text-danger transition-colors shrink-0"
                 >
                   Obriši
                 </button>

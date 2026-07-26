@@ -2,6 +2,111 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-gray-950 text-gray-100;
+/* ═══════════════════════════════════════════════
+   DESIGN TOKENS — token-based accent system
+   Lako proširivo u Fazi 3 (Theme picker)
+   ═══════════════════════════════════════════════ */
+
+/* ── Accent paleta (dostupna za Theme picker) ── */
+:root {
+  --accent-olive: #6b8c42;
+  --accent-olive-hover: #7c9a3e;
+  --accent-olive-dim: rgba(107, 140, 66, 0.12);
+  --accent-olive-border: rgba(107, 140, 66, 0.3);
+
+  --accent-blue: #3b82f6;
+  --accent-blue-hover: #2563eb;
+  --accent-blue-dim: rgba(59, 130, 246, 0.12);
+  --accent-blue-border: rgba(59, 130, 246, 0.3);
+
+  --accent-yellow: #eab308;
+  --accent-yellow-hover: #ca8a04;
+  --accent-yellow-dim: rgba(234, 179, 8, 0.12);
+  --accent-yellow-border: rgba(234, 179, 8, 0.3);
+
+  --accent-orange: #f97316;
+  --accent-orange-hover: #ea580c;
+  --accent-orange-dim: rgba(249, 115, 22, 0.12);
+  --accent-orange-border: rgba(249, 115, 22, 0.3);
+
+  --accent-red: #ef4444;
+  --accent-red-hover: #dc2626;
+  --accent-red-dim: rgba(239, 68, 68, 0.12);
+  --accent-red-border: rgba(239, 68, 68, 0.3);
 }
+
+/* ── Dark tema (default — OLED black) ── */
+[data-theme="dark"], :root {
+  --bg: #000000;
+  --surface: #0a0a0a;
+  --surface-2: #111111;
+  --surface-3: #1a1a1a;
+  --border: #222222;
+  --border-light: #2a2a2a;
+  --text: #e8e8e8;
+  --text-secondary: #888888;
+  --text-muted: #555555;
+  --danger: #c0392b;
+
+  /* Aktivni accent — token varijabla, ne hardkodovana boja */
+  --accent: var(--accent-olive);
+  --accent-hover: var(--accent-olive-hover);
+  --accent-dim: var(--accent-olive-dim);
+  --accent-border: var(--accent-olive-border);
+}
+
+/* ── Light tema ── */
+[data-theme="light"] {
+  --bg: #f5f5f5;
+  --surface: #ffffff;
+  --surface-2: #f0f0f0;
+  --surface-3: #e8e8e8;
+  --border: #d4d4d4;
+  --border-light: #e0e0e0;
+  --text: #111111;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --danger: #c0392b;
+
+  --accent: var(--accent-olive);
+  --accent-hover: var(--accent-olive-hover);
+  --accent-dim: var(--accent-olive-dim);
+  --accent-border: var(--accent-olive-border);
+}
+
+/* ── Accent tema swap (za Theme picker u Fazi 3) ── */
+[data-accent="blue"] {
+  --accent: var(--accent-blue);
+  --accent-hover: var(--accent-blue-hover);
+  --accent-dim: var(--accent-blue-dim);
+  --accent-border: var(--accent-blue-border);
+}
+[data-accent="yellow"] {
+  --accent: var(--accent-yellow);
+  --accent-hover: var(--accent-yellow-hover);
+  --accent-dim: var(--accent-yellow-dim);
+  --accent-border: var(--accent-yellow-border);
+}
+[data-accent="orange"] {
+  --accent: var(--accent-orange);
+  --accent-hover: var(--accent-orange-hover);
+  --accent-dim: var(--accent-orange-dim);
+  --accent-border: var(--accent-orange-border);
+}
+[data-accent="red"] {
+  --accent: var(--accent-red);
+  --accent-hover: var(--accent-red-hover);
+  --accent-dim: var(--accent-red-dim);
+  --accent-border: var(--accent-red-border);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
