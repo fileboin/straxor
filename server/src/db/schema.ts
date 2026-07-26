@@ -26,6 +26,8 @@ export const projects = pgTable("projects", {
     .references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
+  template: varchar("template", { length: 50 }).notNull().default("empty"),
+  color: varchar("color", { length: 7 }).default("#3b82f6"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

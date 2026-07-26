@@ -19,11 +19,14 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { name, description } = req.body;
+  const { name, description, template, color } = req.body;
 
   if (!name?.trim()) {
     return res.status(400).json({ error: "Naziv projekta je obavezan" });
   }
+
+  const validTemplates = ["empty", "react", "nextjs", "node-api", "fastapi", "flutter", "expo", "laravel"];
+  const templateValue = validTemplates.includes(template) ? template : "empty";
 
   const [project] = await db
     .insert(projects)
@@ -31,6 +34,8 @@ router.post("/", async (req, res) => {
       userId: req.user!.userId,
       name: name.trim(),
       description: description?.trim() || null,
+      template: templateValue,
+      color: color || "#3b82f6",
     })
     .returning();
 
