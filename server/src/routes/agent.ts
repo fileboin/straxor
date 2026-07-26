@@ -139,6 +139,15 @@ router.post("/send", requireAuth, async (req, res) => {
       privateKey,
     });
 
+    // Handle SSH connection drops
+    ssh.client.on("error", () => {
+      finish();
+    });
+
+    ssh.client.on("close", () => {
+      finish();
+    });
+
     const opencodePort = machine.opencodePort || 4096;
 
     // Create or reuse session
@@ -242,10 +251,34 @@ router.post("/send", requireAuth, async (req, res) => {
     });
 
     sseStream.on("error", () => {
-      // SSE stream error — non-fatal if we already finished
+      finish();
     });
 
     sseStream.on("close", () => {
+      // Flush any remaining partial SSE data
+      if (sseBuffer.trim()) {
+        const { events } = parseSSEBuffer(sseBuffer + "\n\n");
+        for (const event of events) {
+          if (!event.data) continue;
+          try {
+            const parsed = JSON.parse(event.data) as Record<string, unknown>;
+            if (event.type === "message.updated") {
+              const info = (parsed.info || parsed) as Record<string, unknown>;
+              const msgSessionId = (info.sessionID || info.sessionId) as string;
+              if (msgSessionId === sessionId) {
+                const parts = (parsed.parts || []) as Record<string, unknown>[];
+                for (const part of parts) {
+                  forwardPart(sendEvent, part);
+                }
+              }
+            }
+            if (event.type === "part.updated") {
+              const part = (parsed.part || parsed) as Record<string, unknown>;
+              forwardPart(sendEvent, part);
+            }
+          } catch {}
+        }
+      }
       finish();
     });
 
