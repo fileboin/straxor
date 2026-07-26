@@ -5,9 +5,17 @@ interface Props {
   projectName: string;
   template: string;
   status?: "idle" | "active";
+  orchestrator: boolean;
+  onOrchestratorChange: (value: boolean) => void;
 }
 
-export default function WorkspaceTopbar({ projectName, template, status = "idle" }: Props) {
+export default function WorkspaceTopbar({
+  projectName,
+  template,
+  status = "idle",
+  orchestrator,
+  onOrchestratorChange,
+}: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
 
@@ -32,6 +40,20 @@ export default function WorkspaceTopbar({ projectName, template, status = "idle"
         )}
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
+        {/* Orkestrator toggle */}
+        <button
+          onClick={() => onOrchestratorChange(!orchestrator)}
+          className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+            orchestrator
+              ? "border-accent-border bg-accent-dim text-accent"
+              : "border-border bg-transparent text-text-muted hover:text-text-secondary hover:border-border-light"
+          }`}
+          title={orchestrator ? "Orkestrator uključen — AI rutira modele po složenosti" : "Orkestrator isključen — ručni izbor modela"}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${orchestrator ? "bg-accent" : "bg-text-muted"}`} />
+          <span className="hidden lg:inline">Orch</span>
+        </button>
+
         <button
           onClick={toggleTheme}
           className="px-2.5 py-1.5 rounded-lg border border-border bg-surface-3 text-text-secondary text-xs hover:text-text transition-colors"

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import ProviderModelDropdown from "./ProviderModelDropdown.js";
 import InputToolbar from "./InputToolbar.js";
+import PlanActToggle, { type PlanActMode } from "./PlanActToggle.js";
 import type { ThinkingBudget } from "../../lib/models.js";
 
 export interface ChatMessage {
@@ -19,9 +20,11 @@ interface Props {
   providerId: string;
   modelId: string;
   thinking: ThinkingBudget;
+  planActMode: PlanActMode;
   onProviderChange: (providerId: string) => void;
   onModelChange: (modelId: string) => void;
   onThinkingChange: (budget: ThinkingBudget) => void;
+  onPlanActChange: (mode: PlanActMode) => void;
   messages: ChatMessage[];
   inputPlaceholder: string;
   onSend: (message: string) => void;
@@ -37,9 +40,11 @@ export default function ChatPanel({
   providerId,
   modelId,
   thinking,
+  planActMode,
   onProviderChange,
   onModelChange,
   onThinkingChange,
+  onPlanActChange,
   messages,
   inputPlaceholder,
   onSend,
@@ -85,14 +90,17 @@ export default function ChatPanel({
             {badge}
           </span>
         </div>
-        <ProviderModelDropdown
-          providerId={providerId}
-          modelId={modelId}
-          thinking={thinking}
-          onProviderChange={onProviderChange}
-          onModelChange={onModelChange}
-          onThinkingChange={onThinkingChange}
-        />
+        <div className="flex items-center gap-2 shrink-0">
+          <PlanActToggle mode={planActMode} onChange={onPlanActChange} />
+          <ProviderModelDropdown
+            providerId={providerId}
+            modelId={modelId}
+            thinking={thinking}
+            onProviderChange={onProviderChange}
+            onModelChange={onModelChange}
+            onThinkingChange={onThinkingChange}
+          />
+        </div>
       </div>
 
       {/* Messages */}

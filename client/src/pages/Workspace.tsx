@@ -3,6 +3,7 @@ import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar.js";
 import ChatPanel from "../components/workspace/ChatPanel.js";
 import BottomBar from "../components/workspace/BottomBar.js";
 import type { ChatMessage } from "../components/workspace/ChatPanel.js";
+import type { PlanActMode } from "../components/workspace/PlanActToggle.js";
 import type { ThinkingBudget } from "../lib/models.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
@@ -40,13 +41,17 @@ const INITIAL_AGENT_MESSAGES: ChatMessage[] = [
 ];
 
 export default function Workspace() {
+  const [orchestrator, setOrchestrator] = useState(false);
+
   const [askProvider, setAskProvider] = useState("anthropic");
   const [askModel, setAskModel] = useState("claude-sonnet-4");
   const [askThinking, setAskThinking] = useState<ThinkingBudget>("medium");
+  const [askPlanAct, setAskPlanAct] = useState<PlanActMode>("plan");
 
   const [agentProvider, setAgentProvider] = useState("anthropic");
   const [agentModel, setAgentModel] = useState("claude-opus-4-6");
   const [agentThinking, setAgentThinking] = useState<ThinkingBudget>("high");
+  const [agentPlanAct, setAgentPlanAct] = useState<PlanActMode>("act");
 
   const [askMessages, setAskMessages] = useState<ChatMessage[]>(INITIAL_ASK_MESSAGES);
   const [agentMessages, setAgentMessages] = useState<ChatMessage[]>(INITIAL_AGENT_MESSAGES);
@@ -68,7 +73,13 @@ export default function Workspace() {
 
   return (
     <div className="h-full flex flex-col">
-      <WorkspaceTopbar projectName="straxor-landing" template="react" status="active" />
+      <WorkspaceTopbar
+        projectName="straxor-landing"
+        template="react"
+        status="active"
+        orchestrator={orchestrator}
+        onOrchestratorChange={setOrchestrator}
+      />
 
       {/* Mobile tab switcher */}
       <div className="flex border-b border-border bg-surface shrink-0 md:hidden">
@@ -113,9 +124,11 @@ export default function Workspace() {
             providerId={askProvider}
             modelId={askModel}
             thinking={askThinking}
+            planActMode={askPlanAct}
             onProviderChange={setAskProvider}
             onModelChange={setAskModel}
             onThinkingChange={setAskThinking}
+            onPlanActChange={setAskPlanAct}
             messages={askMessages}
             inputPlaceholder="Pitaj bilo šta..."
             onSend={handleAskSend}
@@ -136,9 +149,11 @@ export default function Workspace() {
             providerId={agentProvider}
             modelId={agentModel}
             thinking={agentThinking}
+            planActMode={agentPlanAct}
             onProviderChange={setAgentProvider}
             onModelChange={setAgentModel}
             onThinkingChange={setAgentThinking}
+            onPlanActChange={setAgentPlanAct}
             messages={agentMessages}
             inputPlaceholder="Naredi agentu šta da napravi..."
             onSend={handleAgentSend}
