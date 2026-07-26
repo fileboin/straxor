@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Straxor — Mockup</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #000000;
+    --surface: #0a0a0a;
+    --surface-2: #111111;
+    --surface-3: #1a1a1a;
+    --border: #222222;
+    --border-light: #2a2a2a;
+    --text: #e8e8e8;
+    --text-secondary: #888888;
+    --text-muted: #555555;
+    --accent: #6b8c42;
+    --accent-hover: #7c9a3e;
+    --accent-dim: rgba(107, 140, 66, 0.12);
+    --accent-border: rgba(107, 140, 66, 0.3);
+    --danger: #c0392b;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+  }
+
+  .light {
+    --bg: #f5f5f5;
+    --surface: #ffffff;
+    --surface-2: #f0f0f0;
+    --surface-3: #e8e8e8;
+    --border: #d4d4d4;
+    --border-light: #e0e0e0;
+    --text: #111111;
+    --text-secondary: #666666;
+    --text-muted: #999999;
+    --accent: #5a7a35;
+    --accent-hover: #4d6a2d;
+    --accent-dim: rgba(90, 122, 53, 0.08);
+    --accent-border: rgba(90, 122, 53, 0.25);
+    --danger: #c0392b;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* ── NAV BAR ── */
+  .mockup-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+  }
+  .mockup-nav button {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mockup-nav button:hover { color: var(--text); background: var(--surface-3); }
+  .mockup-nav button.active {
+    color: var(--accent);
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+  }
+  .mockup-nav .theme-toggle {
+    position: fixed;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-3);
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mockup-nav .theme-toggle:hover { color: var(--text); }
+
+  .page { display: none; width: 100%; min-height: 100vh; }
+  .page.active { display: flex; }
+
+  /* ═══════════════════════════════════════════════
+     PAGE 1 — LOGIN
+     ═══════════════════════════════════════════════ */
+  .login-page {
+    align-items: center;
+    justify-content: center;
+    padding-top: 56px;
+  }
+  .login-card {
+    width: 100%;
+    max-width: 380px;
+    padding: 40px 32px;
+  }
+  .login-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .login-logo-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 16px;
+    color: #fff;
+  }
+  .login-logo-text {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .login-subtitle {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+  .form-group { margin-bottom: 12px; }
+  .form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  .form-input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .form-input::placeholder { color: var(--text-muted); }
+  .btn-primary {
+    width: 100%;
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-top: 8px;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .login-footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .login-footer a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .login-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .login-tab {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .login-tab.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  /* ═══════════════════════════════════════════════
+     PAGE 2 — DASHBOARD
+     ═══════════════════════════════════════════════ */
+  .dashboard-page {
+    flex-direction: column;
+    padding-top: 56px;
+  }
+  .dash-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .dash-header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+  .dash-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .dash-user span { font-size: 13px; color: var(--text-secondary); }
+  .btn-ghost {
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--border-light); }
+  .btn-accent {
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-accent:hover { background: var(--accent-hover); }
+
+  .dash-content {
+    max-width: 680px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .dash-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .dash-title-row h2 { font-size: 18px; font-weight: 600; }
+  .project-count { font-size: 13px; color: var(--text-muted); }
+
+  .project-list { display: flex; flex-direction: column; gap: 8px; }
+  .project-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .project-card:hover {
+    border-color: var(--border-light);
+    background: var(--surface-2);
+  }
+  .project-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .project-info { flex: 1; min-width: 0; }
+  .project-name {
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .project-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+  .project-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .project-template {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--surface-3);
+  }
+  .project-delete {
+    font-size: 13px;
+    color: var(--text-muted);
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.15s;
+  }
+  .project-delete:hover { color: var(--danger); }
+  .project-arrow {
+    color: var(--text-muted);
+    font-size: 14px;
+    transition: color 0.15s;
+  }
+  .project-card:hover .project-arrow { color: var(--text-secondary); }
+
+  /* ═══════════════════════════════════════════════
+     PAGE 3 — WORKSPACE (two-panel)
+     ═══════════════════════════════════════════════ */
+  .workspace-page {
+    padding-top: 56px;
+    height: 100vh;
+  }
+  .workspace-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    height: 48px;
+  }
+  .workspace-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .back-btn:hover { color: var(--text); border-color: var(--border-light); }
+  .workspace-project-name {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .workspace-project-tag {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--surface-3);
+  }
+  .workspace-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .status-text { font-size: 12px; color: var(--text-muted); }
+
+  .workspace-panels {
+    display: flex;
+    height: calc(100vh - 56px - 48px);
+  }
+  .panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel + .panel { border-left: 1px solid var(--border); }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .panel-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+  }
+  .panel-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* Chat panel */
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .chat-msg {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: var(--radius-lg);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .chat-msg.user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .chat-msg.assistant {
+    align-self: flex-start;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+  .chat-msg .msg-label {
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    opacity: 0.6;
+  }
+  .chat-input-area {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .chat-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    transition: border-color 0.15s;
+  }
+  .chat-input-wrap:focus-within { border-color: var(--accent); }
+  .chat-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+  }
+  .chat-input::placeholder { color: var(--text-muted); }
+  .chat-send {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .chat-send:hover { background: var(--accent-hover); }
+
+  /* Terminal panel */
+  .terminal-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    background: var(--bg);
+  }
+  .terminal-line { white-space: pre-wrap; }
+  .terminal-line .prompt { color: var(--accent); }
+  .terminal-line .cmd { color: var(--text); }
+  .terminal-line .output { color: var(--text-muted); }
+  .terminal-line .success { color: var(--accent); }
+  .terminal-line .error { color: var(--danger); }
+  .terminal-cursor {
+    display: inline-block;
+    width: 7px;
+    height: 14px;
+    background: var(--accent);
+    animation: blink 1s infinite;
+    vertical-align: middle;
+    margin-left: 2px;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* File tree */
+  .file-tree {
+    padding: 8px 0;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+  }
+  .file-tree-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 16px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .file-tree-item:hover { background: var(--surface-2); }
+  .file-tree-item.folder { color: var(--text); font-weight: 500; }
+  .file-tree-indent { display: inline-block; width: 16px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+  /* Responsive: stack panels on mobile */
+  @media (max-width: 768px) {
+    .workspace-panels { flex-direction: column; }
+    .panel + .panel { border-left: none; border-top: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── MOCKUP NAV ── -->
+<nav class="mockup-nav">
+  <button class="active" onclick="showPage('login')">Login</button>
+  <button onclick="showPage('dashboard')">Dashboard</button>
+  <button onclick="showPage('workspace')">Workspace</button>
+  <button class="theme-toggle" onclick="toggleTheme()">◐ Tema</button>
+</nav>
+
+<!-- ═══════════════════════════════════════════════
+     PAGE 1 — LOGIN / AUTH
+     ═══════════════════════════════════════════════ -->
+<div id="page-login" class="page login-page active">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">S</div>
+      <span class="login-logo-text">Straxor</span>
+    </div>
+    <p class="login-subtitle">AI-powered development platform</p>
+
+    <div class="login-tabs">
+      <button class="login-tab active">Prijavi se</button>
+      <button class="login-tab">Registruj se</button>
+    </div>
+
+    <form onsubmit="return false">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Lozinka</label>
+        <input class="form-input" type="password" placeholder="••••••••">
+      </div>
+      <button class="btn-primary" type="submit">Prijavi se</button>
+    </form>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     PAGE 2 — DASHBOARD
+     ═══════════════════════════════════════════════ -->
+<div id="page-dashboard" class="page dashboard-page">
+  <div class="dash-header">
+    <h1>Straxor</h1>
+    <div class="dash-user">
+      <span>bojan@example.com</span>
+      <button class="btn-ghost">Odjavi se</button>
+    </div>
+  </div>
+
+  <div class="dash-content">
+    <div class="dash-title-row">
+      <h2>Projekti</h2>
+      <button class="btn-accent">+ Novi projekat</button>
+    </div>
+
+    <div class="project-list">
+      <div class="project-card" onclick="showPage('workspace')">
+        <div class="project-dot" style="background:#6b8c42"></div>
+        <div class="project-info">
+          <div class="project-name">straxor-landing</div>
+          <div class="project-desc">Marketing landing page za Straxor platformu</div>
+        </div>
+        <div class="project-meta">
+          <span class="project-template">react</span>
+          <span class="project-arrow">→</span>
+        </div>
+      </div>
+
+      <div class="project-card">
+        <div class="project-dot" style="background:#3b82f6"></div>
+        <div class="project-info">
+          <div class="project-name">auth-microservice</div>
+          <div class="project-desc">JWT auth servis sa refresh tokenima</div>
+        </div>
+        <div class="project-meta">
+          <span class="project-template">node-api</span>
+          <span class="project-arrow">→</span>
+        </div>
+      </div>
+
+      <div class="project-card">
+        <div class="project-dot" style="background:#f59e0b"></div>
+        <div class="project-info">
+          <div class="project-name">ml-pipeline</div>
+          <div class="project-desc">FastAPI endpoint za inference</div>
+        </div>
+        <div class="project-meta">
+          <span class="project-template">fastapi</span>
+          <span class="project-arrow">→</span>
+        </div>
+      </div>
+
+      <div class="project-card">
+        <div class="project-dot" style="background:#8b5cf6"></div>
+        <div class="project-info">
+          <div class="project-name">mobile-app</div>
+          <div class="project-desc"></div>
+        </div>
+        <div class="project-meta">
+          <span class="project-template">expo</span>
+          <span class="project-arrow">→</span>
+        </div>
+      </div>
+
+      <div class="project-card">
+        <div class="project-dot" style="background:#6b7280"></div>
+        <div class="project-info">
+          <div class="project-name">blank-sandbox</div>
+          <div class="project-desc">Eksperimentalni projekat</div>
+        </div>
+        <div class="project-meta">
+          <span class="project-template">empty</span>
+          <span class="project-arrow">→</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     PAGE 3 — WORKSPACE (two-panel)
+     ═══════════════════════════════════════════════ -->
+<div id="page-workspace" class="page workspace-page">
+  <div class="workspace-topbar">
+    <div class="workspace-topbar-left">
+      <button class="back-btn" onclick="showPage('dashboard')">←</button>
+      <span class="workspace-project-name">straxor-landing</span>
+      <span class="workspace-project-tag">react</span>
+      <div class="status-dot"></div>
+      <span class="status-text">Agent aktivan</span>
+    </div>
+    <div class="workspace-topbar-right">
+      <button class="btn-ghost" style="font-size:12px">SSH</button>
+      <button class="btn-ghost" style="font-size:12px">Deploy</button>
+    </div>
+  </div>
+
+  <div class="workspace-panels">
+    <!-- LEFT: Chat / Agent -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Agent</span>
+        <span class="panel-badge">3 poruke</span>
+      </div>
+      <div class="chat-messages">
+        <div class="chat-msg user">
+          <div class="msg-label">Ti</div>
+          Napravi landing page sa hero sekcijom, features gridom i CTA dugmetom. Koristi Tailwind.
+        </div>
+        <div class="chat-msg assistant">
+          <div class="msg-label">Straxor</div>
+          Kreiram React komponente. Počinjem sa Hero.tsx, zatim Features.tsx i CTA.tsx. Koristim Tailwind classes i dark theme.
+        </div>
+        <div class="chat-msg assistant">
+          <div class="msg-label">Straxor</div>
+          Hero gotov. Dodajem features sekciju sa 3 kartice u gridu. Testiram layout na mobile viewportu.
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <div class="chat-input-wrap">
+          <input class="chat-input" placeholder=" opiši šta želiš da napraviš..." disabled>
+          <button class="chat-send">↑</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Terminal / Files -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Terminal</span>
+        <span class="panel-badge" style="background:var(--accent-dim);color:var(--accent)">bash</span>
+      </div>
+      <div class="terminal-content">
+        <div class="terminal-line"><span class="prompt">$</span> <span class="cmd">npm create vite@latest straxor-landing -- --template react-ts</span></div>
+        <div class="terminal-line"><span class="output">✓ Scaffolding project in straxor-landing...</span></div>
+        <div class="terminal-line"><span class="success">✓ Done.</span></div>
+        <div class="terminal-line">&nbsp;</div>
+        <div class="terminal-line"><span class="prompt">$</span> <span class="cmd">cd straxor-landing && npm install</span></div>
+        <div class="terminal-line"><span class="output">added 142 packages in 8s</span></div>
+        <div class="terminal-line">&nbsp;</div>
+        <div class="terminal-line"><span class="prompt">$</span> <span class="cmd">npm install -D tailwindcss @tailwindcss/vite</span></div>
+        <div class="terminal-line"><span class="output">added 3 packages in 4s</span></div>
+        <div class="terminal-line">&nbsp;</div>
+        <div class="terminal-line"><span class="prompt">$</span> <span class="cmd">cat src/App.tsx</span></div>
+        <div class="terminal-line"><span class="output">import Hero from './components/Hero'</span></div>
+        <div class="terminal-line"><span class="output">import Features from './components/Features'</span></div>
+        <div class="terminal-line"><span class="output">import CTA from './components/CTA'</span></div>
+        <div class="terminal-line">&nbsp;</div>
+        <div class="terminal-line"><span class="prompt">$</span> <span class="terminal-cursor"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+    document.querySelectorAll('.mockup-nav button:not(.theme-toggle)').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+
+  function toggleTheme() {
+    document.documentElement.classList.toggle('light');
+  }
+</script>
+
+</body>
+</html>
