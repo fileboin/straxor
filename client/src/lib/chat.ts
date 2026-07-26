@@ -1,3 +1,5 @@
+import { api } from "./api.js";
+
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
@@ -9,20 +11,38 @@ interface StreamCallbacks {
   onError: (error: string) => void;
 }
 
-// API key storage in localStorage
-export function getApiKey(providerId: string): string | null {
-  return localStorage.getItem(`straxor_key_${providerId}`);
+// API key management via server (encrypted in DB)
+export async function getApiKey(providerId: string): Promise<string | null> {
+  try {
+    const result = await api<{ key: string }>(`/api-keys/${providerId}`);
+    return result.key;
+  } catch {
+    return null;
+  }
 }
 
-export function setApiKey(providerId: string, key: string): void {
-  localStorage.setItem(`straxor_key_${providerId}`, key);
+export async function setApiKey(providerId: string, key: string): Promise<void> {
+  await api("/api-keys", {
+    method: "POST",
+    body: JSON.stringify({ providerId, key }),
+  });
 }
 
-export function removeApiKey(providerId: string): void {
-  localStorage.removeItem(`straxor_key_${providerId}`);
+export async function removeApiKey(providerId: string): Promise<void> {
+  await api(`/api-keys/${providerId}`, { method: "DELETE" });
 }
 
-// Streaming chat function
+// Check if API key exists (masked version for UI)
+export async function hasApiKey(providerId: string): Promise<boolean> {
+  try {
+    await api(`/api-keys/${providerId}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Streaming chat function - server fetches the API key from DB
 export async function streamChat(
   providerId: string,
   modelId: string,
@@ -30,8 +50,9 @@ export async function streamChat(
   thinking: string,
   callbacks: StreamCallbacks
 ): Promise<void> {
-  const apiKey = getApiKey(providerId);
-  if (!apiKey) {
+  // First check if we have an API key for this provider
+  const key = await getApiKey(providerId);
+  if (!key) {
     callbacks.onError("API key not configured for this provider");
     return;
   }
@@ -48,7 +69,7 @@ export async function streamChat(
         providerId,
         modelId,
         messages,
-        apiKey,
+        apiKey: key,
         thinking,
       }),
     });

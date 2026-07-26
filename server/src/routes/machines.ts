@@ -5,10 +5,11 @@ import { machines } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import { connectSSH, detectOS, getNodeVersion, installNode, installOpenCode, startOpenCodeServe, checkOpenCodeRunning, getOpenCodePort } from "../runtime/opencode-adapter/index.js";
 import type { ProvisionEvent } from "../runtime/opencode-adapter/index.js";
+import { encrypt, decrypt, isEncrypted } from "../lib/crypto.js";
 
 const router = Router();
 
-// GET /api/machines — listaj sve mašine korisnika
+// GET /api/machines — listaj sve mašine korisnika (maskirane lozinke)
 router.get("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
@@ -17,14 +18,21 @@ router.get("/", requireAuth, async (req, res) => {
       .from(machines)
       .where(eq(machines.userId, userId));
 
-    res.json(result);
+    // Mask sensitive fields
+    const masked = result.map((row) => ({
+      ...row,
+      password: row.password ? "••••••••" : null,
+      privateKey: row.privateKey ? "••••••••" : null,
+    }));
+
+    res.json(masked);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({ error: message });
   }
 });
 
-// GET /api/machines/:id — dohvati jednu mašinu
+// GET /api/machines/:id — dohvati jednu mašinu (maskirana lozinka)
 router.get("/:id", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
@@ -41,14 +49,21 @@ router.get("/:id", requireAuth, async (req, res) => {
       return;
     }
 
-    res.json(result[0]);
+    // Mask sensitive fields
+    const masked = {
+      ...result[0],
+      password: result[0].password ? "••••••••" : null,
+      privateKey: result[0].privateKey ? "••••••••" : null,
+    };
+
+    res.json(masked);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({ error: message });
   }
 });
 
-// POST /api/machines — spremi SSH podatke
+// POST /api/machines — spremi SSH podatke (enkriptovano)
 router.post("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
@@ -58,6 +73,10 @@ router.post("/", requireAuth, async (req, res) => {
       res.status(400).json({ error: "Missing required fields" });
       return;
     }
+
+    // Encrypt sensitive fields
+    const encryptedPassword = password ? encrypt(password) : null;
+    const encryptedPrivateKey = privateKey ? encrypt(privateKey) : null;
 
     const result = await db
       .insert(machines)
@@ -69,8 +88,8 @@ router.post("/", requireAuth, async (req, res) => {
         port: port || 22,
         username,
         authType: authType || "password",
-        password: password || null,
-        privateKey: privateKey || null,
+        password: encryptedPassword,
+        privateKey: encryptedPrivateKey,
         status: "pending",
       })
       .returning();
@@ -114,6 +133,14 @@ router.post("/:id/provision", requireAuth, async (req, res) => {
 
     const machine = result[0];
 
+    // Decrypt sensitive fields for SSH connection
+    const password = machine.password
+      ? (isEncrypted(machine.password) ? decrypt(machine.password) : machine.password)
+      : undefined;
+    const privateKey = machine.privateKey
+      ? (isEncrypted(machine.privateKey) ? decrypt(machine.privateKey) : machine.privateKey)
+      : undefined;
+
     // Update status to connecting
     await db
       .update(machines)
@@ -127,8 +154,8 @@ router.post("/:id/provision", requireAuth, async (req, res) => {
       host: machine.host,
       port: machine.port,
       username: machine.username,
-      password: machine.password || undefined,
-      privateKey: machine.privateKey || undefined,
+      password,
+      privateKey,
     });
 
     sendEvent({ status: "checking-os", message: "Detekcija operativnog sustava..." });

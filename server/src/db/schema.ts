@@ -20,6 +20,7 @@ export const users = pgTable("users", {
 export const usersRelations = relations(users, ({ many }) => ({
   projects: many(projects),
   machines: many(machines),
+  apiKeys: many(userApiKeys),
 }));
 
 export const projects = pgTable("projects", {
@@ -67,4 +68,19 @@ export const machines = pgTable("machines", {
 export const machinesRelations = relations(machines, ({ one }) => ({
   user: one(users, { fields: [machines.userId], references: [users.id] }),
   project: one(projects, { fields: [machines.projectId], references: [projects.id] }),
+}));
+
+export const userApiKeys = pgTable("user_api_keys", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  providerId: varchar("provider_id", { length: 50 }).notNull(),
+  encryptedKey: text("encrypted_key").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const userApiKeysRelations = relations(userApiKeys, ({ one }) => ({
+  user: one(users, { fields: [userApiKeys.userId], references: [users.id] }),
 }));

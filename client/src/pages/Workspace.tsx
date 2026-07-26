@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar.js";
 import ChatPanel from "../components/workspace/ChatPanel.js";
 import BottomBar from "../components/workspace/BottomBar.js";
@@ -6,7 +6,7 @@ import SshInput from "../components/workspace/SshInput.js";
 import type { ChatMessage } from "../components/workspace/ChatPanel.js";
 import type { PlanActMode } from "../components/workspace/PlanActToggle.js";
 import type { ThinkingBudget } from "../lib/models.js";
-import { streamChat, getApiKey } from "../lib/chat.js";
+import { streamChat, hasApiKey } from "../lib/chat.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
   {
@@ -68,6 +68,19 @@ export default function Workspace() {
   // VPS state
   const [showSshModal, setShowSshModal] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
+
+  // API key status
+  const [askHasKey, setAskHasKey] = useState(false);
+  const [agentHasKey, setAgentHasKey] = useState(false);
+
+  // Check API key status when provider changes
+  useEffect(() => {
+    hasApiKey(askProvider).then(setAskHasKey);
+  }, [askProvider]);
+
+  useEffect(() => {
+    hasApiKey(agentProvider).then(setAgentHasKey);
+  }, [agentProvider]);
 
   const handleAskSend = useCallback((msg: string) => {
     const userMsg: ChatMessage = { id: `a-${Date.now()}`, role: "user", content: msg };
@@ -219,7 +232,7 @@ export default function Workspace() {
             onPlanActChange={setAskPlanAct}
             messages={askMessages}
             inputPlaceholder={
-              getApiKey(askProvider) ? "Pitaj bilo šta..." : "Prvo unesi API key..."
+              askHasKey ? "Pitaj bilo šta..." : "Prvo unesi API key..."
             }
             onSend={handleAskSend}
             loading={askLoading}
@@ -248,7 +261,7 @@ export default function Workspace() {
             onPlanActChange={setAgentPlanAct}
             messages={agentMessages}
             inputPlaceholder={
-              getApiKey(agentProvider) ? "Naredi agentu šta da napravi..." : "Prvo unesi API key..."
+              agentHasKey ? "Naredi agentu šta da napravi..." : "Prvo unesi API key..."
             }
             onSend={handleAgentSend}
             loading={agentLoading}

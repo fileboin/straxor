@@ -7,7 +7,7 @@ import {
   type ThinkingBudget,
 } from "../../lib/models.js";
 import ApiKeyInput from "./ApiKeyInput.js";
-import { getApiKey } from "../../lib/chat.js";
+import { hasApiKey } from "../../lib/chat.js";
 
 interface Props {
   providerId: string;
@@ -32,10 +32,25 @@ export default function ProviderModelDropdown({
   const [view, setView] = useState<"providers" | "models">("providers");
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [showKeyInput, setShowKeyInput] = useState(false);
+  const [providerKeys, setProviderKeys] = useState<Record<string, boolean>>({});
   const ref = useRef<HTMLDivElement>(null);
 
   const currentProvider = PROVIDERS.find((p) => p.id === providerId);
   const currentModel = currentProvider?.models.find((m) => m.id === modelId);
+
+  // Load API key status for all providers
+  useEffect(() => {
+    if (open) {
+      const loadKeys = async () => {
+        const keys: Record<string, boolean> = {};
+        for (const p of PROVIDERS) {
+          keys[p.id] = await hasApiKey(p.id);
+        }
+        setProviderKeys(keys);
+      };
+      loadKeys();
+    }
+  }, [open]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -127,7 +142,7 @@ export default function ProviderModelDropdown({
           {view === "providers" && !showKeyInput && (
             <div className="overflow-y-auto flex-1">
               {PROVIDERS.map((p) => {
-                const hasKey = !!getApiKey(p.id);
+                const hasKey = providerKeys[p.id] || false;
                 return (
                   <button
                     key={p.id}
@@ -179,6 +194,7 @@ export default function ProviderModelDropdown({
                 providerName={selectedProvider.name}
                 onKeySaved={() => {
                   setShowKeyInput(false);
+                  setProviderKeys((prev) => ({ ...prev, [selectedProvider.id]: true }));
                   onApiKeyChange?.();
                 }}
               />
