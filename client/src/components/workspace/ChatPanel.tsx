@@ -40,6 +40,7 @@ interface Props {
   loading?: boolean;
   streamingMessageId?: string | null;
   onApiKeyChange?: () => void;
+  headerContent?: React.ReactNode;
 }
 
 function ToolCallCard({ tool }: { tool: ToolCall }) {
@@ -110,6 +111,7 @@ export default function ChatPanel({
   loading,
   streamingMessageId,
   onApiKeyChange,
+  headerContent,
 }: Props) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -164,6 +166,9 @@ export default function ChatPanel({
           />
         </div>
       </div>
+
+      {/* Optional header content (e.g. TodoList) */}
+      {headerContent}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 md:p-4 flex flex-col gap-3 min-h-0">

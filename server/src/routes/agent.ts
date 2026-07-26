@@ -396,6 +396,116 @@ router.get("/sessions/:machineId", requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/agent/todos/:machineId/:sessionId — dohvati todo listu iz opencode sesije
+router.get("/todos/:machineId/:sessionId", requireAuth, async (req, res) => {
+  const userId = req.user!.userId;
+  const machineId = req.params.machineId as string;
+  const sessionId = req.params.sessionId as string;
+
+  let ssh: SSHClient | null = null;
+
+  try {
+    const result = await db
+      .select()
+      .from(machines)
+      .where(and(eq(machines.id, machineId), eq(machines.userId, userId)))
+      .limit(1);
+
+    if (result.length === 0) {
+      res.status(404).json({ error: "Machine not found" });
+      return;
+    }
+
+    const machine = result[0];
+    const password = machine.password
+      ? (isEncrypted(machine.password) ? decrypt(machine.password) : machine.password)
+      : undefined;
+    const privateKey = machine.privateKey
+      ? (isEncrypted(machine.privateKey) ? decrypt(machine.privateKey) : machine.privateKey)
+      : undefined;
+
+    ssh = await connectSSH({
+      host: machine.host,
+      port: machine.port,
+      username: machine.username,
+      password,
+      privateKey,
+    });
+
+    const opencodePort = machine.opencodePort || 4096;
+    const response = await curlExec(ssh, opencodePort, "GET", `/session/${sessionId}/todo`);
+
+    if (response.status !== 200) {
+      res.status(502).json({ error: "Failed to fetch todos" });
+      return;
+    }
+
+    res.json(JSON.parse(response.data));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  } finally {
+    if (ssh) {
+      try { ssh.close(); } catch {}
+    }
+  }
+});
+
+// GET /api/agent/diff/:machineId/:sessionId — dohvati diff iz opencode sesije
+router.get("/diff/:machineId/:sessionId", requireAuth, async (req, res) => {
+  const userId = req.user!.userId;
+  const machineId = req.params.machineId as string;
+  const sessionId = req.params.sessionId as string;
+
+  let ssh: SSHClient | null = null;
+
+  try {
+    const result = await db
+      .select()
+      .from(machines)
+      .where(and(eq(machines.id, machineId), eq(machines.userId, userId)))
+      .limit(1);
+
+    if (result.length === 0) {
+      res.status(404).json({ error: "Machine not found" });
+      return;
+    }
+
+    const machine = result[0];
+    const password = machine.password
+      ? (isEncrypted(machine.password) ? decrypt(machine.password) : machine.password)
+      : undefined;
+    const privateKey = machine.privateKey
+      ? (isEncrypted(machine.privateKey) ? decrypt(machine.privateKey) : machine.privateKey)
+      : undefined;
+
+    ssh = await connectSSH({
+      host: machine.host,
+      port: machine.port,
+      username: machine.username,
+      password,
+      privateKey,
+    });
+
+    const opencodePort = machine.opencodePort || 4096;
+    const response = await curlExec(ssh, opencodePort, "GET", `/session/${sessionId}/diff`);
+
+    if (response.status !== 200) {
+      res.status(502).json({ error: "Failed to fetch diff" });
+      return;
+    }
+
+    res.json(JSON.parse(response.data));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  } finally {
+    if (ssh) {
+      try { ssh.close(); } catch {}
+    }
+  }
+});
+
 function forwardPart(
   sendEvent: (event: Record<string, unknown>) => void,
   part: Record<string, unknown>

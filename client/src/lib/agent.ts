@@ -8,6 +8,12 @@ export interface ToolCall {
   status: "pending" | "running" | "completed" | "error";
 }
 
+export interface TodoItem {
+  id: string;
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+}
+
 interface AgentStreamCallbacks {
   onSession: (sessionId: string) => void;
   onText: (content: string, messageID?: string) => void;
@@ -108,6 +114,28 @@ export async function streamAgentMessage(
 export async function fetchAgentSessions(machineId: string): Promise<unknown[]> {
   try {
     return await api<unknown[]>(`/agent/sessions/${machineId}`);
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchTodos(
+  machineId: string,
+  sessionId: string
+): Promise<TodoItem[]> {
+  try {
+    return await api<TodoItem[]>(`/agent/todos/${machineId}/${sessionId}`);
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchDiff(
+  machineId: string,
+  sessionId: string
+): Promise<Array<{ path: string; additions: string[]; deletions: string[] }>> {
+  try {
+    return await api(`/agent/diff/${machineId}/${sessionId}`);
   } catch {
     return [];
   }

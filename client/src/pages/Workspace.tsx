@@ -1,13 +1,14 @@
 import { useState, useCallback, useEffect } from "react";
 import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar.js";
 import ChatPanel from "../components/workspace/ChatPanel.js";
+import TodoList, { type TodoStep } from "../components/workspace/TodoList.js";
 import BottomBar from "../components/workspace/BottomBar.js";
 import SshInput from "../components/workspace/SshInput.js";
 import type { ChatMessage, ToolCall } from "../components/workspace/ChatPanel.js";
 import type { PlanActMode } from "../components/workspace/PlanActToggle.js";
 import type { ThinkingBudget } from "../lib/models.js";
 import { streamChat, hasApiKey } from "../lib/chat.js";
-import { streamAgentMessage } from "../lib/agent.js";
+import { streamAgentMessage, fetchTodos, fetchDiff } from "../lib/agent.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
   {
@@ -54,6 +55,11 @@ export default function Workspace() {
   const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
   const [agentMachineId, setAgentMachineId] = useState<string | null>(null);
 
+  // Agent todo state
+  const [agentTodos, setAgentTodos] = useState<TodoStep[]>([]);
+  const [confirmedSteps, setConfirmedSteps] = useState<Set<string>>(new Set());
+  const [diffCache, setDiffCache] = useState<Record<string, string>>({});
+
   // API key status
   const [askHasKey, setAskHasKey] = useState(false);
 
@@ -61,6 +67,70 @@ export default function Workspace() {
   useEffect(() => {
     hasApiKey(askProvider).then(setAskHasKey);
   }, [askProvider]);
+
+  // Fetch todos after agent finishes
+  const refreshTodos = useCallback(async () => {
+    if (!agentMachineId || !agentSessionId) return;
+
+    const raw = await fetchTodos(agentMachineId, agentSessionId);
+    const steps: TodoStep[] = raw.map((t) => {
+      const id = String(t.id);
+      const isConfirmed = confirmedSteps.has(id);
+
+      let status: TodoStep["status"];
+      if (isConfirmed) {
+        status = "completed";
+      } else if (t.status === "completed") {
+        status = "needs_review";
+      } else {
+        status = t.status as TodoStep["status"];
+      }
+
+      return { id, content: t.content, status, diff: diffCache[id] };
+    });
+
+    setAgentTodos(steps);
+  }, [agentMachineId, agentSessionId, confirmedSteps, diffCache]);
+
+  // Fetch diff for a specific step
+  const handleExpandStep = useCallback(async (stepId: string) => {
+    if (!agentMachineId || !agentSessionId) return;
+    if (diffCache[stepId]) return;
+
+    const diffs = await fetchDiff(agentMachineId, agentSessionId);
+    const unified = diffs
+      .map((d) => {
+        const header = `--- ${d.path}\n+++ ${d.path}`;
+        const adds = d.additions.map((l) => `+ ${l}`).join("\n");
+        const dels = d.deletions.map((l) => `- ${l}`).join("\n");
+        return [header, dels, adds].filter(Boolean).join("\n");
+      })
+      .join("\n\n");
+
+    if (unified) {
+      setDiffCache((prev) => ({ ...prev, [stepId]: unified }));
+      setAgentTodos((prev) =>
+        prev.map((s) => (s.id === stepId ? { ...s, diff: unified } : s))
+      );
+    }
+  }, [agentMachineId, agentSessionId, diffCache]);
+
+  // Confirm a step — send message to agent to continue
+  const handleConfirmStep = useCallback(
+    (stepId: string) => {
+      const step = agentTodos.find((s) => s.id === stepId);
+      if (!step) return;
+
+      setConfirmedSteps((prev) => new Set([...prev, stepId]));
+      setAgentTodos((prev) =>
+        prev.map((s) => (s.id === stepId ? { ...s, status: "completed" as const } : s))
+      );
+
+      // Send confirmation message to agent
+      handleAgentSend(`Korak potvrđen: "${step.content}". Nastavi na sljedeći korak.`);
+    },
+    [agentTodos]
+  );
 
   const handleAskSend = useCallback((msg: string) => {
     const userMsg: ChatMessage = { id: `a-${Date.now()}`, role: "user", content: msg };
@@ -151,7 +221,6 @@ export default function Workspace() {
           prev.map((m) => {
             if (m.id !== assistantMsg.id) return m;
             const existing = m.toolCalls || [];
-            // Update if already exists, otherwise add
             const idx = existing.findIndex((tc) => tc.id === id);
             const tc: ToolCall = { id, name, args, status: "running" };
             const updated = [...existing];
@@ -183,6 +252,8 @@ export default function Workspace() {
       onDone: () => {
         setAgentStreamingId(null);
         setAgentLoading(false);
+        // Refresh todos after agent finishes
+        setTimeout(() => refreshTodos(), 300);
       },
       onError: (error) => {
         setAgentMessages((prev) =>
@@ -196,7 +267,7 @@ export default function Workspace() {
         setAgentLoading(false);
       },
     });
-  }, [agentMachineId, agentSessionId, agentModel]);
+  }, [agentMachineId, agentSessionId, agentModel, refreshTodos]);
 
   const handleVpsConnected = useCallback((machineId: string) => {
     setAgentMachineId(machineId);
@@ -302,6 +373,14 @@ export default function Workspace() {
             onSend={handleAgentSend}
             loading={agentLoading}
             streamingMessageId={agentStreamingId}
+            headerContent={
+              <TodoList
+                steps={agentTodos}
+                onConfirm={handleConfirmStep}
+                onExpand={handleExpandStep}
+                loading={agentLoading}
+              />
+            }
           />
         </div>
       </div>
