@@ -7,7 +7,25 @@ interface Props {
   status?: "idle" | "active";
   orchestrator: boolean;
   onOrchestratorChange: (value: boolean) => void;
+  vpsStatus?: "disconnected" | "connecting" | "provisioning" | "ready" | "error";
+  onConnectVps?: () => void;
 }
+
+const VPS_STATUS_LABELS: Record<string, string> = {
+  disconnected: "SSH",
+  connecting: "Spajanje...",
+  provisioning: "Provisioning...",
+  ready: "VPS ✓",
+  error: "VPS ✕",
+};
+
+const VPS_STATUS_COLORS: Record<string, string> = {
+  disconnected: "border-border bg-transparent text-text-secondary",
+  connecting: "border-yellow-500/50 bg-yellow-500/10 text-yellow-500",
+  provisioning: "border-accent/50 bg-accent-dim text-accent",
+  ready: "border-green-500/50 bg-green-500/10 text-green-500",
+  error: "border-red-500/50 bg-red-500/10 text-red-500",
+};
 
 export default function WorkspaceTopbar({
   projectName,
@@ -15,6 +33,8 @@ export default function WorkspaceTopbar({
   status = "idle",
   orchestrator,
   onOrchestratorChange,
+  vpsStatus = "disconnected",
+  onConnectVps,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -61,9 +81,20 @@ export default function WorkspaceTopbar({
         >
           {theme === "dark" ? "☀" : "☾"}
         </button>
-        <button className="hidden sm:flex px-2.5 py-1.5 rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors">
-          SSH
+
+        {/* Connect VPS button */}
+        <button
+          onClick={onConnectVps}
+          disabled={vpsStatus === "connecting" || vpsStatus === "provisioning"}
+          className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${VPS_STATUS_COLORS[vpsStatus]} disabled:opacity-50 disabled:cursor-not-allowed`}
+          title={vpsStatus === "ready" ? "VPS povezan" : "Poveži VPS"}
+        >
+          {(vpsStatus === "connecting" || vpsStatus === "provisioning") && (
+            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" />
+          )}
+          <span className="hidden lg:inline">{VPS_STATUS_LABELS[vpsStatus]}</span>
         </button>
+
         <button className="hidden sm:flex px-2.5 py-1.5 rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors">
           Deploy
         </button>

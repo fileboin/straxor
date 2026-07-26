@@ -4,6 +4,7 @@ import cors from "cors";
 import authRoutes from "./routes/auth.js";
 import projectRoutes from "./routes/projects.js";
 import chatRoutes from "./routes/chat.js";
+import machineRoutes from "./routes/machines.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -18,6 +19,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/machines", machineRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

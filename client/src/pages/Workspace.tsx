@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar.js";
 import ChatPanel from "../components/workspace/ChatPanel.js";
 import BottomBar from "../components/workspace/BottomBar.js";
+import SshInput from "../components/workspace/SshInput.js";
 import type { ChatMessage } from "../components/workspace/ChatPanel.js";
 import type { PlanActMode } from "../components/workspace/PlanActToggle.js";
 import type { ThinkingBudget } from "../lib/models.js";
@@ -63,6 +64,10 @@ export default function Workspace() {
 
   const [askLoading, setAskLoading] = useState(false);
   const [agentLoading, setAgentLoading] = useState(false);
+
+  // VPS state
+  const [showSshModal, setShowSshModal] = useState(false);
+  const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   const handleAskSend = useCallback((msg: string) => {
     const userMsg: ChatMessage = { id: `a-${Date.now()}`, role: "user", content: msg };
@@ -153,13 +158,15 @@ export default function Workspace() {
   }, [agentProvider, agentModel, agentThinking, agentMessages]);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative">
       <WorkspaceTopbar
         projectName="straxor-landing"
         template="react"
         status="active"
         orchestrator={orchestrator}
         onOrchestratorChange={setOrchestrator}
+        vpsStatus={vpsStatus}
+        onConnectVps={() => setShowSshModal(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -251,6 +258,22 @@ export default function Workspace() {
       </div>
 
       <BottomBar />
+
+      {/* SSH Modal */}
+      {showSshModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md mx-4">
+            <SshInput
+              projectId="placeholder-project-id"
+              onConnected={() => {
+                setVpsStatus("ready");
+                setShowSshModal(false);
+              }}
+              onCancel={() => setShowSshModal(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
