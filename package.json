@@ -1,0 +1,14 @@
+{
+  "name": "straxor",
+  "private": true,
+  "scripts": {
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "db:generate": "cd server && npm run db:generate",
+    "db:migrate": "cd server && npm run db:migrate"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
