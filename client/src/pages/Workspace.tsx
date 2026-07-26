@@ -63,7 +63,7 @@ export default function Workspace() {
   };
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-full flex flex-col">
       <WorkspaceTopbar projectName="straxor-landing" template="react" status="active" />
 
       {/* Mobile tab switcher */}
