@@ -115,23 +115,6 @@ export default function Workspace() {
     }
   }, [agentMachineId, agentSessionId, diffCache]);
 
-  // Confirm a step — send message to agent to continue
-  const handleConfirmStep = useCallback(
-    (stepId: string) => {
-      const step = agentTodos.find((s) => s.id === stepId);
-      if (!step) return;
-
-      setConfirmedSteps((prev) => new Set([...prev, stepId]));
-      setAgentTodos((prev) =>
-        prev.map((s) => (s.id === stepId ? { ...s, status: "completed" as const } : s))
-      );
-
-      // Send confirmation message to agent
-      handleAgentSend(`Korak potvrđen: "${step.content}". Nastavi na sljedeći korak.`);
-    },
-    [agentTodos]
-  );
-
   const handleAskSend = useCallback((msg: string) => {
     const userMsg: ChatMessage = { id: `a-${Date.now()}`, role: "user", content: msg };
     const assistantMsg: ChatMessage = {
@@ -268,6 +251,23 @@ export default function Workspace() {
       },
     });
   }, [agentMachineId, agentSessionId, agentModel, refreshTodos]);
+
+  // Confirm a step — send message to agent to continue
+  const handleConfirmStep = useCallback(
+    (stepId: string) => {
+      const step = agentTodos.find((s) => s.id === stepId);
+      if (!step) return;
+
+      setConfirmedSteps((prev) => new Set([...prev, stepId]));
+      setAgentTodos((prev) =>
+        prev.map((s) => (s.id === stepId ? { ...s, status: "completed" as const } : s))
+      );
+
+      // Send confirmation message to agent
+      handleAgentSend(`Korak potvrđen: "${step.content}". Nastavi na sljedeći korak.`);
+    },
+    [agentTodos, handleAgentSend]
+  );
 
   const handleVpsConnected = useCallback((machineId: string) => {
     setAgentMachineId(machineId);

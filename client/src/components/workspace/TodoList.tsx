@@ -168,6 +168,12 @@ export default function TodoList({ steps, onConfirm, onExpand, loading }: Props)
               Agent radi...
             </div>
           )}
+          {!loading && steps.some((s) => s.status === "needs_review") && (
+            <div className="flex items-center gap-2 px-2.5 py-1.5 text-[11px] text-accent">
+              <span className="animate-pulse">◉</span>
+              Čeka tvoju potvrdu...
+            </div>
+          )}
         </div>
       )}
     </div>
