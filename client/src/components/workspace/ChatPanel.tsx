@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, type FormEvent } from "react";
+import ProviderModelDropdown from "./ProviderModelDropdown.js";
+import type { ThinkingBudget } from "../../lib/models.js";
 
 export interface ChatMessage {
   id: string;
@@ -13,9 +15,12 @@ interface Props {
   iconColor: "blue" | "accent";
   badge: string;
   badgeColor?: "blue" | "accent";
-  models: string[];
-  selectedModel: string;
-  onModelChange: (model: string) => void;
+  providerId: string;
+  modelId: string;
+  thinking: ThinkingBudget;
+  onProviderChange: (providerId: string) => void;
+  onModelChange: (modelId: string) => void;
+  onThinkingChange: (budget: ThinkingBudget) => void;
   messages: ChatMessage[];
   inputPlaceholder: string;
   onSend: (message: string) => void;
@@ -28,9 +33,12 @@ export default function ChatPanel({
   iconColor,
   badge,
   badgeColor,
-  models,
-  selectedModel,
+  providerId,
+  modelId,
+  thinking,
+  onProviderChange,
   onModelChange,
+  onThinkingChange,
   messages,
   inputPlaceholder,
   onSend,
@@ -76,21 +84,14 @@ export default function ChatPanel({
             {badge}
           </span>
         </div>
-        <select
-          value={selectedModel}
-          onChange={(e) => onModelChange(e.target.value)}
-          className="text-[11px] px-2 py-1 rounded-lg border border-border bg-surface-2 text-text-secondary cursor-pointer hover:border-border-light hover:text-text focus:outline-none focus:border-accent transition-colors appearance-none pr-5 bg-no-repeat bg-[length:10px_6px] bg-[right:8px_center]"
-          style={{
-            backgroundImage:
-              "url(\"data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23666' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
-          }}
-        >
-          {models.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
+        <ProviderModelDropdown
+          providerId={providerId}
+          modelId={modelId}
+          thinking={thinking}
+          onProviderChange={onProviderChange}
+          onModelChange={onModelChange}
+          onThinkingChange={onThinkingChange}
+        />
       </div>
 
       {/* Messages */}

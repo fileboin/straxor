@@ -3,9 +3,7 @@ import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar.js";
 import ChatPanel from "../components/workspace/ChatPanel.js";
 import BottomBar from "../components/workspace/BottomBar.js";
 import type { ChatMessage } from "../components/workspace/ChatPanel.js";
-
-const ASK_MODELS = ["Claude Sonnet 4", "GPT-4o", "DeepSeek R1", "Gemini 2.5 Pro"];
-const AGENT_MODELS = ["Opus 4.6", "Claude Sonnet 4", "GPT-4o", "DeepSeek Coder"];
+import type { ThinkingBudget } from "../lib/models.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
   {
@@ -42,8 +40,14 @@ const INITIAL_AGENT_MESSAGES: ChatMessage[] = [
 ];
 
 export default function Workspace() {
-  const [askModel, setAskModel] = useState(ASK_MODELS[0]);
-  const [agentModel, setAgentModel] = useState(AGENT_MODELS[0]);
+  const [askProvider, setAskProvider] = useState("anthropic");
+  const [askModel, setAskModel] = useState("claude-sonnet-4");
+  const [askThinking, setAskThinking] = useState<ThinkingBudget>("medium");
+
+  const [agentProvider, setAgentProvider] = useState("anthropic");
+  const [agentModel, setAgentModel] = useState("claude-opus-4-6");
+  const [agentThinking, setAgentThinking] = useState<ThinkingBudget>("high");
+
   const [askMessages, setAskMessages] = useState<ChatMessage[]>(INITIAL_ASK_MESSAGES);
   const [agentMessages, setAgentMessages] = useState<ChatMessage[]>(INITIAL_AGENT_MESSAGES);
   const [mobileTab, setMobileTab] = useState<"ask" | "agent">("ask");
@@ -106,9 +110,12 @@ export default function Workspace() {
             iconColor="blue"
             badge="chat"
             badgeColor="blue"
-            models={ASK_MODELS}
-            selectedModel={askModel}
+            providerId={askProvider}
+            modelId={askModel}
+            thinking={askThinking}
+            onProviderChange={setAskProvider}
             onModelChange={setAskModel}
+            onThinkingChange={setAskThinking}
             messages={askMessages}
             inputPlaceholder="Pitaj bilo šta..."
             onSend={handleAskSend}
@@ -126,9 +133,12 @@ export default function Workspace() {
             icon="⚡"
             iconColor="accent"
             badge="build"
-            models={AGENT_MODELS}
-            selectedModel={agentModel}
+            providerId={agentProvider}
+            modelId={agentModel}
+            thinking={agentThinking}
+            onProviderChange={setAgentProvider}
             onModelChange={setAgentModel}
+            onThinkingChange={setAgentThinking}
             messages={agentMessages}
             inputPlaceholder="Naredi agentu šta da napravi..."
             onSend={handleAgentSend}
