@@ -44,6 +44,8 @@ interface Props {
   copyLabel?: string;
   onCopyTo?: (content: string) => void;
   prefill?: string;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 function ToolCallCard({ tool }: { tool: ToolCall }) {
@@ -118,6 +120,8 @@ export default function ChatPanel({
   copyLabel,
   onCopyTo,
   prefill,
+  isExpanded,
+  onToggleExpand,
 }: Props) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -167,6 +171,15 @@ export default function ChatPanel({
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {onToggleExpand && (
+            <button
+              onClick={onToggleExpand}
+              className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
+              title={isExpanded ? "Collapse" : "Expand"}
+            >
+              {isExpanded ? "⊟" : "⊞"}
+            </button>
+          )}
           <PlanActToggle mode={planActMode} onChange={onPlanActChange} />
           <ProviderModelDropdown
             providerId={providerId}

@@ -71,6 +71,9 @@ export default function Workspace() {
   const [askPrefill, setAskPrefill] = useState("");
   const [agentPrefill, setAgentPrefill] = useState("");
 
+  // Panel mode: split | ask-full | agent-full
+  const [panelMode, setPanelMode] = useState<"split" | "ask-full" | "agent-full">("split");
+
   // Check API key status when provider changes
   useEffect(() => {
     hasApiKey(askProvider).then(setAskHasKey);
@@ -285,6 +288,14 @@ export default function Workspace() {
     setShowSshModal(false);
   }, []);
 
+  const toggleAskExpand = useCallback(() => {
+    setPanelMode((prev) => (prev === "ask-full" ? "split" : "ask-full"));
+  }, []);
+
+  const toggleAgentExpand = useCallback(() => {
+    setPanelMode((prev) => (prev === "agent-full" ? "split" : "agent-full"));
+  }, []);
+
   return (
     <div className="h-full flex flex-col relative">
       <WorkspaceTopbar
@@ -329,9 +340,13 @@ export default function Workspace() {
       <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
         {/* Ask panel */}
         <div
-          className={`flex-1 flex flex-col min-h-0 min-w-0 border-b md:border-b-0 md:border-r border-border ${
-            mobileTab !== "ask" ? "hidden md:flex" : "flex"
-          }`}
+          className={`flex flex-col min-h-0 min-w-0 border-b md:border-b-0 md:border-r border-border ${
+            panelMode === "agent-full"
+              ? "hidden md:hidden"
+              : panelMode === "ask-full"
+              ? "flex-1"
+              : "flex-1"
+          } ${mobileTab !== "ask" && panelMode === "split" ? "hidden md:flex" : panelMode !== "split" && panelMode !== "ask-full" ? "hidden" : "flex"}`}
         >
           <ChatPanel
             title="Ask"
@@ -357,14 +372,20 @@ export default function Workspace() {
             copyLabel="→ Copy to Agent"
             onCopyTo={(content) => setAgentPrefill(content)}
             prefill={askPrefill}
+            isExpanded={panelMode === "ask-full"}
+            onToggleExpand={toggleAskExpand}
           />
         </div>
 
         {/* Agent panel */}
         <div
-          className={`flex-1 flex flex-col min-h-0 min-w-0 ${
-            mobileTab !== "agent" ? "hidden md:flex" : "flex"
-          }`}
+          className={`flex flex-col min-h-0 min-w-0 ${
+            panelMode === "ask-full"
+              ? "hidden md:hidden"
+              : panelMode === "agent-full"
+              ? "flex-1"
+              : "flex-1"
+          } ${mobileTab !== "agent" && panelMode === "split" ? "hidden md:flex" : panelMode !== "split" && panelMode !== "agent-full" ? "hidden" : "flex"}`}
         >
           <ChatPanel
             title="Agent"
@@ -391,6 +412,8 @@ export default function Workspace() {
             copyLabel="← Copy to Ask"
             onCopyTo={(content) => setAskPrefill(content)}
             prefill={agentPrefill}
+            isExpanded={panelMode === "agent-full"}
+            onToggleExpand={toggleAgentExpand}
             headerContent={
               <TodoList
                 steps={agentTodos}
