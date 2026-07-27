@@ -8,6 +8,10 @@ export {
   startOpenCodeServe,
   checkOpenCodeRunning,
   getOpenCodePort,
+  getOpenCodeVersion,
+  getOpenCodePid,
+  getOpenCodeUptime,
+  updateOpenCode,
   type ProvisionStatus,
   type ProvisionEvent,
 } from "./provisioner.js";

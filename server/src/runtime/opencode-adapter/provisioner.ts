@@ -148,3 +148,58 @@ export async function getOpenCodePort(ssh: SSHClient): Promise<number | null> {
   const match = stdout.match(/:(\d+)/);
   return match ? parseInt(match[1], 10) : null;
 }
+
+export async function getOpenCodeVersion(ssh: SSHClient): Promise<string | null> {
+  try {
+    const { stdout, code } = await ssh.exec(
+      'export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" 2>/dev/null; opencode --version 2>/dev/null'
+    );
+    if (code === 0 && stdout.trim()) {
+      return stdout.trim().replace(/^v/, "");
+    }
+  } catch {}
+  return null;
+}
+
+export async function getOpenCodePid(ssh: SSHClient): Promise<number | null> {
+  try {
+    const { stdout } = await ssh.exec("pgrep -f 'opencode serve' || true");
+    const pid = stdout.trim().split("\n")[0];
+    return pid ? parseInt(pid, 10) : null;
+  } catch {}
+  return null;
+}
+
+export async function getOpenCodeUptime(ssh: SSHClient): Promise<string | null> {
+  try {
+    const pid = await getOpenCodePid(ssh);
+    if (!pid) return null;
+    const { stdout } = await ssh.exec(
+      `ps -o etime= -p ${pid} 2>/dev/null || true`
+    );
+    return stdout.trim() || null;
+  } catch {}
+  return null;
+}
+
+export async function updateOpenCode(
+  ssh: SSHClient,
+  channel: "stable" | "beta" | "custom",
+  version?: string
+): Promise<void> {
+  let tag: string;
+  if (channel === "custom" && version) {
+    tag = version;
+  } else if (channel === "beta") {
+    tag = "beta";
+  } else {
+    tag = "latest";
+  }
+
+  const { code, stderr } = await ssh.exec(
+    `export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" 2>/dev/null; npm install -g opencode@${tag} 2>&1`
+  );
+  if (code !== 0) {
+    throw new Error(`Failed to update opencode to ${tag}: ${stderr}`);
+  }
+}

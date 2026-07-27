@@ -8,6 +8,7 @@ import machineRoutes from "./routes/machines.js";
 import apiKeyRoutes from "./routes/api-keys.js";
 import agentRoutes from "./routes/agent.js";
 import logRoutes from "./routes/logs.js";
+import runtimeRoutes from "./routes/runtime.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,6 +27,7 @@ app.use("/api/machines", machineRoutes);
 app.use("/api/api-keys", apiKeyRoutes);
 app.use("/api/agent", agentRoutes);
 app.use("/api/logs", logRoutes);
+app.use("/api/runtime", runtimeRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

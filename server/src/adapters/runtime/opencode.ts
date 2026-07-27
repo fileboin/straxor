@@ -5,7 +5,16 @@ import { eq, and } from "drizzle-orm";
 import { connectSSH } from "../../runtime/opencode-adapter/ssh.js";
 import { decrypt, isEncrypted } from "../../lib/crypto.js";
 import type { SSHClient } from "../../runtime/opencode-adapter/ssh.js";
-import type { RuntimeAdapter, TodoItem, FileDiff } from "./adapter.js";
+import {
+  checkOpenCodeRunning,
+  getOpenCodePort,
+  getOpenCodeVersion,
+  getOpenCodePid,
+  getOpenCodeUptime,
+  startOpenCodeServe,
+  updateOpenCode,
+} from "../../runtime/opencode-adapter/provisioner.js";
+import type { RuntimeAdapter, TodoItem, FileDiff, RuntimeHealth, RuntimeChannel } from "./adapter.js";
 
 interface MachineRow {
   id: string;
@@ -30,6 +39,17 @@ async function getMachine(machineId: string, userId: string): Promise<MachineRow
   const m = result[0];
   if (m.status !== "ready" || !m.opencodeRunning) throw new Error("Opencode not running");
   return m as unknown as MachineRow;
+}
+
+async function getMachineRaw(machineId: string, userId: string): Promise<MachineRow> {
+  const result = await db
+    .select()
+    .from(machines)
+    .where(and(eq(machines.id, machineId), eq(machines.userId, userId)))
+    .limit(1);
+
+  if (result.length === 0) throw new Error("Machine not found");
+  return result[0] as unknown as MachineRow;
 }
 
 function decryptCreds(machine: MachineRow) {
@@ -58,6 +78,26 @@ async function withSSH<T>(
   });
   try {
     return await fn(ssh, machine.opencodePort || 4096);
+  } finally {
+    try { ssh.close(); } catch {}
+  }
+}
+
+async function withSSHRaw<T>(
+  machineId: string,
+  userId: string,
+  fn: (ssh: SSHClient) => Promise<T>
+): Promise<T> {
+  const machine = await getMachineRaw(machineId, userId);
+  const creds = decryptCreds(machine);
+  const ssh = await connectSSH({
+    host: machine.host,
+    port: machine.port,
+    username: machine.username,
+    ...creds,
+  });
+  try {
+    return await fn(ssh);
   } finally {
     try { ssh.close(); } catch {}
   }
@@ -112,6 +152,22 @@ export function createOpenCodeAdapter(): RuntimeAdapter {
 
     async abortSession(machineId, sessionId) {
       throw new Error("abortSession requires userId — use bound adapter");
+    },
+
+    async healthCheck(machineId) {
+      throw new Error("healthCheck requires userId — use bound adapter");
+    },
+
+    async restart(machineId) {
+      throw new Error("restart requires userId — use bound adapter");
+    },
+
+    async reconnect(machineId) {
+      throw new Error("reconnect requires userId — use bound adapter");
+    },
+
+    async updateRuntime(machineId, channel, version) {
+      throw new Error("updateRuntime requires userId — use bound adapter");
     },
   };
 }
@@ -197,6 +253,128 @@ export function createBoundAdapter(userId: string) {
       return withSSH(machineId, userId, async (ssh, port) => {
         const res = await curlExec(ssh, port, "POST", `/session/${sessionId}/abort`);
         return res.status === 200;
+      });
+    },
+
+    async healthCheck(machineId: string) {
+      return withSSHRaw(machineId, userId, async (ssh) => {
+        const running = await checkOpenCodeRunning(ssh);
+        const port = running ? await getOpenCodePort(ssh) : null;
+        const version = running ? await getOpenCodeVersion(ssh) : null;
+        const pid = running ? await getOpenCodePid(ssh) : null;
+        const uptime = running ? await getOpenCodeUptime(ssh) : undefined;
+
+        return {
+          running,
+          sshConnected: true,
+          opencodePort: port,
+          version: version || undefined,
+          pid: pid || undefined,
+          uptime: uptime || undefined,
+        };
+      });
+    },
+
+    async restart(machineId: string) {
+      return withSSHRaw(machineId, userId, async (ssh) => {
+        // Stop existing
+        await ssh.exec("pkill -f 'opencode serve' 2>/dev/null || true");
+        await new Promise((r) => setTimeout(r, 1000));
+
+        // Find port and restart
+        const port = (await getOpenCodePort(ssh)) || 4096;
+        await startOpenCodeServe(ssh, port);
+
+        const running = await checkOpenCodeRunning(ssh);
+        const version = running ? await getOpenCodeVersion(ssh) : null;
+        const pid = running ? await getOpenCodePid(ssh) : null;
+        const uptime = running ? await getOpenCodeUptime(ssh) : undefined;
+
+        // Update DB status
+        const machine = await getMachineRaw(machineId, userId);
+        await db
+          .update(machines)
+          .set({ opencodeRunning: running, opencodePort: port })
+          .where(eq(machines.id, machineId));
+
+        return {
+          running,
+          sshConnected: true,
+          opencodePort: port,
+          version: version || undefined,
+          pid: pid || undefined,
+          uptime: uptime || undefined,
+        };
+      });
+    },
+
+    async reconnect(machineId: string) {
+      return withSSHRaw(machineId, userId, async (ssh) => {
+        const running = await checkOpenCodeRunning(ssh);
+        let port: number | null = null;
+
+        if (running) {
+          port = await getOpenCodePort(ssh);
+        }
+
+        // Update DB
+        await db
+          .update(machines)
+          .set({
+            status: running ? "ready" : "error",
+            opencodeRunning: running,
+            opencodePort: port,
+            lastError: running ? null : "Reconnect: opencode not running",
+          })
+          .where(eq(machines.id, machineId));
+
+        const version = running ? await getOpenCodeVersion(ssh) : null;
+        const pid = running ? await getOpenCodePid(ssh) : null;
+        const uptime = running ? await getOpenCodeUptime(ssh) : undefined;
+
+        return {
+          running,
+          sshConnected: true,
+          opencodePort: port,
+          version: version || undefined,
+          pid: pid || undefined,
+          uptime: uptime || undefined,
+        };
+      });
+    },
+
+    async updateRuntime(machineId: string, channel: RuntimeChannel, version?: string) {
+      return withSSHRaw(machineId, userId, async (ssh) => {
+        // Update the package
+        await updateOpenCode(ssh, channel, version);
+
+        // Restart the serve process
+        await ssh.exec("pkill -f 'opencode serve' 2>/dev/null || true");
+        await new Promise((r) => setTimeout(r, 1000));
+
+        const port = (await getOpenCodePort(ssh)) || 4096;
+        await startOpenCodeServe(ssh, port);
+
+        const running = await checkOpenCodeRunning(ssh);
+        const newVersion = running ? await getOpenCodeVersion(ssh) : null;
+        const pid = running ? await getOpenCodePid(ssh) : null;
+        const uptime = running ? await getOpenCodeUptime(ssh) : undefined;
+
+        // Update DB
+        await db
+          .update(machines)
+          .set({ opencodeRunning: running, opencodePort: port })
+          .where(eq(machines.id, machineId));
+
+        return {
+          running,
+          sshConnected: true,
+          opencodePort: port,
+          version: newVersion || undefined,
+          channel,
+          pid: pid || undefined,
+          uptime: uptime || undefined,
+        };
       });
     },
 
