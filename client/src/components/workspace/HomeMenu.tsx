@@ -9,6 +9,7 @@ interface Props {
   onOpenWorktrees?: () => void;
   onOpenBrowserVerify?: () => void;
   onOpenRollback?: () => void;
+  onOpenContext?: () => void;
 }
 
 const EDITORS = [
@@ -32,7 +33,7 @@ const EDITORS = [
   },
 ];
 
-export default function HomeMenu({ onOpenHowItWorks, onOpenSettings, onOpenExport, onOpenNotifications, onOpenWorktrees, onOpenBrowserVerify, onOpenRollback }: Props) {
+export default function HomeMenu({ onOpenHowItWorks, onOpenSettings, onOpenExport, onOpenNotifications, onOpenWorktrees, onOpenBrowserVerify, onOpenRollback, onOpenContext }: Props) {
   const [open, setOpen] = useState(false);
   const [showEditors, setShowEditors] = useState(false);
   const { user, logout } = useAuth();
@@ -167,6 +168,15 @@ export default function HomeMenu({ onOpenHowItWorks, onOpenSettings, onOpenExpor
           >
             <span className="w-4 text-center text-[11px]">↺</span>
             Historija verzija
+          </button>
+
+          {/* Context Engine */}
+          <button
+            onClick={() => { onOpenContext?.(); setOpen(false); }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-text-secondary hover:bg-surface-2 hover:text-text transition-colors text-left"
+          >
+            <span className="w-4 text-center text-[11px]">🧠</span>
+            Kontekst engine
           </button>
 
           {/* Documentation */}

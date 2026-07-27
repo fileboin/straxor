@@ -370,3 +370,64 @@ export const restorePointsRelations = relations(restorePoints, ({ one }) => ({
   project: one(projects, { fields: [restorePoints.projectId], references: [projects.id] }),
   machine: one(machines, { fields: [restorePoints.machineId], references: [machines.id] }),
 }));
+
+export const projectRules = pgTable("project_rules", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  category: varchar("category", { length: 30 }).notNull().default("general"),
+  isActive: boolean("is_active").default(true),
+  priority: integer("priority").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const projectRulesRelations = relations(projectRules, ({ one }) => ({
+  project: one(projects, { fields: [projectRules.projectId], references: [projects.id] }),
+  user: one(users, { fields: [projectRules.userId], references: [users.id] }),
+}));
+
+export const memories = pgTable("memories", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id")
+    .references(() => projects.id, { onDelete: "cascade" }),
+  key: varchar("key", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  category: varchar("category", { length: 30 }).notNull().default("general"),
+  source: varchar("source", { length: 50 }).notNull().default("manual"),
+  isGlobal: boolean("is_global").default(false),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const memoriesRelations = relations(memories, ({ one }) => ({
+  user: one(users, { fields: [memories.userId], references: [users.id] }),
+  project: one(projects, { fields: [memories.projectId], references: [projects.id] }),
+}));
+
+export const webResearch = pgTable("web_research", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  title: varchar("title", { length: 500 }),
+  content: text("content"),
+  summary: text("summary"),
+  tokenCount: integer("token_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const webResearchRelations = relations(webResearch, ({ one }) => ({
+  user: one(users, { fields: [webResearch.userId], references: [users.id] }),
+}));

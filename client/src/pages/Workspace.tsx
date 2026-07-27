@@ -28,6 +28,7 @@ import BrowserVerifier from "../components/workspace/BrowserVerifier.js";
 import SessionPicker from "../components/workspace/SessionPicker.js";
 import SearchPanel from "../components/workspace/SearchPanel.js";
 import RollbackPanel from "../components/workspace/RollbackPanel.js";
+import ContextPanel from "../components/workspace/ContextPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -88,6 +89,7 @@ export default function Workspace() {
   const [showBrowserVerify, setShowBrowserVerify] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showRollback, setShowRollback] = useState(false);
+  const [showContext, setShowContext] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -874,6 +876,15 @@ export default function Workspace() {
       action: () => setShowRollback(true),
     },
     {
+      id: "action-context",
+      label: "Kontekst engine",
+      description: "Upravljaj pravilima, sjećanjima i kontekstom za AI",
+      icon: "🧠",
+      category: "action",
+      keywords: ["context", "kontekst", "rules", "pravila", "memory", "sjećanje"],
+      action: () => setShowContext(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -990,7 +1001,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback,
+    setAgentRole, setShowRollback, setShowContext,
   ]);
 
   return (
@@ -1011,6 +1022,7 @@ export default function Workspace() {
         onOpenWorktrees={() => setShowWorktrees(true)}
         onOpenBrowserVerify={() => setShowBrowserVerify(true)}
         onOpenRollback={() => setShowRollback(true)}
+        onOpenContext={() => setShowContext(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -1331,6 +1343,22 @@ export default function Workspace() {
           machineId={agentMachineId}
           projectPath="/root/straxor-landing"
           onClose={() => setShowRollback(false)}
+        />
+      )}
+
+      {showContext && (
+        <ContextPanel
+          projectId="straxor-landing"
+          machineId={agentMachineId}
+          projectPath="/root/straxor-landing"
+          onClose={() => setShowContext(false)}
+          onAssembled={(ctx) => {
+            // Inject assembled context into next agent message
+            setShowContext(false);
+            if (ctx.systemPrompt) {
+              setAgentPrefill(`[KONTEKST]\n${ctx.systemPrompt}\n[/KONTEKST]\n\n`);
+            }
+          }}
         />
       )}
 

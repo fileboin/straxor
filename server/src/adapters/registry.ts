@@ -10,6 +10,7 @@ import type { SearchAdapter } from "./search/adapter.js";
 import type { PreviewAdapter } from "./preview/adapter.js";
 import type { DatabaseAdapter } from "./database/adapter.js";
 import type { RollbackAdapter } from "./rollback/adapter.js";
+import type { ContextEngine } from "./context/adapter.js";
 import { createBoundAdapter, type BoundAdapter } from "./runtime/opencode.js";
 import { createHttpAIProviderAdapter } from "./ai-provider/http.js";
 import { createStubGitAdapter } from "./git/local.js";
@@ -22,6 +23,7 @@ import { createSSHSearchAdapter } from "./search/ssh.js";
 import { createVPSPreviewAdapter } from "./preview/vps.js";
 import { createPostgresAdapter } from "./database/postgres.js";
 import { createVPSRollbackAdapter } from "./rollback/vps.js";
+import { createContextEngine } from "./context/engine.js";
 
 export interface AdapterRegistry {
   runtime: (userId: string) => BoundAdapter;
@@ -36,6 +38,7 @@ export interface AdapterRegistry {
   preview: (userId: string) => PreviewAdapter;
   database: (userId: string) => DatabaseAdapter;
   rollback: (userId: string) => RollbackAdapter;
+  context: ContextEngine;
 }
 
 let registry: AdapterRegistry | null = null;
@@ -66,6 +69,7 @@ export function initAdapters(): AdapterRegistry {
       const runtime = createBoundAdapter(userId);
       return createVPSRollbackAdapter((machineId, cmd) => runtime.executeCommand(machineId, cmd));
     },
+    context: createContextEngine(),
   };
   return registry;
 }
