@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../lib/theme.js";
+import HomeMenu from "./HomeMenu.js";
 
 interface Props {
   projectName: string;
@@ -11,6 +12,8 @@ interface Props {
   onConnectVps?: () => void;
   onOpenEnv?: () => void;
   onOpenDeploy?: () => void;
+  onOpenHowItWorks?: () => void;
+  onOpenSettings?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -39,6 +42,8 @@ export default function WorkspaceTopbar({
   onConnectVps,
   onOpenEnv,
   onOpenDeploy,
+  onOpenHowItWorks,
+  onOpenSettings,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -111,6 +116,10 @@ export default function WorkspaceTopbar({
         >
           Deploy
         </button>
+        <HomeMenu
+          onOpenHowItWorks={onOpenHowItWorks}
+          onOpenSettings={onOpenSettings}
+        />
       </div>
     </header>
   );
