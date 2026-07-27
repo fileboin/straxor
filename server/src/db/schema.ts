@@ -202,3 +202,18 @@ export const consoleEntries = pgTable("console_entries", {
 export const consoleEntriesRelations = relations(consoleEntries, ({ one }) => ({
   user: one(users, { fields: [consoleEntries.userId], references: [users.id] }),
 }));
+
+export const userPermissions = pgTable("user_permissions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  toolId: varchar("tool_id", { length: 50 }).notNull(),
+  level: varchar("level", { length: 10 }).notNull().default("ask"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const userPermissionsRelations = relations(userPermissions, ({ one }) => ({
+  user: one(users, { fields: [userPermissions.userId], references: [users.id] }),
+}));

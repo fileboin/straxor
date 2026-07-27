@@ -7,11 +7,14 @@ import SshInput from "../components/workspace/SshInput.js";
 import EnvEditor from "../components/workspace/EnvEditor.js";
 import DeploymentPanel from "../components/workspace/DeploymentPanel.js";
 import DiffReview, { type DiffFile } from "../components/workspace/DiffReview.js";
+import PermissionsPanel from "../components/workspace/PermissionsPanel.js";
+import ToolConfirmDialog from "../components/workspace/ToolConfirmDialog.js";
 import type { ChatMessage, ToolCall } from "../components/workspace/ChatPanel.js";
 import type { PlanActMode } from "../components/workspace/PlanActToggle.js";
 import type { ThinkingBudget } from "../lib/models.js";
 import { streamChat, hasApiKey } from "../lib/chat.js";
 import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges } from "../lib/agent.js";
+import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
   {
@@ -56,6 +59,16 @@ export default function Workspace() {
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
+  // Permissions state
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [permissions, setPermissions] = useState<PermissionConfig>({});
+  const [pendingTool, setPendingTool] = useState<{
+    toolId: string;
+    args: Record<string, unknown> | string;
+    onAllow: () => void;
+    onDeny: () => void;
+  } | null>(null);
+
   // Agent session state
   const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
   const [agentMachineId, setAgentMachineId] = useState<string | null>(null);
@@ -84,6 +97,11 @@ export default function Workspace() {
   useEffect(() => {
     hasApiKey(askProvider).then(setAskHasKey);
   }, [askProvider]);
+
+  // Load permissions on mount
+  useEffect(() => {
+    fetchPermissions().then(setPermissions);
+  }, []);
 
   // Fetch todos after agent finishes
   const refreshTodos = useCallback(async () => {
@@ -262,6 +280,60 @@ export default function Workspace() {
         );
       },
       onToolCall: (id, name, args) => {
+        // Check permission for this tool
+        const level = permissions[name] || "ask";
+        if (level === "never") {
+          // Block — don't add as running
+          setAgentMessages((prev) =>
+            prev.map((m) => {
+              if (m.id !== assistantMsg.id) return m;
+              const existing = m.toolCalls || [];
+              const tc: ToolCall = { id, name, args, status: "error", result: "⛔ Blokirano dozvolama" };
+              return { ...m, toolCalls: [...existing, tc] };
+            })
+          );
+          return;
+        }
+
+        if (level === "ask") {
+          // Show confirmation dialog
+          setPendingTool({
+            toolId: name,
+            args,
+            onAllow: () => {
+              setPendingTool(null);
+              setAgentMessages((prev) =>
+                prev.map((m) => {
+                  if (m.id !== assistantMsg.id) return m;
+                  const existing = m.toolCalls || [];
+                  const idx = existing.findIndex((tc) => tc.id === id);
+                  const tc: ToolCall = { id, name, args, status: "running" };
+                  const updated = [...existing];
+                  if (idx >= 0) {
+                    updated[idx] = { ...updated[idx], status: "running", args };
+                  } else {
+                    updated.push(tc);
+                  }
+                  return { ...m, toolCalls: updated };
+                })
+              );
+            },
+            onDeny: () => {
+              setPendingTool(null);
+              setAgentMessages((prev) =>
+                prev.map((m) => {
+                  if (m.id !== assistantMsg.id) return m;
+                  const existing = m.toolCalls || [];
+                  const tc: ToolCall = { id, name, args, status: "error", result: "⛔ Odbijeno od korisnika" };
+                  return { ...m, toolCalls: [...existing, tc] };
+                })
+              );
+            },
+          });
+          return;
+        }
+
+        // always — proceed
         setAgentMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantMsg.id) return m;
@@ -312,7 +384,7 @@ export default function Workspace() {
         setAgentLoading(false);
       },
     });
-  }, [agentMachineId, agentSessionId, agentModel, refreshTodos]);
+  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions]);
 
   // Confirm a step — send message to agent to continue
   const handleConfirmStep = useCallback(
@@ -357,6 +429,7 @@ export default function Workspace() {
         onConnectVps={() => setShowSshModal(true)}
         onOpenEnv={() => setShowEnvModal(true)}
         onOpenDeploy={() => setShowDeployModal(true)}
+        onOpenSettings={() => setShowPermissionsModal(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -530,6 +603,21 @@ export default function Workspace() {
           onReject={handleReject}
           onClose={() => setShowDiffReview(false)}
           loading={diffLoading}
+        />
+      )}
+
+      {/* Permissions Panel */}
+      {showPermissionsModal && (
+        <PermissionsPanel onClose={() => setShowPermissionsModal(false)} />
+      )}
+
+      {/* Tool Confirmation Dialog */}
+      {pendingTool && (
+        <ToolConfirmDialog
+          toolId={pendingTool.toolId}
+          args={pendingTool.args}
+          onAllow={pendingTool.onAllow}
+          onDeny={pendingTool.onDeny}
         />
       )}
     </div>

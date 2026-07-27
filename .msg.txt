@@ -1,1 +1,1 @@
-Block 24: Console / Runtime Error Panel  
+Block 25: Agent Permissions  
