@@ -41,6 +41,7 @@ interface Props {
   streamingMessageId?: string | null;
   onApiKeyChange?: () => void;
   headerContent?: React.ReactNode;
+  headerLeft?: React.ReactNode;
   copyLabel?: string;
   onCopyTo?: (content: string) => void;
   prefill?: string;
@@ -117,6 +118,7 @@ export default function ChatPanel({
   streamingMessageId,
   onApiKeyChange,
   headerContent,
+  headerLeft,
   copyLabel,
   onCopyTo,
   prefill,
@@ -169,6 +171,7 @@ export default function ChatPanel({
           >
             {badge}
           </span>
+          {headerLeft}
         </div>
         <div className="flex items-center gap-1 shrink-0 sm:gap-2">
           {onToggleExpand && (

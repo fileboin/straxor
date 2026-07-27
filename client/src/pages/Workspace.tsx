@@ -15,6 +15,9 @@ import type { ThinkingBudget } from "../lib/models.js";
 import { streamChat, hasApiKey } from "../lib/chat.js";
 import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges } from "../lib/agent.js";
 import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
+import { type AgentRole, getRoleById, fetchPrompts, type SavedPrompt } from "../lib/roles.js";
+import RoleSelector from "../components/workspace/RoleSelector.js";
+import PromptLibrary from "../components/workspace/PromptLibrary.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
   {
@@ -69,6 +72,12 @@ export default function Workspace() {
     onDeny: () => void;
   } | null>(null);
 
+  // Agent role & prompts state
+  const [agentRole, setAgentRole] = useState<AgentRole>("developer");
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
+  const [activePromptIds, setActivePromptIds] = useState<Set<string>>(new Set());
+  const [showPromptLibrary, setShowPromptLibrary] = useState(false);
+
   // Agent session state
   const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
   const [agentMachineId, setAgentMachineId] = useState<string | null>(null);
@@ -101,6 +110,7 @@ export default function Workspace() {
   // Load permissions on mount
   useEffect(() => {
     fetchPermissions().then(setPermissions);
+    fetchPrompts().then(setSavedPrompts);
   }, []);
 
   // Fetch todos after agent finishes
@@ -252,6 +262,19 @@ export default function Workspace() {
       return;
     }
 
+    // Build system context from role + active prompts
+    const roleConfig = getRoleById(agentRole);
+    const activePrompts = savedPrompts.filter((p) => activePromptIds.has(p.id));
+    const systemParts: string[] = [];
+    systemParts.push(`[SISTEMSKA ULOGA: ${roleConfig.label}]\n${roleConfig.systemPrompt}`);
+    for (const p of activePrompts) {
+      systemParts.push(`[${p.name}]\n${p.content}`);
+    }
+    const fullMsg =
+      systemParts.length > 0
+        ? `${systemParts.join("\n\n")}\n\n---\n\n${msg}`
+        : msg;
+
     const userMsg: ChatMessage = { id: `g-${Date.now()}`, role: "user", content: msg };
     const assistantMsg: ChatMessage = {
       id: `g-${Date.now() + 1}`,
@@ -266,7 +289,7 @@ export default function Workspace() {
     setAgentLoading(true);
     setAgentPrefill("");
 
-    streamAgentMessage(agentMachineId, msg, agentSessionId, {
+    streamAgentMessage(agentMachineId, fullMsg, agentSessionId, {
       onSession: (sessionId) => {
         setAgentSessionId(sessionId);
       },
@@ -384,7 +407,7 @@ export default function Workspace() {
         setAgentLoading(false);
       },
     });
-  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions]);
+  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds]);
 
   // Confirm a step — send message to agent to continue
   const handleConfirmStep = useCallback(
@@ -540,6 +563,9 @@ export default function Workspace() {
             prefill={agentPrefill}
             isExpanded={panelMode === "agent-full"}
             onToggleExpand={toggleAgentExpand}
+            headerLeft={
+              <RoleSelector role={agentRole} onChange={setAgentRole} />
+            }
             headerContent={
               <>
                 <TodoList
@@ -558,6 +584,14 @@ export default function Workspace() {
                     </button>
                   </div>
                 )}
+                <div className="px-2 py-1.5 border-b border-border bg-surface">
+                  <button
+                    onClick={() => setShowPromptLibrary(true)}
+                    className="w-full py-1.5 text-[11px] font-medium rounded-lg border border-border bg-surface-2 text-text-secondary hover:bg-surface-2/80 transition-colors"
+                  >
+                    📋 Prompt Library ({activePromptIds.size} aktivnih)
+                  </button>
+                </div>
               </>
             }
           />
@@ -619,6 +653,39 @@ export default function Workspace() {
           onAllow={pendingTool.onAllow}
           onDeny={pendingTool.onDeny}
         />
+      )}
+
+      {/* Prompt Library Modal */}
+      {showPromptLibrary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-[500px] mx-4 bg-surface border border-border rounded-2xl shadow-2xl shadow-black/50 overflow-hidden h-[70vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+              <span className="text-[13px] font-semibold text-text">Prompt Library</span>
+              <button
+                onClick={() => setShowPromptLibrary(false)}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <PromptLibrary
+                projectId={undefined}
+                onSelect={(p) => {
+                  setActivePromptIds((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(p.id)) {
+                      next.delete(p.id);
+                    } else {
+                      next.add(p.id);
+                    }
+                    return next;
+                  });
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

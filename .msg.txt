@@ -1,1 +1,1 @@
-Block 25: Agent Permissions  
+Block 26: System Prompt / Agent Role  

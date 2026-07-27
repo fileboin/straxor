@@ -217,3 +217,23 @@ export const userPermissions = pgTable("user_permissions", {
 export const userPermissionsRelations = relations(userPermissions, ({ one }) => ({
   user: one(users, { fields: [userPermissions.userId], references: [users.id] }),
 }));
+
+export const savedPrompts = pgTable("saved_prompts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id")
+    .references(() => projects.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  category: varchar("category", { length: 20 }).notNull().default("instruction"),
+  isGlobal: boolean("is_global").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const savedPromptsRelations = relations(savedPrompts, ({ one }) => ({
+  user: one(users, { fields: [savedPrompts.userId], references: [users.id] }),
+  project: one(projects, { fields: [savedPrompts.projectId], references: [projects.id] }),
+}));

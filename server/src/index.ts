@@ -13,6 +13,7 @@ import envRoutes from "./routes/envs.js";
 import deploymentRoutes from "./routes/deployments.js";
 import consoleRoutes from "./routes/console.js";
 import permissionRoutes from "./routes/permissions.js";
+import promptRoutes from "./routes/prompts.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -36,6 +37,7 @@ app.use("/api/envs", envRoutes);
 app.use("/api/deployments", deploymentRoutes);
 app.use("/api/console", consoleRoutes);
 app.use("/api/permissions", permissionRoutes);
+app.use("/api/prompts", promptRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
