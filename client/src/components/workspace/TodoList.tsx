@@ -1,17 +1,23 @@
 import { useState } from "react";
+import VerificationBadge from "./VerificationBadge.js";
+import type { VerificationResult } from "../../lib/verify.js";
 
 export interface TodoStep {
   id: string;
   content: string;
   status: "pending" | "in_progress" | "completed" | "needs_review";
   diff?: string;
+  verification?: VerificationResult;
 }
 
 interface Props {
   steps: TodoStep[];
   onConfirm: (stepId: string) => void;
   onExpand?: (stepId: string) => void;
+  onVerified?: (stepId: string, result: VerificationResult) => void;
   loading?: boolean;
+  machineId?: string;
+  sessionId?: string;
 }
 
 function StatusIcon({ status }: { status: TodoStep["status"] }) {
@@ -32,10 +38,16 @@ function StepRow({
   step,
   onConfirm,
   onExpand,
+  onVerified,
+  machineId,
+  sessionId,
 }: {
   step: TodoStep;
   onConfirm: (id: string) => void;
   onExpand?: (id: string) => void;
+  onVerified?: (stepId: string, result: VerificationResult) => void;
+  machineId?: string;
+  sessionId?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasDiff = !!step.diff;
@@ -46,6 +58,8 @@ function StepRow({
     setExpanded(next);
     if (next && onExpand) onExpand(step.id);
   };
+
+  const showVerificationBadge = isReviewable && machineId && sessionId;
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -106,11 +120,23 @@ function StepRow({
           </pre>
         </div>
       )}
+      {showVerificationBadge && (
+        <div className="border-t border-border px-2.5 py-1.5 bg-surface">
+          <VerificationBadge
+            machineId={machineId!}
+            sessionId={sessionId!}
+            stepId={step.id}
+            stepContent={step.content}
+            existingResult={step.verification}
+            onVerified={(result) => onVerified?.(step.id, result)}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
-export default function TodoList({ steps, onConfirm, onExpand, loading }: Props) {
+export default function TodoList({ steps, onConfirm, onExpand, onVerified, loading, machineId, sessionId }: Props) {
   const [collapsed, setCollapsed] = useState(false);
 
   if (steps.length === 0) return null;
@@ -160,6 +186,9 @@ export default function TodoList({ steps, onConfirm, onExpand, loading }: Props)
               step={step}
               onConfirm={onConfirm}
               onExpand={onExpand}
+              onVerified={onVerified}
+              machineId={machineId}
+              sessionId={sessionId}
             />
           ))}
           {loading && (

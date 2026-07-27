@@ -18,6 +18,7 @@ import securityRoutes from "./routes/security.js";
 import exportRoutes from "./routes/export.js";
 import notificationRoutes from "./routes/notifications.js";
 import worktreeRoutes from "./routes/worktrees.js";
+import verifyRoutes from "./routes/verify.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -46,6 +47,7 @@ app.use("/api/security", securityRoutes);
 app.use("/api/export", exportRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/worktrees", worktreeRoutes);
+app.use("/api/verify", verifyRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

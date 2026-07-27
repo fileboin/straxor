@@ -24,6 +24,7 @@ import ExportPanel from "../components/workspace/ExportPanel.js";
 import NotificationSettings from "../components/workspace/NotificationSettings.js";
 import CommandPalette from "../components/workspace/CommandPalette.js";
 import WorktreeManager from "../components/workspace/WorktreeManager.js";
+import type { VerificationResult } from "../lib/verify.js";
 import type { Command } from "../lib/commands.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
@@ -145,6 +146,11 @@ export default function Workspace() {
   const refreshTodos = useCallback(async () => {
     if (!agentMachineId || !agentSessionId) return;
 
+    // Preserve verification results from current state
+    const existingVerifications = new Map(
+      agentTodos.filter((s) => s.verification).map((s) => [s.id, s.verification!])
+    );
+
     const raw = await fetchTodos(agentMachineId, agentSessionId);
     const steps: TodoStep[] = raw.map((t) => {
       const id = String(t.id);
@@ -159,11 +165,17 @@ export default function Workspace() {
         status = t.status as TodoStep["status"];
       }
 
-      return { id, content: t.content, status, diff: diffCache[id] };
+      return {
+        id,
+        content: t.content,
+        status,
+        diff: diffCache[id],
+        verification: existingVerifications.get(id),
+      };
     });
 
     setAgentTodos(steps);
-  }, [agentMachineId, agentSessionId, confirmedSteps, diffCache]);
+  }, [agentMachineId, agentSessionId, confirmedSteps, diffCache, agentTodos]);
 
   // Fetch diff for a specific step
   const handleExpandStep = useCallback(async (stepId: string) => {
@@ -492,6 +504,13 @@ export default function Workspace() {
     },
     [agentTodos, handleAgentSend]
   );
+
+  // Store verification result for a step
+  const handleVerified = useCallback((stepId: string, result: VerificationResult) => {
+    setAgentTodos((prev) =>
+      prev.map((s) => (s.id === stepId ? { ...s, verification: result } : s))
+    );
+  }, []);
 
   const handleVpsConnected = useCallback((machineId: string) => {
     setAgentMachineId(machineId);
@@ -878,7 +897,10 @@ export default function Workspace() {
                   steps={agentTodos}
                   onConfirm={handleConfirmStep}
                   onExpand={handleExpandStep}
+                  onVerified={handleVerified}
                   loading={agentLoading}
+                  machineId={agentMachineId || undefined}
+                  sessionId={agentSessionId || undefined}
                 />
                 {agentTodos.length > 0 && (
                   <div className="px-2 py-1.5 border-b border-border bg-surface">
