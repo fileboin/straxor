@@ -1,1 +1,1 @@
-Block 29: Notification Adapter  
+Block 30: Command Palette  

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar.js";
 import ChatPanel from "../components/workspace/ChatPanel.js";
 import TodoList, { type TodoStep } from "../components/workspace/TodoList.js";
@@ -22,6 +22,8 @@ import PromptLibrary from "../components/workspace/PromptLibrary.js";
 import SecurityScanResult from "../components/workspace/SecurityScanResult.js";
 import ExportPanel from "../components/workspace/ExportPanel.js";
 import NotificationSettings from "../components/workspace/NotificationSettings.js";
+import CommandPalette from "../components/workspace/CommandPalette.js";
+import type { Command } from "../lib/commands.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
   {
@@ -66,6 +68,7 @@ export default function Workspace() {
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -122,6 +125,18 @@ export default function Workspace() {
   useEffect(() => {
     fetchPermissions().then(setPermissions);
     fetchPrompts().then(setSavedPrompts);
+  }, []);
+
+  // Command palette keyboard shortcut (CTRL/CMD + K)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setShowCommandPalette((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, []);
 
   // Fetch todos after agent finishes
@@ -490,6 +505,233 @@ export default function Workspace() {
     setPanelMode((prev) => (prev === "agent-full" ? "split" : "agent-full"));
   }, []);
 
+  // ── Command Palette commands ──
+  const commands: Command[] = useMemo(() => [
+    // Panel commands
+    {
+      id: "panel-split",
+      label: "Split prikaz",
+      description: "Prikaži Ask i Agent panele",
+      icon: "⊞",
+      category: "panel",
+      shortcut: "MOD+1",
+      keywords: ["panel", "split", "dva"],
+      action: () => setPanelMode("split"),
+    },
+    {
+      id: "panel-ask",
+      label: "Ask panel (full)",
+      description: "Proširi Ask panel",
+      icon: "◆",
+      category: "panel",
+      shortcut: "MOD+2",
+      keywords: ["ask", "pitanja", "chat"],
+      action: () => setPanelMode("ask-full"),
+    },
+    {
+      id: "panel-agent",
+      label: "Agent panel (full)",
+      description: "Proširi Agent panel",
+      icon: "⚡",
+      category: "panel",
+      shortcut: "MOD+3",
+      keywords: ["agent", "build", "kod"],
+      action: () => setPanelMode("agent-full"),
+    },
+
+    // Model commands
+    {
+      id: "model-sonnet",
+      label: "Switch to Claude Sonnet 4",
+      description: "Ask panel → Claude Sonnet 4",
+      icon: "◆",
+      category: "model",
+      keywords: ["model", "sonnet", "claude", "anthropic"],
+      action: () => { setAskProvider("anthropic"); setAskModel("claude-sonnet-4"); },
+    },
+    {
+      id: "model-opus",
+      label: "Switch to Claude Opus",
+      description: "Agent panel → Claude Opus",
+      icon: "◆",
+      category: "model",
+      keywords: ["model", "opus", "claude", "anthropic"],
+      action: () => { setAgentProvider("anthropic"); setAgentModel("claude-opus-4-6"); },
+    },
+    {
+      id: "model-gpt4o",
+      label: "Switch to GPT-4o",
+      description: "Ask panel → GPT-4o",
+      icon: "◉",
+      category: "model",
+      keywords: ["model", "gpt", "openai", "4o"],
+      action: () => { setAskProvider("openai"); setAskModel("gpt-4o"); },
+    },
+    {
+      id: "model-gemini",
+      label: "Switch to Gemini 2.5",
+      description: "Ask panel → Gemini 2.5 Pro",
+      icon: "◇",
+      category: "model",
+      keywords: ["model", "gemini", "google"],
+      action: () => { setAskProvider("google"); setAskModel("gemini-2.5-pro"); },
+    },
+
+    // Action commands
+    {
+      id: "action-connect-vps",
+      label: "Poveži VPS",
+      description: "Otvori SSH povezivanje",
+      icon: "⏻",
+      category: "action",
+      keywords: ["vps", "ssh", "connect", "server"],
+      action: () => setShowSshModal(true),
+    },
+    {
+      id: "action-deploy",
+      label: "Deploy projekat",
+      description: "Pokreni deploy proces",
+      icon: "🚀",
+      category: "action",
+      keywords: ["deploy", "publish", "objavi"],
+      action: () => setShowDeployModal(true),
+    },
+    {
+      id: "action-export",
+      label: "Export projekat",
+      description: "Exportuj kao ZIP",
+      icon: "📦",
+      category: "action",
+      keywords: ["export", "download", "zip", "paket"],
+      action: () => setShowExportModal(true),
+    },
+    {
+      id: "action-env",
+      label: "Uredi env varijable",
+      description: "Upravljaj .env datotekom",
+      icon: "🔑",
+      category: "action",
+      keywords: ["env", "environment", "varijable", "secret"],
+      action: () => setShowEnvModal(true),
+    },
+    {
+      id: "action-logs",
+      label: "Otvori logove",
+      description: "Prikaži logove sistema",
+      icon: "📋",
+      category: "action",
+      keywords: ["log", "logs", "povijest", "zapis"],
+      action: () => {
+        // Focus BottomBar logs tab — handled via event
+        window.dispatchEvent(new CustomEvent("straxor:open-logs"));
+      },
+    },
+    {
+      id: "action-console",
+      label: "Otvori konzolu",
+      description: "Prikaži konzolu (greške)",
+      icon: "◉",
+      category: "action",
+      keywords: ["console", "konzola", "error", "greska"],
+      action: () => {
+        window.dispatchEvent(new CustomEvent("straxor:open-console"));
+      },
+    },
+
+    // Settings commands
+    {
+      id: "settings-permissions",
+      label: "Agent dozvole",
+      description: "Upravljaj dozvolama alata",
+      icon: "⬡",
+      category: "settings",
+      keywords: ["permissions", "dozvole", "security", "alati"],
+      action: () => setShowPermissionsModal(true),
+    },
+    {
+      id: "settings-notifications",
+      label: "Notifikacije",
+      description: "Postavi notifikacije",
+      icon: "🔔",
+      category: "settings",
+      keywords: ["notifications", "notifikacije", "obavijesti"],
+      action: () => setShowNotifications(true),
+    },
+    {
+      id: "settings-prompts",
+      label: "Prompt Library",
+      description: "Upravljaj promptima",
+      icon: "📋",
+      category: "settings",
+      keywords: ["prompts", "prompt", "library", "biblioteka"],
+      action: () => setShowPromptLibrary(true),
+    },
+
+    // Agent role commands
+    {
+      id: "role-developer",
+      label: "Uloga: Developer",
+      description: "Postavi agent ulogu na Developer",
+      icon: "⌨",
+      category: "action",
+      keywords: ["role", "uloga", "developer", "kod"],
+      action: () => setAgentRole("developer"),
+    },
+    {
+      id: "role-designer",
+      label: "Uloga: Designer",
+      description: "Postavi agent ulogu na Designer",
+      icon: "◆",
+      category: "action",
+      keywords: ["role", "uloga", "designer", "dizajn"],
+      action: () => setAgentRole("designer"),
+    },
+    {
+      id: "role-qa",
+      label: "Uloga: QA",
+      description: "Postavi agent ulogu na QA",
+      icon: "◉",
+      category: "action",
+      keywords: ["role", "uloga", "qa", "test"],
+      action: () => setAgentRole("qa"),
+    },
+    {
+      id: "role-security",
+      label: "Uloga: Security",
+      description: "Postavi agent ulogu na Security Reviewer",
+      icon: "⬡",
+      category: "action",
+      keywords: ["role", "uloga", "security", "sigurnost"],
+      action: () => setAgentRole("security"),
+    },
+    {
+      id: "role-marketing",
+      label: "Uloga: Marketing",
+      description: "Postavi agent ulogu na Marketing",
+      icon: "▲",
+      category: "action",
+      keywords: ["role", "uloga", "marketing", "sadrzaj"],
+      action: () => setAgentRole("marketing"),
+    },
+
+    // Navigation
+    {
+      id: "nav-dashboard",
+      label: "Natrag na Dashboard",
+      description: "Idi na početnu stranicu",
+      icon: "←",
+      category: "navigation",
+      shortcut: "MOD+D",
+      keywords: ["dashboard", "pocetna", "home"],
+      action: () => window.location.href = "/dashboard",
+    },
+  ], [
+    setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
+    setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
+    setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
+    setAgentRole,
+  ]);
+
   return (
     <div className="h-full flex flex-col relative">
       <WorkspaceTopbar
@@ -800,6 +1042,25 @@ export default function Workspace() {
 
       {showNotifications && (
         <NotificationSettings onClose={() => setShowNotifications(false)} />
+      )}
+
+      {/* Command Palette */}
+      <CommandPalette
+        commands={commands}
+        open={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+      />
+
+      {/* Command Palette trigger hint */}
+      {!showCommandPalette && (
+        <button
+          onClick={() => setShowCommandPalette(true)}
+          className="fixed bottom-4 right-4 z-40 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-surface/80 backdrop-blur-sm text-[10px] text-text-muted hover:text-text-secondary hover:border-border-light transition-colors shadow-lg shadow-black/20 hidden md:flex"
+          title="Command Palette (Ctrl+K)"
+        >
+          <kbd className="text-[9px] bg-surface-2 border border-border px-1 py-0.5 rounded font-mono">⌘K</kbd>
+          <span>Komande</span>
+        </button>
       )}
     </div>
   );
