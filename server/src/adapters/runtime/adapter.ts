@@ -1,0 +1,33 @@
+import type { Duplex } from "stream";
+
+export interface TodoItem {
+  id: string;
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+}
+
+export interface FileDiff {
+  path: string;
+  additions: string[];
+  deletions: string[];
+}
+
+export interface AgentEvent {
+  type: "session" | "text" | "tool_call" | "tool_result" | "done" | "error";
+  [key: string]: unknown;
+}
+
+export interface RuntimeAdapter {
+  createSession(machineId: string, title: string): Promise<{ id: string }>;
+  sendMessage(
+    machineId: string,
+    sessionId: string,
+    text: string,
+    mode?: "sync" | "async"
+  ): Promise<{ parts?: unknown[] }>;
+  listSessions(machineId: string): Promise<unknown[]>;
+  getTodos(machineId: string, sessionId: string): Promise<TodoItem[]>;
+  getDiff(machineId: string, sessionId: string): Promise<FileDiff[]>;
+  openEventStream(machineId: string): Promise<Duplex>;
+  abortSession(machineId: string, sessionId: string): Promise<boolean>;
+}
