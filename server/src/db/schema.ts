@@ -342,3 +342,31 @@ export const sessionMessages = pgTable("session_messages", {
 export const sessionMessagesRelations = relations(sessionMessages, ({ one }) => ({
   session: one(sessions, { fields: [sessionMessages.sessionId], references: [sessions.id] }),
 }));
+
+export const restorePoints = pgTable("restore_points", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  machineId: uuid("machine_id")
+    .notNull()
+    .references(() => machines.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  type: varchar("type", { length: 20 }).notNull().default("version"),
+  snapshotPath: varchar("snapshot_path", { length: 500 }).notNull(),
+  gitCommit: varchar("git_commit", { length: 40 }),
+  fileCount: integer("file_count").default(0),
+  totalSize: varchar("total_size", { length: 50 }).default("0 B"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const restorePointsRelations = relations(restorePoints, ({ one }) => ({
+  user: one(users, { fields: [restorePoints.userId], references: [users.id] }),
+  project: one(projects, { fields: [restorePoints.projectId], references: [projects.id] }),
+  machine: one(machines, { fields: [restorePoints.machineId], references: [machines.id] }),
+}));

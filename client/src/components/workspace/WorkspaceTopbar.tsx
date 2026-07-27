@@ -18,6 +18,7 @@ interface Props {
   onOpenNotifications?: () => void;
   onOpenWorktrees?: () => void;
   onOpenBrowserVerify?: () => void;
+  onOpenRollback?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -52,6 +53,7 @@ export default function WorkspaceTopbar({
   onOpenNotifications,
   onOpenWorktrees,
   onOpenBrowserVerify,
+  onOpenRollback,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -137,6 +139,7 @@ export default function WorkspaceTopbar({
           onOpenNotifications={onOpenNotifications}
           onOpenWorktrees={onOpenWorktrees}
           onOpenBrowserVerify={onOpenBrowserVerify}
+          onOpenRollback={onOpenRollback}
         />
       </div>
     </header>

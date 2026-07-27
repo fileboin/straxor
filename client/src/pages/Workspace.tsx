@@ -27,6 +27,7 @@ import WorktreeManager from "../components/workspace/WorktreeManager.js";
 import BrowserVerifier from "../components/workspace/BrowserVerifier.js";
 import SessionPicker from "../components/workspace/SessionPicker.js";
 import SearchPanel from "../components/workspace/SearchPanel.js";
+import RollbackPanel from "../components/workspace/RollbackPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -86,6 +87,7 @@ export default function Workspace() {
   const [showWorktrees, setShowWorktrees] = useState(false);
   const [showBrowserVerify, setShowBrowserVerify] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showRollback, setShowRollback] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -863,6 +865,15 @@ export default function Workspace() {
       action: () => setShowBrowserVerify(true),
     },
     {
+      id: "action-rollback",
+      label: "Historija verzija",
+      description: "Vizuelni povratak projekta na prethodno stanje",
+      icon: "↺",
+      category: "action",
+      keywords: ["rollback", "restore", "snapshot", "povijest", "verzija"],
+      action: () => setShowRollback(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -979,7 +990,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole,
+    setAgentRole, setShowRollback,
   ]);
 
   return (
@@ -999,6 +1010,7 @@ export default function Workspace() {
         onOpenNotifications={() => setShowNotifications(true)}
         onOpenWorktrees={() => setShowWorktrees(true)}
         onOpenBrowserVerify={() => setShowBrowserVerify(true)}
+        onOpenRollback={() => setShowRollback(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -1310,6 +1322,14 @@ export default function Workspace() {
         <BrowserVerifier
           machineId={agentMachineId}
           onClose={() => setShowBrowserVerify(false)}
+        />
+      )}
+
+      {showRollback && agentMachineId && (
+        <RollbackPanel
+          machineId={agentMachineId}
+          projectPath="/root/straxor-landing"
+          onClose={() => setShowRollback(false)}
         />
       )}
 
