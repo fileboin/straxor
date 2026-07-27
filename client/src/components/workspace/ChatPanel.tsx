@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, type FormEvent } from "react";
 import ProviderModelDropdown from "./ProviderModelDropdown.js";
 import InputToolbar from "./InputToolbar.js";
 import PlanActToggle, { type PlanActMode } from "./PlanActToggle.js";
+import PlanPreview from "./PlanPreview.js";
 import type { ThinkingBudget } from "../../lib/models.js";
 
 export interface ToolCall {
@@ -47,6 +48,7 @@ interface Props {
   prefill?: string;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  enablePlanPreview?: boolean;
 }
 
 function ToolCallCard({ tool }: { tool: ToolCall }) {
@@ -124,8 +126,11 @@ export default function ChatPanel({
   prefill,
   isExpanded,
   onToggleExpand,
+  enablePlanPreview,
 }: Props) {
   const [input, setInput] = useState("");
+  const [showPlanPreview, setShowPlanPreview] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -143,8 +148,27 @@ export default function ChatPanel({
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed || loading) return;
+
+    if (enablePlanPreview) {
+      setPendingMessage(trimmed);
+      setShowPlanPreview(true);
+      return;
+    }
+
     onSend(trimmed);
     setInput("");
+  };
+
+  const handlePlanConfirm = () => {
+    setShowPlanPreview(false);
+    onSend(pendingMessage);
+    setInput("");
+    setPendingMessage("");
+  };
+
+  const handlePlanCancel = () => {
+    setShowPlanPreview(false);
+    setPendingMessage("");
   };
 
   return (
@@ -251,6 +275,21 @@ export default function ChatPanel({
 
       {/* Input */}
       <div className="px-2 py-2 border-t border-border bg-surface shrink-0 sm:px-3 sm:py-2.5">
+        {/* Plan Preview */}
+        {showPlanPreview && (
+          <div className="mb-2">
+            <PlanPreview
+              prompt={pendingMessage}
+              providerId={providerId}
+              modelId={modelId}
+              thinking={thinking}
+              onConfirm={handlePlanConfirm}
+              onCancel={handlePlanCancel}
+              onModelChange={(pId, mId) => { onProviderChange(pId); onModelChange(mId); }}
+              loading={loading}
+            />
+          </div>
+        )}
         <form
           onSubmit={handleSubmit}
           className={`flex items-center gap-2 px-2.5 py-1.5 rounded-[20px] border border-border bg-surface-2 transition-colors focus-within:border-accent sm:px-3 ${

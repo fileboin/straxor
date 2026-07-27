@@ -1121,6 +1121,7 @@ export default function Workspace() {
             prefill={agentPrefill}
             isExpanded={panelMode === "agent-full"}
             onToggleExpand={toggleAgentExpand}
+            enablePlanPreview
             headerLeft={
               <RoleSelector role={agentRole} onChange={setAgentRole} />
             }
