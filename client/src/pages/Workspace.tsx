@@ -5,6 +5,7 @@ import TodoList, { type TodoStep } from "../components/workspace/TodoList.js";
 import BottomBar from "../components/workspace/BottomBar.js";
 import SshInput from "../components/workspace/SshInput.js";
 import EnvEditor from "../components/workspace/EnvEditor.js";
+import DeploymentPanel from "../components/workspace/DeploymentPanel.js";
 import type { ChatMessage, ToolCall } from "../components/workspace/ChatPanel.js";
 import type { PlanActMode } from "../components/workspace/PlanActToggle.js";
 import type { ThinkingBudget } from "../lib/models.js";
@@ -51,6 +52,7 @@ export default function Workspace() {
   // VPS state
   const [showSshModal, setShowSshModal] = useState(false);
   const [showEnvModal, setShowEnvModal] = useState(false);
+  const [showDeployModal, setShowDeployModal] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Agent session state
@@ -288,6 +290,7 @@ export default function Workspace() {
         vpsStatus={vpsStatus}
         onConnectVps={() => setShowSshModal(true)}
         onOpenEnv={() => setShowEnvModal(true)}
+        onOpenDeploy={() => setShowDeployModal(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -408,6 +411,14 @@ export default function Workspace() {
         <EnvEditor
           projectId="placeholder-project-id"
           onClose={() => setShowEnvModal(false)}
+        />
+      )}
+
+      {/* Deployment Panel Modal */}
+      {showDeployModal && (
+        <DeploymentPanel
+          projectId="placeholder-project-id"
+          onClose={() => setShowDeployModal(false)}
         />
       )}
     </div>

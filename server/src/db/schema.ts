@@ -145,3 +145,42 @@ export const projectEnvHistoryRelations = relations(projectEnvHistory, ({ one })
   project: one(projects, { fields: [projectEnvHistory.projectId], references: [projects.id] }),
   user: one(users, { fields: [projectEnvHistory.userId], references: [users.id] }),
 }));
+
+export const deployments = pgTable("deployments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  target: varchar("target", { length: 20 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("building"),
+  liveUrl: text("live_url"),
+  branch: varchar("branch", { length: 100 }).notNull().default("main"),
+  commitHash: varchar("commit_hash", { length: 40 }),
+  commitMessage: text("commit_message"),
+  startedAt: timestamp("started_at").notNull(),
+  finishedAt: timestamp("finished_at"),
+  duration: integer("duration"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const deploymentsRelations = relations(deployments, ({ one }) => ({
+  project: one(projects, { fields: [deployments.projectId], references: [projects.id] }),
+  user: one(users, { fields: [deployments.userId], references: [users.id] }),
+}));
+
+export const deploymentBuildLogs = pgTable("deployment_build_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  deploymentId: uuid("deployment_id")
+    .notNull()
+    .references(() => deployments.id, { onDelete: "cascade" }),
+  level: varchar("level", { length: 10 }).notNull().default("info"),
+  message: text("message").notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+export const deploymentBuildLogsRelations = relations(deploymentBuildLogs, ({ one }) => ({
+  deployment: one(deployments, { fields: [deploymentBuildLogs.deploymentId], references: [deployments.id] }),
+}));
