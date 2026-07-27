@@ -16,6 +16,7 @@ interface Props {
   onOpenSettings?: () => void;
   onOpenExport?: () => void;
   onOpenNotifications?: () => void;
+  onOpenWorktrees?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -48,6 +49,7 @@ export default function WorkspaceTopbar({
   onOpenSettings,
   onOpenExport,
   onOpenNotifications,
+  onOpenWorktrees,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -117,11 +119,21 @@ export default function WorkspaceTopbar({
         >
           Deploy
         </button>
+        {onOpenWorktrees && (
+          <button
+            onClick={onOpenWorktrees}
+            className="hidden sm:flex px-2.5 py-1.5 rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+            title="Git Worktrees"
+          >
+            🌳
+          </button>
+        )}
         <HomeMenu
           onOpenHowItWorks={onOpenHowItWorks}
           onOpenSettings={onOpenSettings}
           onOpenExport={onOpenExport}
           onOpenNotifications={onOpenNotifications}
+          onOpenWorktrees={onOpenWorktrees}
         />
       </div>
     </header>

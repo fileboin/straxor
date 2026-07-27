@@ -274,3 +274,24 @@ export const notificationHistory = pgTable("notification_history", {
 export const notificationHistoryRelations = relations(notificationHistory, ({ one }) => ({
   user: one(users, { fields: [notificationHistory.userId], references: [users.id] }),
 }));
+
+export const worktrees = pgTable("worktrees", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  machineId: uuid("machine_id")
+    .notNull()
+    .references(() => machines.id, { onDelete: "cascade" }),
+  branch: varchar("branch", { length: 255 }).notNull(),
+  worktreePath: varchar("worktree_path", { length: 500 }).notNull(),
+  taskName: varchar("task_name", { length: 255 }),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const worktreesRelations = relations(worktrees, ({ one }) => ({
+  user: one(users, { fields: [worktrees.userId], references: [users.id] }),
+  machine: one(machines, { fields: [worktrees.machineId], references: [machines.id] }),
+}));

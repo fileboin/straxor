@@ -23,6 +23,7 @@ import SecurityScanResult from "../components/workspace/SecurityScanResult.js";
 import ExportPanel from "../components/workspace/ExportPanel.js";
 import NotificationSettings from "../components/workspace/NotificationSettings.js";
 import CommandPalette from "../components/workspace/CommandPalette.js";
+import WorktreeManager from "../components/workspace/WorktreeManager.js";
 import type { Command } from "../lib/commands.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
@@ -69,6 +70,7 @@ export default function Workspace() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showWorktrees, setShowWorktrees] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -637,6 +639,15 @@ export default function Workspace() {
         window.dispatchEvent(new CustomEvent("straxor:open-console"));
       },
     },
+    {
+      id: "action-worktrees",
+      label: "Git Worktrees",
+      description: "Upravljaj worktree-ovima za paralelne grane",
+      icon: "🌳",
+      category: "action",
+      keywords: ["worktree", "git", "branch", "grana", "paralelno"],
+      action: () => setShowWorktrees(true),
+    },
 
     // Settings commands
     {
@@ -747,6 +758,7 @@ export default function Workspace() {
         onOpenSettings={() => setShowPermissionsModal(true)}
         onOpenExport={() => setShowExportModal(true)}
         onOpenNotifications={() => setShowNotifications(true)}
+        onOpenWorktrees={() => setShowWorktrees(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -1042,6 +1054,13 @@ export default function Workspace() {
 
       {showNotifications && (
         <NotificationSettings onClose={() => setShowNotifications(false)} />
+      )}
+
+      {showWorktrees && agentMachineId && (
+        <WorktreeManager
+          machineId={agentMachineId}
+          onClose={() => setShowWorktrees(false)}
+        />
       )}
 
       {/* Command Palette */}
