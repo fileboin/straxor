@@ -11,6 +11,7 @@ import logRoutes from "./routes/logs.js";
 import runtimeRoutes from "./routes/runtime.js";
 import envRoutes from "./routes/envs.js";
 import deploymentRoutes from "./routes/deployments.js";
+import consoleRoutes from "./routes/console.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -32,6 +33,7 @@ app.use("/api/logs", logRoutes);
 app.use("/api/runtime", runtimeRoutes);
 app.use("/api/envs", envRoutes);
 app.use("/api/deployments", deploymentRoutes);
+app.use("/api/console", consoleRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

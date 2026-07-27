@@ -184,3 +184,21 @@ export const deploymentBuildLogs = pgTable("deployment_build_logs", {
 export const deploymentBuildLogsRelations = relations(deploymentBuildLogs, ({ one }) => ({
   deployment: one(deployments, { fields: [deploymentBuildLogs.deploymentId], references: [deployments.id] }),
 }));
+
+export const consoleEntries = pgTable("console_entries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  category: varchar("category", { length: 20 }).notNull(),
+  level: varchar("level", { length: 10 }).notNull().default("error"),
+  message: text("message").notNull(),
+  source: varchar("source", { length: 100 }),
+  stackTrace: text("stack_trace"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const consoleEntriesRelations = relations(consoleEntries, ({ one }) => ({
+  user: one(users, { fields: [consoleEntries.userId], references: [users.id] }),
+}));

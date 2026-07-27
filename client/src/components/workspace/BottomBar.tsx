@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import LogViewer from "./LogViewer";
+import ConsolePanel from "./ConsolePanel";
 
-type Tab = "terminal" | "files" | "logs";
+type Tab = "terminal" | "files" | "logs" | "console";
 
 const MOCK_FILES = [
   { name: "src/", folder: true, indent: 0 },
@@ -115,6 +116,16 @@ function TabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
       >
         Logovi
       </button>
+      <button
+        onClick={() => setTab("console")}
+        className={`px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors ${
+          tab === "console"
+            ? "text-text border-accent"
+            : "text-text-muted border-transparent hover:text-text-secondary"
+        }`}
+      >
+        Konzola
+      </button>
     </>
   );
 }
@@ -154,6 +165,7 @@ export default function BottomBar() {
             {tab === "terminal" && <TerminalContent />}
             {tab === "files" && <FilesContent />}
             {tab === "logs" && <LogViewer />}
+            {tab === "console" && <ConsolePanel />}
           </div>
         )}
       </div>
@@ -162,7 +174,7 @@ export default function BottomBar() {
       <button
         onClick={() => setMobileOpen(true)}
         className="md:hidden fixed bottom-4 right-4 z-40 w-11 h-11 rounded-full border border-border bg-surface shadow-lg shadow-black/40 flex items-center justify-center text-text-secondary hover:text-text hover:border-border-light transition-colors"
-        title="Terminal / Datoteke / Logovi"
+        title="Terminal / Datoteke / Logovi / Konzola"
       >
         <span className="text-sm">▸</span>
       </button>
@@ -201,6 +213,7 @@ export default function BottomBar() {
               {tab === "terminal" && <TerminalContent />}
               {tab === "files" && <FilesContent />}
               {tab === "logs" && <LogViewer />}
+              {tab === "console" && <ConsolePanel />}
             </div>
           </div>
         </div>
