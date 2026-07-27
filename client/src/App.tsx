@@ -1,16 +1,27 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth.js";
 import { ThemeProvider } from "./lib/theme.js";
+import { isOnboardingComplete } from "./lib/onboarding.js";
 import Layout from "./components/Layout.js";
 import Login from "./pages/Login.js";
 import Register from "./pages/Register.js";
 import Dashboard from "./pages/Dashboard.js";
 import Workspace from "./pages/Workspace.js";
+import OnboardingPage from "./pages/Onboarding.js";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
+  if (!isOnboardingComplete()) return <Navigate to="/onboarding" replace />;
+  return <>{children}</>;
+}
+
+function OnboardingGuard({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (isOnboardingComplete()) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -41,6 +52,14 @@ export default function App() {
                 <GuestRoute>
                   <Register />
                 </GuestRoute>
+              }
+            />
+            <Route
+              path="/onboarding"
+              element={
+                <OnboardingGuard>
+                  <OnboardingPage />
+                </OnboardingGuard>
               }
             />
             <Route
