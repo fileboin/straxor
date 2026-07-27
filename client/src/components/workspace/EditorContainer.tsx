@@ -1,7 +1,9 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import CodeEditor from "./CodeEditor";
 import FileExplorer, { FileContextMenu, setFileActions } from "./FileExplorer";
+import HistoryPanel from "./HistoryPanel";
 import { readFile, writeFile, deleteFile, renameFile, createFile, createDir } from "../../lib/files";
+import { changeHistory, describeChange, type ChangeEntry } from "../../lib/history";
 
 interface OpenFile {
   path: string;
@@ -24,6 +26,12 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [treeRefresh, setTreeRefresh] = useState(0);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: { name: string; path: string; type: "file" | "directory" } } | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Track previous content per file for change detection
+  const prevContentRef = useRef<Map<string, string>>(new Map());
+  // Track content loaded from disk (original baseline)
+  const diskContentRef = useRef<Map<string, string>>(new Map());
 
   const current = openFiles.find((f) => f.path === activeFile);
 
@@ -67,6 +75,8 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
       setOpenFiles((prev) =>
         prev.map((f) => (f.path === path ? { ...f, content, loading: false } : f))
       );
+      diskContentRef.current.set(path, content);
+      prevContentRef.current.set(path, content);
     } catch (err: any) {
       setOpenFiles((prev) =>
         prev.map((f) =>
@@ -86,9 +96,24 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
   }, [openFiles]);
 
   const updateContent = useCallback((path: string, content: string) => {
-    setOpenFiles((prev) =>
-      prev.map((f) => (f.path === path ? { ...f, content, dirty: true } : f))
-    );
+    setOpenFiles((prev) => {
+      const file = prev.find((f) => f.path === path);
+      if (!file) return prev;
+
+      // Record the change if content actually differs from last tracked state
+      const lastTracked = prevContentRef.current.get(path);
+      if (lastTracked !== undefined && lastTracked !== content) {
+        const fileName = path.split("/").pop() || path;
+        changeHistory.record(
+          path, fileName, lastTracked, content, "user",
+          describeChange(lastTracked, content)
+        );
+      }
+
+      return prev.map((f) => f.path === path ? { ...f, content, dirty: true } : f);
+    });
+
+    prevContentRef.current.set(path, content);
   }, []);
 
   const saveFile = useCallback(async () => {
@@ -137,6 +162,18 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "F") {
         e.preventDefault();
         setSearchOpen((prev) => !prev);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Ctrl+H for history panel
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "h") {
+        e.preventDefault();
+        setShowHistory((prev) => !prev);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -192,6 +229,52 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
         break;
     }
   }
+
+  // History jump handler
+  const handleHistoryJump = useCallback(async (entry: ChangeEntry, direction: "undo" | "redo") => {
+    if (!machineId) return;
+
+    // For undo: restore contentBefore. For redo: restore contentAfter.
+    const restoreContent = direction === "undo" ? entry.contentBefore : entry.contentAfter;
+
+    // Update open tabs
+    setOpenFiles((prev) => {
+      const file = prev.find((f) => f.path === entry.filePath);
+      if (file) {
+        return prev.map((f) => f.path === entry.filePath
+          ? { ...f, content: restoreContent, dirty: true }
+          : f
+        );
+      }
+      // File not open — open it
+      return [...prev, {
+        path: entry.filePath,
+        name: entry.fileName,
+        content: restoreContent,
+        dirty: true,
+        loading: false,
+      }];
+    });
+    setActiveFile(entry.filePath);
+    prevContentRef.current.set(entry.filePath, restoreContent);
+
+    // Write to disk
+    try {
+      await writeFile(machineId, entry.filePath, restoreContent);
+    } catch (err) {
+      console.error("History jump write failed:", err);
+    }
+  }, [machineId]);
+
+  // Record agent actions (public API via window)
+  useEffect(() => {
+    (window as any).__straxor_history = {
+      recordAgent: (filePath: string, fileName: string, before: string, after: string, desc: string) => {
+        changeHistory.record(filePath, fileName, before, after, "agent", desc);
+      },
+    };
+    return () => { delete (window as any).__straxor_history; };
+  }, []);
 
   function getLangFromPath(path: string): string {
     const ext = path.split(".").pop()?.toLowerCase() || "";
@@ -367,6 +450,11 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
                 disabled={!current.dirty || saving}
                 className={`hover:text-text ${!current.dirty || saving ? "opacity-30 cursor-not-allowed" : ""}`}
               >💾</button>
+              <button
+                onClick={() => setShowHistory(true)}
+                className="text-text-muted hover:text-text"
+                title="Povijest promjena (Ctrl+H)"
+              >↶</button>
             </div>
           </div>
         )}
@@ -380,6 +468,13 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
           onAction={(action) => handleContextAction(action, contextMenu.entry)}
         />
       )}
+
+      {/* History Panel */}
+      <HistoryPanel
+        open={showHistory}
+        onClose={() => setShowHistory(false)}
+        onJump={handleHistoryJump}
+      />
     </div>
   );
 }
