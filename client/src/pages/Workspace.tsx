@@ -1128,7 +1128,7 @@ export default function Workspace() {
         </div>
       </div>
 
-      <BottomBar />
+      <BottomBar machineId={agentMachineId || null} />
 
       {/* SSH Modal */}
       {showSshModal && (

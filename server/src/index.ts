@@ -21,6 +21,7 @@ import worktreeRoutes from "./routes/worktrees.js";
 import verifyRoutes from "./routes/verify.js";
 import browserVerifyRoutes from "./routes/browser-verify.js";
 import sessionRoutes from "./routes/sessions.js";
+import fileRoutes from "./routes/files.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -52,6 +53,7 @@ app.use("/api/worktrees", worktreeRoutes);
 app.use("/api/verify", verifyRoutes);
 app.use("/api/browser-verify", browserVerifyRoutes);
 app.use("/api/sessions", sessionRoutes);
+app.use("/api/files", fileRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
