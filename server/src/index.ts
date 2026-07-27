@@ -24,6 +24,7 @@ import sessionRoutes from "./routes/sessions.js";
 import fileRoutes from "./routes/files.js";
 import searchRoutes from "./routes/search.js";
 import previewRoutes from "./routes/preview.js";
+import databaseRoutes from "./routes/database.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -58,6 +59,7 @@ app.use("/api/sessions", sessionRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/preview", previewRoutes);
+app.use("/api/database", databaseRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

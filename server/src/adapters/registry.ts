@@ -8,6 +8,7 @@ import type { ExportAdapter } from "./export/adapter.js";
 import type { NotificationRegistry } from "./notification/registry.js";
 import type { SearchAdapter } from "./search/adapter.js";
 import type { PreviewAdapter } from "./preview/adapter.js";
+import type { DatabaseAdapter } from "./database/adapter.js";
 import { createBoundAdapter, type BoundAdapter } from "./runtime/opencode.js";
 import { createHttpAIProviderAdapter } from "./ai-provider/http.js";
 import { createStubGitAdapter } from "./git/local.js";
@@ -18,6 +19,7 @@ import { createZipExportAdapter } from "./export/zip.js";
 import { createNotificationRegistry } from "./notification/registry.js";
 import { createSSHSearchAdapter } from "./search/ssh.js";
 import { createVPSPreviewAdapter } from "./preview/vps.js";
+import { createPostgresAdapter } from "./database/postgres.js";
 
 export interface AdapterRegistry {
   runtime: (userId: string) => BoundAdapter;
@@ -30,6 +32,7 @@ export interface AdapterRegistry {
   notification: NotificationRegistry;
   search: (userId: string) => SearchAdapter;
   preview: (userId: string) => PreviewAdapter;
+  database: (userId: string) => DatabaseAdapter;
 }
 
 let registry: AdapterRegistry | null = null;
@@ -51,6 +54,10 @@ export function initAdapters(): AdapterRegistry {
     preview: (userId: string) => {
       const runtime = createBoundAdapter(userId);
       return createVPSPreviewAdapter((machineId, cmd) => runtime.executeCommand(machineId, cmd));
+    },
+    database: (userId: string) => {
+      const runtime = createBoundAdapter(userId);
+      return createPostgresAdapter((machineId, cmd) => runtime.executeCommand(machineId, cmd));
     },
   };
   return registry;
