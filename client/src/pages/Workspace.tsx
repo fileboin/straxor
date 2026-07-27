@@ -345,8 +345,10 @@ export default function Workspace() {
               ? "hidden md:hidden"
               : panelMode === "ask-full"
               ? "flex-1"
+              : mobileTab !== "ask"
+              ? "hidden md:flex md:flex-1"
               : "flex-1"
-          } ${mobileTab !== "ask" && panelMode === "split" ? "hidden md:flex" : panelMode !== "split" && panelMode !== "ask-full" ? "hidden" : "flex"}`}
+          }`}
         >
           <ChatPanel
             title="Ask"
@@ -384,8 +386,10 @@ export default function Workspace() {
               ? "hidden md:hidden"
               : panelMode === "agent-full"
               ? "flex-1"
+              : mobileTab !== "agent"
+              ? "hidden md:flex md:flex-1"
               : "flex-1"
-          } ${mobileTab !== "agent" && panelMode === "split" ? "hidden md:flex" : panelMode !== "split" && panelMode !== "agent-full" ? "hidden" : "flex"}`}
+          }`}
         >
           <ChatPanel
             title="Agent"

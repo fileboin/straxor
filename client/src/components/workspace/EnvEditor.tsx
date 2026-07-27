@@ -148,8 +148,8 @@ export default function EnvEditor({ projectId, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-surface border border-border rounded-xl w-[700px] max-h-[80vh] flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-surface border border-border rounded-xl w-full max-w-[700px] max-h-[80vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold text-text">Environment Varijable</h2>
@@ -323,13 +323,13 @@ export default function EnvEditor({ projectId, onClose }: Props) {
                 history.map((entry) => (
                   <div
                     key={entry.id}
-                    className="flex items-start gap-3 py-2 px-2 rounded hover:bg-surface-2 transition-colors"
+                    className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 py-2 px-2 rounded hover:bg-surface-2 transition-colors"
                   >
-                    <span className="text-[10px] text-text-muted shrink-0 w-[120px]">
+                    <span className="text-[10px] text-text-muted shrink-0 sm:w-[120px]">
                       {formatTime(entry.createdAt)}
                     </span>
                     <span
-                      className={`text-[10px] font-medium shrink-0 w-[70px] ${
+                      className={`text-[10px] font-medium shrink-0 sm:w-[70px] ${
                         entry.action === "create"
                           ? "text-green-400"
                           : entry.action === "delete"
@@ -396,7 +396,7 @@ function EnvForm({
 }) {
   return (
     <div className="p-3 rounded-lg border border-accent/30 bg-accent/5 space-y-2">
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         {mode === "add" && onKeyChange && (
           <input
             type="text"

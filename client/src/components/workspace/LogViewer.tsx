@@ -91,14 +91,14 @@ export default function LogViewer() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-surface">
-        {/* Category tabs */}
-        <div className="flex gap-0.5">
+      <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-border bg-surface sm:gap-2 sm:px-3">
+        {/* Category tabs — scrollable on mobile */}
+        <div className="flex gap-0.5 overflow-x-auto shrink-0 scrollbar-none">
           {CATEGORIES.map((c) => (
             <button
               key={c.id}
               onClick={() => setCategory(c.id)}
-              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+              className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors whitespace-nowrap sm:px-2 ${
                 category === c.id
                   ? `${c.color} bg-surface-2`
                   : "text-text-muted hover:text-text-secondary hover:bg-surface-2/50"
@@ -111,13 +111,13 @@ export default function LogViewer() {
 
         <div className="flex-1" />
 
-        {/* Search */}
+        {/* Search — hidden on very small screens */}
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Pretrazi..."
-          className="px-2 py-0.5 text-[10px] bg-bg border border-border rounded w-32 focus:outline-none focus:border-accent text-text placeholder:text-text-muted"
+          className="hidden sm:block px-2 py-0.5 text-[10px] bg-bg border border-border rounded w-32 focus:outline-none focus:border-accent text-text placeholder:text-text-muted"
         />
 
         {/* Level filter */}
@@ -126,7 +126,7 @@ export default function LogViewer() {
           onChange={(e) => setLevelFilter(e.target.value as LogLevel | "all")}
           className="px-1 py-0.5 text-[10px] bg-bg border border-border rounded focus:outline-none focus:border-accent text-text-secondary"
         >
-          <option value="all">Sve razine</option>
+          <option value="all">Sve</option>
           <option value="info">Info</option>
           <option value="warn">Warn</option>
           <option value="error">Error</option>

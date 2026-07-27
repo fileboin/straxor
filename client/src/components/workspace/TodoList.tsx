@@ -127,7 +127,7 @@ export default function TodoList({ steps, onConfirm, onExpand, loading }: Props)
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between px-3 py-2 hover:bg-surface-2 transition-colors"
+        className="w-full flex items-center justify-between px-2 py-2 hover:bg-surface-2 transition-colors sm:px-3"
       >
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">

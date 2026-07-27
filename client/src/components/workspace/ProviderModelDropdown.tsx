@@ -91,13 +91,13 @@ export default function ProviderModelDropdown({
           setView("providers");
           setSelectedProvider(null);
         }}
-        className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-border bg-surface-2 text-[11px] text-text-secondary hover:border-border-light hover:text-text focus:outline-none focus:border-accent transition-colors"
+        className="flex items-center gap-1 px-1.5 py-1 rounded-lg border border-border bg-surface-2 text-[11px] text-text-secondary hover:border-border-light hover:text-text focus:outline-none focus:border-accent transition-colors sm:gap-1.5 sm:px-2"
       >
-        <span className="truncate max-w-[80px]">
+        <span className="truncate max-w-[50px] sm:max-w-[80px]">
           {currentProvider?.name || "Provider"}
         </span>
         <span className="text-text-muted">·</span>
-        <span className="truncate max-w-[80px]">
+        <span className="truncate max-w-[50px] sm:max-w-[80px]">
           {currentModel?.name || "Model"}
         </span>
         <svg

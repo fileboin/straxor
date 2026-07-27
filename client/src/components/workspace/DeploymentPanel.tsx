@@ -95,8 +95,8 @@ export default function DeploymentPanel({ projectId, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-surface border border-border rounded-xl w-[750px] max-h-[80vh] flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-surface border border-border rounded-xl w-full max-w-[750px] max-h-[80vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold text-text">Deployment</h2>
@@ -118,9 +118,9 @@ export default function DeploymentPanel({ projectId, onClose }: Props) {
 
         {/* Trigger form */}
         {showTrigger && (
-          <div className="px-4 py-3 border-b border-border bg-surface-2/30">
+          <div className="px-3 py-3 border-b border-border bg-surface-2/30 sm:px-4">
             <div className="text-[11px] font-medium text-text-secondary mb-2">Novi deployment</div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <select
                 value={triggerTarget}
                 onChange={(e) => setTriggerTarget(e.target.value as DeploymentTarget)}
@@ -155,9 +155,9 @@ export default function DeploymentPanel({ projectId, onClose }: Props) {
         )}
 
         {/* Content */}
-        <div className="flex flex-1 min-h-0">
+        <div className="flex flex-col md:flex-row flex-1 min-h-0">
           {/* Deployment list */}
-          <div className="w-[280px] border-r border-border overflow-y-auto shrink-0">
+          <div className={`border-b md:border-b-0 md:border-r border-border overflow-y-auto shrink-0 ${selected ? "hidden md:block md:w-[280px]" : "w-full md:w-[280px]"}`}>
             {deployments.length === 0 ? (
               <div className="p-4 text-center text-text-muted text-[11px]">
                 Nema deploymenta.
@@ -198,11 +198,17 @@ export default function DeploymentPanel({ projectId, onClose }: Props) {
           </div>
 
           {/* Detail panel */}
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className={`flex-1 flex flex-col min-w-0 ${!selected ? "hidden md:flex" : "flex"}`}>
             {selected ? (
               <>
                 {/* Status bar */}
-                <div className="px-4 py-3 border-b border-border flex items-center gap-3">
+                <div className="px-3 py-2.5 border-b border-border flex items-center gap-2 sm:px-4 sm:gap-3">
+                  <button
+                    onClick={() => setSelected(null)}
+                    className="md:hidden px-2 py-1 text-[10px] rounded border border-border text-text-muted hover:text-text transition-colors"
+                  >
+                    ← Natrag
+                  </button>
                   <span
                     className={`text-[10px] font-medium px-2 py-0.5 rounded border ${STATUS_COLORS[selected.status]}`}
                   >
