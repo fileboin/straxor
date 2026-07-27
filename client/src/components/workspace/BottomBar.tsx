@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import LogViewer from "./LogViewer";
 import ConsolePanel from "./ConsolePanel";
 import EditorContainer from "./EditorContainer";
+import PreviewPanel from "./PreviewPanel";
 
-type Tab = "terminal" | "files" | "logs" | "console";
+type Tab = "terminal" | "files" | "logs" | "console" | "preview";
 
 const MOCK_TERMINAL = [
   { type: "cmd" as const, text: "~/straxor-landing $ npm create vite@latest . -- --template react-ts" },
@@ -92,6 +93,16 @@ function TabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
       >
         Konzola
       </button>
+      <button
+        onClick={() => setTab("preview")}
+        className={`px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors ${
+          tab === "preview"
+            ? "text-text border-accent"
+            : "text-text-muted border-transparent hover:text-text-secondary"
+        }`}
+      >
+        Preview
+      </button>
     </>
   );
 }
@@ -131,11 +142,12 @@ export default function BottomBar({ machineId }: BottomBarProps) {
         </div>
 
         {!collapsed && (
-          <div className="h-40 overflow-hidden">
+          <div className={`${tab === "preview" ? "h-80" : "h-40"} overflow-hidden transition-all`}>
             {tab === "terminal" && <TerminalContent />}
             {tab === "files" && <div className="h-full"><EditorContainer machineId={machineId || null} /></div>}
             {tab === "logs" && <LogViewer />}
             {tab === "console" && <ConsolePanel />}
+            {tab === "preview" && <div className="h-full"><PreviewPanel machineId={machineId || null} /></div>}
           </div>
         )}
       </div>
@@ -184,6 +196,7 @@ export default function BottomBar({ machineId }: BottomBarProps) {
               {tab === "files" && <div className="h-full"><EditorContainer machineId={machineId || null} /></div>}
               {tab === "logs" && <LogViewer />}
               {tab === "console" && <ConsolePanel />}
+              {tab === "preview" && <div className="h-full"><PreviewPanel machineId={machineId || null} /></div>}
             </div>
           </div>
         </div>
