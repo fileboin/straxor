@@ -20,6 +20,7 @@ import { checkBeforeInstall, type ScanVerdict } from "../lib/security.js";
 import RoleSelector from "../components/workspace/RoleSelector.js";
 import PromptLibrary from "../components/workspace/PromptLibrary.js";
 import SecurityScanResult from "../components/workspace/SecurityScanResult.js";
+import ExportPanel from "../components/workspace/ExportPanel.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
   {
@@ -62,6 +63,7 @@ export default function Workspace() {
   const [showSshModal, setShowSshModal] = useState(false);
   const [showEnvModal, setShowEnvModal] = useState(false);
   const [showDeployModal, setShowDeployModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -499,6 +501,7 @@ export default function Workspace() {
         onOpenEnv={() => setShowEnvModal(true)}
         onOpenDeploy={() => setShowDeployModal(true)}
         onOpenSettings={() => setShowPermissionsModal(true)}
+        onOpenExport={() => setShowExportModal(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -781,6 +784,15 @@ export default function Workspace() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Export Panel */}
+      {showExportModal && (
+        <ExportPanel
+          projectId="straxor-landing"
+          machineId={agentMachineId || undefined}
+          onClose={() => setShowExportModal(false)}
+        />
       )}
     </div>
   );

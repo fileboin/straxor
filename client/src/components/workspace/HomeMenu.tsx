@@ -4,6 +4,7 @@ import { useAuth } from "../../lib/auth.js";
 interface Props {
   onOpenHowItWorks?: () => void;
   onOpenSettings?: () => void;
+  onOpenExport?: () => void;
 }
 
 const EDITORS = [
@@ -27,7 +28,7 @@ const EDITORS = [
   },
 ];
 
-export default function HomeMenu({ onOpenHowItWorks, onOpenSettings }: Props) {
+export default function HomeMenu({ onOpenHowItWorks, onOpenSettings, onOpenExport }: Props) {
   const [open, setOpen] = useState(false);
   const [showEditors, setShowEditors] = useState(false);
   const { user, logout } = useAuth();
@@ -117,6 +118,15 @@ export default function HomeMenu({ onOpenHowItWorks, onOpenSettings }: Props) {
           >
             <span className="w-4 text-center text-[11px]">⚙</span>
             Postavke
+          </button>
+
+          {/* Export */}
+          <button
+            onClick={() => { onOpenExport?.(); setOpen(false); }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-text-secondary hover:bg-surface-2 hover:text-text transition-colors text-left"
+          >
+            <span className="w-4 text-center text-[11px]">📦</span>
+            Export projekta
           </button>
 
           {/* Documentation */}

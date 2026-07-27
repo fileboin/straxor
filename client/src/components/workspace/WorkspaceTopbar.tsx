@@ -14,6 +14,7 @@ interface Props {
   onOpenDeploy?: () => void;
   onOpenHowItWorks?: () => void;
   onOpenSettings?: () => void;
+  onOpenExport?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -44,6 +45,7 @@ export default function WorkspaceTopbar({
   onOpenDeploy,
   onOpenHowItWorks,
   onOpenSettings,
+  onOpenExport,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -116,6 +118,7 @@ export default function WorkspaceTopbar({
         <HomeMenu
           onOpenHowItWorks={onOpenHowItWorks}
           onOpenSettings={onOpenSettings}
+          onOpenExport={onOpenExport}
         />
       </div>
     </header>
