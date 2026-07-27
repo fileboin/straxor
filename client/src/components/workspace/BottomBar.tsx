@@ -1,6 +1,7 @@
 import { useState } from "react";
+import LogViewer from "./LogViewer";
 
-type Tab = "terminal" | "files";
+type Tab = "terminal" | "files" | "logs";
 
 const MOCK_FILES = [
   { name: "src/", folder: true, indent: 0 },
@@ -58,6 +59,16 @@ export default function BottomBar() {
         >
           Datoteke
         </button>
+        <button
+          onClick={() => setTab("logs")}
+          className={`px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors ${
+            tab === "logs"
+              ? "text-text border-accent"
+              : "text-text-muted border-transparent hover:text-text-secondary"
+          }`}
+        >
+          Logovi
+        </button>
         <div className="ml-auto">
           <button
             onClick={() => setCollapsed(!collapsed)}
@@ -69,33 +80,36 @@ export default function BottomBar() {
       </div>
 
       {!collapsed && (
-        <div className="h-40 overflow-y-auto font-mono text-[11.5px] leading-[1.8] text-text-secondary bg-bg p-3">
-          {tab === "terminal" &&
-            MOCK_TERMINAL.map((line, i) => {
-              if (line.type === "blank") return <div key={i}>&nbsp;</div>;
-              if (line.type === "cursor")
+        <div className="h-40 overflow-hidden">
+          {tab === "terminal" && (
+            <div className="h-full overflow-y-auto font-mono text-[11.5px] leading-[1.8] text-text-secondary bg-bg p-3">
+              {MOCK_TERMINAL.map((line, i) => {
+                if (line.type === "blank") return <div key={i}>&nbsp;</div>;
+                if (line.type === "cursor")
+                  return (
+                    <div key={i}>
+                      <span className="text-accent">{line.text} </span>
+                      <span className="inline-block w-[7px] h-[13px] bg-accent animate-pulse align-middle" />
+                    </div>
+                  );
                 return (
-                  <div key={i}>
-                    <span className="text-accent">{line.text} </span>
-                    <span className="inline-block w-[7px] h-[13px] bg-accent animate-pulse align-middle" />
+                  <div key={i} className="whitespace-pre-wrap">
+                    {line.type === "cmd" && (
+                      <>
+                        <span className="text-accent">$ </span>
+                        <span className="text-text">{line.text.replace("~/straxor-landing $ ", "")}</span>
+                      </>
+                    )}
+                    {line.type === "output" && <span className="text-text-muted">{line.text}</span>}
+                    {line.type === "success" && <span className="text-accent">{line.text}</span>}
                   </div>
                 );
-              return (
-                <div key={i} className="whitespace-pre-wrap">
-                  {line.type === "cmd" && (
-                    <>
-                      <span className="text-accent">$ </span>
-                      <span className="text-text">{line.text.replace("~/straxor-landing $ ", "")}</span>
-                    </>
-                  )}
-                  {line.type === "output" && <span className="text-text-muted">{line.text}</span>}
-                  {line.type === "success" && <span className="text-accent">{line.text}</span>}
-                </div>
-              );
-            })}
+              })}
+            </div>
+          )}
 
           {tab === "files" && (
-            <div>
+            <div className="h-full overflow-y-auto font-mono text-[11.5px] leading-[1.8] text-text-secondary bg-bg p-3">
               {MOCK_FILES.map((f, i) => (
                 <div
                   key={i}
@@ -112,6 +126,8 @@ export default function BottomBar() {
               ))}
             </div>
           )}
+
+          {tab === "logs" && <LogViewer />}
         </div>
       )}
     </div>
