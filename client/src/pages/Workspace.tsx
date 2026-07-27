@@ -67,6 +67,10 @@ export default function Workspace() {
   // API key status
   const [askHasKey, setAskHasKey] = useState(false);
 
+  // Panel-to-panel copy
+  const [askPrefill, setAskPrefill] = useState("");
+  const [agentPrefill, setAgentPrefill] = useState("");
+
   // Check API key status when provider changes
   useEffect(() => {
     hasApiKey(askProvider).then(setAskHasKey);
@@ -131,6 +135,7 @@ export default function Workspace() {
     setAskMessages((prev) => [...prev, userMsg, assistantMsg]);
     setAskStreamingId(assistantMsg.id);
     setAskLoading(true);
+    setAskPrefill("");
 
     const history = [...askMessages, userMsg].map((m) => ({
       role: m.role as "user" | "assistant",
@@ -189,6 +194,7 @@ export default function Workspace() {
     setAgentMessages((prev) => [...prev, userMsg, assistantMsg]);
     setAgentStreamingId(assistantMsg.id);
     setAgentLoading(true);
+    setAgentPrefill("");
 
     streamAgentMessage(agentMachineId, msg, agentSessionId, {
       onSession: (sessionId) => {
@@ -348,6 +354,9 @@ export default function Workspace() {
             onSend={handleAskSend}
             loading={askLoading}
             streamingMessageId={askStreamingId}
+            copyLabel="→ Copy to Agent"
+            onCopyTo={(content) => setAgentPrefill(content)}
+            prefill={askPrefill}
           />
         </div>
 
@@ -379,6 +388,9 @@ export default function Workspace() {
             onSend={handleAgentSend}
             loading={agentLoading}
             streamingMessageId={agentStreamingId}
+            copyLabel="← Copy to Ask"
+            onCopyTo={(content) => setAskPrefill(content)}
+            prefill={agentPrefill}
             headerContent={
               <TodoList
                 steps={agentTodos}

@@ -41,6 +41,9 @@ interface Props {
   streamingMessageId?: string | null;
   onApiKeyChange?: () => void;
   headerContent?: React.ReactNode;
+  copyLabel?: string;
+  onCopyTo?: (content: string) => void;
+  prefill?: string;
 }
 
 function ToolCallCard({ tool }: { tool: ToolCall }) {
@@ -112,6 +115,9 @@ export default function ChatPanel({
   streamingMessageId,
   onApiKeyChange,
   headerContent,
+  copyLabel,
+  onCopyTo,
+  prefill,
 }: Props) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -119,6 +125,13 @@ export default function ChatPanel({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Apply prefill from other panel
+  useEffect(() => {
+    if (prefill) {
+      setInput(prefill);
+    }
+  }, [prefill]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -175,7 +188,7 @@ export default function ChatPanel({
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed ${
+            className={`group relative max-w-[85%] px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed ${
               msg.role === "user"
                 ? "self-end bg-accent text-white rounded-br-sm"
                 : `self-start bg-surface-2 border border-border rounded-bl-sm ${
@@ -204,6 +217,16 @@ export default function ChatPanel({
                   <span className="inline-block w-2 h-4 mt-1 bg-accent animate-pulse" />
                 )}
               </div>
+            )}
+            {/* Copy to other panel button — only on assistant messages */}
+            {msg.role === "assistant" && onCopyTo && copyLabel && msg.content && (
+              <button
+                onClick={() => onCopyTo(msg.content)}
+                className="absolute -bottom-3 left-0 opacity-0 group-hover:opacity-100 px-2 py-0.5 text-[10px] font-medium rounded-md border border-border bg-surface text-text-muted hover:text-text hover:border-border-light transition-all shadow-sm"
+                title={copyLabel}
+              >
+                {copyLabel}
+              </button>
             )}
           </div>
         ))}
