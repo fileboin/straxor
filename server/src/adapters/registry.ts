@@ -5,6 +5,7 @@ import type { LogAdapter } from "./log/adapter.js";
 import type { DeploymentAdapter } from "./deployment/adapter.js";
 import type { ScannerRegistry } from "./security-scanner/registry.js";
 import type { ExportAdapter } from "./export/adapter.js";
+import type { NotificationRegistry } from "./notification/registry.js";
 import { createBoundAdapter, type BoundAdapter } from "./runtime/opencode.js";
 import { createHttpAIProviderAdapter } from "./ai-provider/http.js";
 import { createStubGitAdapter } from "./git/local.js";
@@ -12,6 +13,7 @@ import { createDbLogAdapter } from "./log/db.js";
 import { createDbDeploymentAdapter } from "./deployment/db.js";
 import { createScannerRegistry } from "./security-scanner/registry.js";
 import { createZipExportAdapter } from "./export/zip.js";
+import { createNotificationRegistry } from "./notification/registry.js";
 
 export interface AdapterRegistry {
   runtime: (userId: string) => BoundAdapter;
@@ -21,6 +23,7 @@ export interface AdapterRegistry {
   deployment: DeploymentAdapter;
   securityScanner: ScannerRegistry;
   export: ExportAdapter;
+  notification: NotificationRegistry;
 }
 
 let registry: AdapterRegistry | null = null;
@@ -34,6 +37,7 @@ export function initAdapters(): AdapterRegistry {
     deployment: createDbDeploymentAdapter(),
     securityScanner: createScannerRegistry(),
     export: createZipExportAdapter(),
+    notification: createNotificationRegistry(),
   };
   return registry;
 }

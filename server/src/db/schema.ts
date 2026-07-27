@@ -237,3 +237,40 @@ export const savedPromptsRelations = relations(savedPrompts, ({ one }) => ({
   user: one(users, { fields: [savedPrompts.userId], references: [users.id] }),
   project: one(projects, { fields: [savedPrompts.projectId], references: [projects.id] }),
 }));
+
+export const notificationConfigs = pgTable("notification_configs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  channel: varchar("channel", { length: 20 }).notNull(),
+  enabled: boolean("enabled").default(false),
+  events: text("events").default("[]"),
+  config: text("config").default("{}"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const notificationConfigsRelations = relations(notificationConfigs, ({ one }) => ({
+  user: one(users, { fields: [notificationConfigs.userId], references: [users.id] }),
+}));
+
+export const notificationHistory = pgTable("notification_history", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  channel: varchar("channel", { length: 20 }).notNull(),
+  eventType: varchar("event_type", { length: 30 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  body: text("body").notNull(),
+  severity: varchar("severity", { length: 10 }).notNull().default("info"),
+  success: boolean("success").notNull().default(true),
+  error: text("error"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const notificationHistoryRelations = relations(notificationHistory, ({ one }) => ({
+  user: one(users, { fields: [notificationHistory.userId], references: [users.id] }),
+}));
