@@ -6,11 +6,12 @@ import BottomBar from "../components/workspace/BottomBar.js";
 import SshInput from "../components/workspace/SshInput.js";
 import EnvEditor from "../components/workspace/EnvEditor.js";
 import DeploymentPanel from "../components/workspace/DeploymentPanel.js";
+import DiffReview, { type DiffFile } from "../components/workspace/DiffReview.js";
 import type { ChatMessage, ToolCall } from "../components/workspace/ChatPanel.js";
 import type { PlanActMode } from "../components/workspace/PlanActToggle.js";
 import type { ThinkingBudget } from "../lib/models.js";
 import { streamChat, hasApiKey } from "../lib/chat.js";
-import { streamAgentMessage, fetchTodos, fetchDiff } from "../lib/agent.js";
+import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges } from "../lib/agent.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
   {
@@ -74,6 +75,11 @@ export default function Workspace() {
   // Panel mode: split | ask-full | agent-full
   const [panelMode, setPanelMode] = useState<"split" | "ask-full" | "agent-full">("split");
 
+  // Diff review modal
+  const [showDiffReview, setShowDiffReview] = useState(false);
+  const [diffFiles, setDiffFiles] = useState<DiffFile[]>([]);
+  const [diffLoading, setDiffLoading] = useState(false);
+
   // Check API key status when provider changes
   useEffect(() => {
     hasApiKey(askProvider).then(setAskHasKey);
@@ -125,6 +131,49 @@ export default function Workspace() {
       );
     }
   }, [agentMachineId, agentSessionId, diffCache]);
+
+  // Open diff review modal
+  const handleOpenDiffReview = useCallback(async () => {
+    if (!agentMachineId || !agentSessionId) return;
+    setDiffLoading(true);
+    try {
+      const diffs = await fetchDiff(agentMachineId, agentSessionId);
+      const files: DiffFile[] = diffs.map((d) => ({
+        path: d.path,
+        additions: d.additions,
+        deletions: d.deletions,
+      }));
+      setDiffFiles(files);
+      setShowDiffReview(true);
+    } catch {}
+    setDiffLoading(false);
+  }, [agentMachineId, agentSessionId]);
+
+  // Approve selected changes
+  const handleApprove = useCallback(async (paths: string[]) => {
+    if (!agentMachineId || !agentSessionId) return;
+    setDiffLoading(true);
+    try {
+      await approveChanges(agentMachineId, agentSessionId, paths);
+      setShowDiffReview(false);
+      // Refresh todos after approval
+      setTimeout(() => refreshTodos(), 500);
+    } catch {}
+    setDiffLoading(false);
+  }, [agentMachineId, agentSessionId, refreshTodos]);
+
+  // Reject selected changes
+  const handleReject = useCallback(async (paths: string[]) => {
+    if (!agentMachineId || !agentSessionId) return;
+    setDiffLoading(true);
+    try {
+      await rejectChanges(agentMachineId, agentSessionId, paths);
+      setShowDiffReview(false);
+      // Refresh todos after rejection
+      setTimeout(() => refreshTodos(), 500);
+    } catch {}
+    setDiffLoading(false);
+  }, [agentMachineId, agentSessionId, refreshTodos]);
 
   const handleAskSend = useCallback((msg: string) => {
     const userMsg: ChatMessage = { id: `a-${Date.now()}`, role: "user", content: msg };
@@ -419,12 +468,24 @@ export default function Workspace() {
             isExpanded={panelMode === "agent-full"}
             onToggleExpand={toggleAgentExpand}
             headerContent={
-              <TodoList
-                steps={agentTodos}
-                onConfirm={handleConfirmStep}
-                onExpand={handleExpandStep}
-                loading={agentLoading}
-              />
+              <>
+                <TodoList
+                  steps={agentTodos}
+                  onConfirm={handleConfirmStep}
+                  onExpand={handleExpandStep}
+                  loading={agentLoading}
+                />
+                {agentTodos.length > 0 && (
+                  <div className="px-2 py-1.5 border-b border-border bg-surface">
+                    <button
+                      onClick={handleOpenDiffReview}
+                      className="w-full py-1.5 text-[11px] font-medium rounded-lg border border-accent/30 bg-accent/5 text-accent hover:bg-accent/10 transition-colors"
+                    >
+                      Pregledaj promjene
+                    </button>
+                  </div>
+                )}
+              </>
             }
           />
         </div>
@@ -458,6 +519,17 @@ export default function Workspace() {
         <DeploymentPanel
           projectId="placeholder-project-id"
           onClose={() => setShowDeployModal(false)}
+        />
+      )}
+
+      {/* Diff Review Modal */}
+      {showDiffReview && (
+        <DiffReview
+          files={diffFiles}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          onClose={() => setShowDiffReview(false)}
+          loading={diffLoading}
         />
       )}
     </div>

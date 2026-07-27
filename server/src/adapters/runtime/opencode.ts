@@ -169,6 +169,10 @@ export function createOpenCodeAdapter(): RuntimeAdapter {
     async updateRuntime(machineId, channel, version) {
       throw new Error("updateRuntime requires userId — use bound adapter");
     },
+
+    async executeCommand(machineId, command) {
+      throw new Error("executeCommand requires userId — use bound adapter");
+    },
   };
 }
 
@@ -388,6 +392,13 @@ export function createBoundAdapter(userId: string) {
         ...creds,
       });
       return { ssh, port: machine.opencodePort || 4096 };
+    },
+
+    async executeCommand(machineId: string, command: string) {
+      return withSSHRaw(machineId, userId, async (ssh) => {
+        const { stdout } = await ssh.exec(command);
+        return stdout;
+      });
     },
   };
 }

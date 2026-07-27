@@ -178,4 +178,84 @@ router.get("/diff/:machineId/:sessionId", async (req: Request, res: Response) =>
   }
 });
 
+// POST /api/agent/approve — approve selected file changes
+router.post("/approve", async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const { machineId, sessionId, paths } = req.body as {
+    machineId: string;
+    sessionId: string;
+    paths: string[];
+  };
+
+  if (!machineId || !sessionId || !paths?.length) {
+    res.status(400).json({ error: "Missing required fields" });
+    return;
+  }
+
+  try {
+    const adapter = getAdapters().runtime(userId);
+    // Send approval message to agent session
+    const message = `Korisnik je odobrio promjene na datotekama: ${paths.join(", ")}. Nastavi.`;
+    await adapter.sendMessage(machineId, sessionId, message, "async");
+    res.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/agent/reject — reject selected file changes
+router.post("/reject", async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const { machineId, sessionId, paths } = req.body as {
+    machineId: string;
+    sessionId: string;
+    paths: string[];
+  };
+
+  if (!machineId || !sessionId || !paths?.length) {
+    res.status(400).json({ error: "Missing required fields" });
+    return;
+  }
+
+  try {
+    const adapter = getAdapters().runtime(userId);
+    // Send rejection message — ask agent to revert
+    const message = `Korisnik je ODBIO promjene na datotekama: ${paths.join(", ")}. Vrati te promjene.`;
+    await adapter.sendMessage(machineId, sessionId, message, "async");
+    res.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+// GET /api/agent/file/:machineId/:sessionId/:path — get file content (before/after)
+router.get("/file/:machineId/:sessionId/:encodedPath", async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const machineId = req.params.machineId as string;
+  const sessionId = req.params.sessionId as string;
+  const path = decodeURIComponent(req.params.encodedPath as string);
+  const side = (req.query.side as string) || "after";
+
+  try {
+    const adapter = getAdapters().runtime(userId);
+    // Execute git show or cat to get file content
+    let command: string;
+    if (side === "before") {
+      // Get file content before agent changes — use git show HEAD:path
+      command = `cd /tmp && git show HEAD:${path} 2>/dev/null || echo ""`;
+    } else {
+      // Get current file content
+      command = `cat ${path} 2>/dev/null || echo ""`;
+    }
+
+    const result = await adapter.executeCommand(machineId, command);
+    res.json({ content: result });
+  } catch (error) {
+    // Fallback — return empty content
+    res.json({ content: "" });
+  }
+});
+
 export default router;

@@ -140,3 +140,41 @@ export async function fetchDiff(
     return [];
   }
 }
+
+export async function approveChanges(
+  machineId: string,
+  sessionId: string,
+  paths: string[]
+): Promise<void> {
+  await api("/agent/approve", {
+    method: "POST",
+    body: JSON.stringify({ machineId, sessionId, paths }),
+  });
+}
+
+export async function rejectChanges(
+  machineId: string,
+  sessionId: string,
+  paths: string[]
+): Promise<void> {
+  await api("/agent/reject", {
+    method: "POST",
+    body: JSON.stringify({ machineId, sessionId, paths }),
+  });
+}
+
+export async function fetchFileContent(
+  machineId: string,
+  sessionId: string,
+  path: string,
+  side: "before" | "after"
+): Promise<string> {
+  try {
+    const data = await api<{ content: string }>(
+      `/agent/file/${machineId}/${sessionId}/${encodeURIComponent(path)}?side=${side}`
+    );
+    return data.content;
+  } catch {
+    return "";
+  }
+}

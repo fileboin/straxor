@@ -50,4 +50,5 @@ export interface RuntimeAdapter {
     channel: RuntimeChannel,
     version?: string
   ): Promise<RuntimeHealth>;
+  executeCommand(machineId: string, command: string): Promise<string>;
 }
