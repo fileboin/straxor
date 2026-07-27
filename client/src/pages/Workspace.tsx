@@ -26,6 +26,7 @@ import CommandPalette from "../components/workspace/CommandPalette.js";
 import WorktreeManager from "../components/workspace/WorktreeManager.js";
 import BrowserVerifier from "../components/workspace/BrowserVerifier.js";
 import SessionPicker from "../components/workspace/SessionPicker.js";
+import SearchPanel from "../components/workspace/SearchPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -84,6 +85,7 @@ export default function Workspace() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showWorktrees, setShowWorktrees] = useState(false);
   const [showBrowserVerify, setShowBrowserVerify] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -251,6 +253,11 @@ export default function Workspace() {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setShowCommandPalette((prev) => !prev);
+      }
+      // Search shortcut (Ctrl+Shift+F)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "F") {
+        e.preventDefault();
+        setShowSearch((prev) => !prev);
       }
     };
     window.addEventListener("keydown", handler);
@@ -695,6 +702,18 @@ export default function Workspace() {
 
   // ── Command Palette commands ──
   const commands: Command[] = useMemo(() => [
+    // Search command
+    {
+      id: "search-project",
+      label: "Pretraga projekta",
+      description: "Pretraži datoteke, tekst, regex",
+      icon: "🔍",
+      category: "file",
+      shortcut: "MOD+SHIFT+F",
+      keywords: ["search", "pretraga", "find", "nađi", "grep"],
+      action: () => setShowSearch(true),
+    },
+
     // Panel commands
     {
       id: "panel-split",
@@ -1345,6 +1364,19 @@ export default function Workspace() {
           onClose={() => setShowSessionPicker(false)}
         />
       )}
+
+      {/* Search Panel */}
+      <SearchPanel
+        machineId={agentMachineId}
+        open={showSearch}
+        onClose={() => setShowSearch(false)}
+        onFileSelect={(path, line) => {
+          setShowSearch(false);
+          // Open file in BottomBar editor — trigger by clicking Files tab
+          // For now, log the path; full integration with EditorContainer comes later
+          console.log("Open file:", path, "line:", line);
+        }}
+      />
 
       {/* Command Palette */}
       <CommandPalette
