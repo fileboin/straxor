@@ -24,6 +24,7 @@ import ExportPanel from "../components/workspace/ExportPanel.js";
 import NotificationSettings from "../components/workspace/NotificationSettings.js";
 import CommandPalette from "../components/workspace/CommandPalette.js";
 import WorktreeManager from "../components/workspace/WorktreeManager.js";
+import BrowserVerifier from "../components/workspace/BrowserVerifier.js";
 import type { VerificationResult } from "../lib/verify.js";
 import type { Command } from "../lib/commands.js";
 
@@ -72,6 +73,7 @@ export default function Workspace() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showWorktrees, setShowWorktrees] = useState(false);
+  const [showBrowserVerify, setShowBrowserVerify] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -667,6 +669,15 @@ export default function Workspace() {
       keywords: ["worktree", "git", "branch", "grana", "paralelno"],
       action: () => setShowWorktrees(true),
     },
+    {
+      id: "action-browser-verify",
+      label: "Browser Verifikacija",
+      description: "Testiraj stranice u browseru — screenshot, JS greške, forme",
+      icon: "🌐",
+      category: "action",
+      keywords: ["browser", "playwright", "screenshot", "test", "web"],
+      action: () => setShowBrowserVerify(true),
+    },
 
     // Settings commands
     {
@@ -778,6 +789,7 @@ export default function Workspace() {
         onOpenExport={() => setShowExportModal(true)}
         onOpenNotifications={() => setShowNotifications(true)}
         onOpenWorktrees={() => setShowWorktrees(true)}
+        onOpenBrowserVerify={() => setShowBrowserVerify(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -1082,6 +1094,13 @@ export default function Workspace() {
         <WorktreeManager
           machineId={agentMachineId}
           onClose={() => setShowWorktrees(false)}
+        />
+      )}
+
+      {showBrowserVerify && agentMachineId && (
+        <BrowserVerifier
+          machineId={agentMachineId}
+          onClose={() => setShowBrowserVerify(false)}
         />
       )}
 

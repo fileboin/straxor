@@ -17,6 +17,7 @@ interface Props {
   onOpenExport?: () => void;
   onOpenNotifications?: () => void;
   onOpenWorktrees?: () => void;
+  onOpenBrowserVerify?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -50,6 +51,7 @@ export default function WorkspaceTopbar({
   onOpenExport,
   onOpenNotifications,
   onOpenWorktrees,
+  onOpenBrowserVerify,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -134,6 +136,7 @@ export default function WorkspaceTopbar({
           onOpenExport={onOpenExport}
           onOpenNotifications={onOpenNotifications}
           onOpenWorktrees={onOpenWorktrees}
+          onOpenBrowserVerify={onOpenBrowserVerify}
         />
       </div>
     </header>
