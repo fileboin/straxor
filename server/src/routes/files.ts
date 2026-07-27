@@ -27,7 +27,6 @@ router.get("/tree", requireAuth, async (req: any, res) => {
     const exec = getExec(userId);
     const path = rootPath || ".";
 
-    // Get tree using find command
     const output = await exec(
       machineId,
       `find ${path} -maxdepth 4 -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' -not -path '*/.next/*' -not -path '*/__pycache__/*' -not -path '*/.venv/*' -not -path '*/target/*' 2>/dev/null | head -500`
@@ -53,18 +52,15 @@ router.get("/read", requireAuth, async (req: any, res) => {
 
     const exec = getExec(userId);
 
-    // Check file size first
     const sizeOutput = await exec(machineId, `wc -c < "${path}" 2>/dev/null || echo "0"`);
     const size = parseInt(sizeOutput.trim(), 10);
     if (size > 1024 * 1024) {
       return res.status(400).json({ error: "File too large (>1MB)" });
     }
 
-    // Read file, handle binary files
     const output = await exec(machineId, `cat "${path}" 2>/dev/null || echo ""`);
     const content = output.replace(/\n$/, "");
 
-    // Check if it looks like binary
     const hasBinary = /[\x00-\x08\x0e-\x1f]/.test(content);
     if (hasBinary) {
       return res.json({ content: "[Binary file]", binary: true });
@@ -88,12 +84,16 @@ router.post("/write", requireAuth, async (req: any, res) => {
 
     const exec = getExec(userId);
 
-    // Escape content for shell
+    // Use printf for safe content writing (handles newlines, special chars)
     const escaped = content
       .replace(/\\/g, "\\\\")
-      .replace(/'/g, "'\\''");
+      .replace(/%/g, "%%")
+      .replace(/'/g, "'\\''")
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\r")
+      .replace(/\t/g, "\\t");
 
-    await exec(machineId, `echo '${escaped}' > "${filePath}"`);
+    await exec(machineId, `printf '%s' '${escaped}' > "${filePath}"`);
     res.json({ success: true });
   } catch (error) {
     console.error("Error writing file:", error);
@@ -101,7 +101,7 @@ router.post("/write", requireAuth, async (req: any, res) => {
   }
 });
 
-// POST /api/files/delete — delete file
+// POST /api/files/delete — delete file or directory
 router.post("/delete", requireAuth, async (req: any, res) => {
   try {
     const userId = req.userId;
@@ -111,7 +111,7 @@ router.post("/delete", requireAuth, async (req: any, res) => {
     }
 
     const exec = getExec(userId);
-    await exec(machineId, `rm -f "${filePath}"`);
+    await exec(machineId, `rm -rf "${filePath}"`);
     res.json({ success: true });
   } catch (error) {
     console.error("Error deleting file:", error);
@@ -134,6 +134,42 @@ router.post("/mkdir", requireAuth, async (req: any, res) => {
   } catch (error) {
     console.error("Error creating directory:", error);
     res.status(500).json({ error: "Failed to create directory" });
+  }
+});
+
+// POST /api/files/touch — create empty file
+router.post("/touch", requireAuth, async (req: any, res) => {
+  try {
+    const userId = req.userId;
+    const { machineId, path: filePath } = req.body;
+    if (!machineId || !filePath) {
+      return res.status(400).json({ error: "machineId and path required" });
+    }
+
+    const exec = getExec(userId);
+    await exec(machineId, `touch "${filePath}"`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error creating file:", error);
+    res.status(500).json({ error: "Failed to create file" });
+  }
+});
+
+// POST /api/files/rename — rename / move file or directory
+router.post("/rename", requireAuth, async (req: any, res) => {
+  try {
+    const userId = req.userId;
+    const { machineId, oldPath, newPath } = req.body;
+    if (!machineId || !oldPath || !newPath) {
+      return res.status(400).json({ error: "machineId, oldPath, and newPath required" });
+    }
+
+    const exec = getExec(userId);
+    await exec(machineId, `mv "${oldPath}" "${newPath}"`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error renaming file:", error);
+    res.status(500).json({ error: "Failed to rename file" });
   }
 });
 
@@ -180,7 +216,6 @@ function buildTree(lines: string[], rootPath: string): FileEntry[] {
   const entries: FileEntry[] = [];
   const seen = new Set<string>();
 
-  // Sort: directories first, then files
   const sorted = [...lines].sort((a, b) => {
     const aIsDir = a.endsWith("/");
     const bIsDir = b.endsWith("/");
@@ -194,19 +229,14 @@ function buildTree(lines: string[], rootPath: string): FileEntry[] {
     const name = cleanPath.split("/").pop() || cleanPath;
     const isDir = line.endsWith("/");
 
-    // Skip hidden files and common ignores
-    if (name.startsWith(".") && name !== ".env") continue;
-    if (name === "node_modules" || name === ".git" || name === "dist" || name === ".next") continue;
+    if (name === "node_modules" || name === ".git" || name === "dist" || name === ".next" || name === "__pycache__" || name === ".venv" || name === "target") continue;
 
-    // Calculate depth relative to root
     const relativePath = cleanPath.startsWith(rootPath + "/")
       ? cleanPath.slice(rootPath.length + 1)
       : cleanPath;
     const depth = relativePath.split("/").length - 1;
 
-    // Only show top 2 levels in the initial tree
-    if (depth > 2) continue;
-
+    if (depth > 3) continue;
     if (seen.has(cleanPath)) continue;
     seen.add(cleanPath);
 
