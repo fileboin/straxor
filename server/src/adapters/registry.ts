@@ -3,11 +3,13 @@ import type { AIProviderAdapter } from "./ai-provider/adapter.js";
 import type { GitAdapter } from "./git/adapter.js";
 import type { LogAdapter } from "./log/adapter.js";
 import type { DeploymentAdapter } from "./deployment/adapter.js";
+import type { ScannerRegistry } from "./security-scanner/registry.js";
 import { createBoundAdapter, type BoundAdapter } from "./runtime/opencode.js";
 import { createHttpAIProviderAdapter } from "./ai-provider/http.js";
 import { createStubGitAdapter } from "./git/local.js";
 import { createDbLogAdapter } from "./log/db.js";
 import { createDbDeploymentAdapter } from "./deployment/db.js";
+import { createScannerRegistry } from "./security-scanner/registry.js";
 
 export interface AdapterRegistry {
   runtime: (userId: string) => BoundAdapter;
@@ -15,6 +17,7 @@ export interface AdapterRegistry {
   git: GitAdapter;
   log: LogAdapter;
   deployment: DeploymentAdapter;
+  securityScanner: ScannerRegistry;
 }
 
 let registry: AdapterRegistry | null = null;
@@ -26,6 +29,7 @@ export function initAdapters(): AdapterRegistry {
     git: createStubGitAdapter(),
     log: createDbLogAdapter(),
     deployment: createDbDeploymentAdapter(),
+    securityScanner: createScannerRegistry(),
   };
   return registry;
 }

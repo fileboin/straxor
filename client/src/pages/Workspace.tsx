@@ -16,8 +16,10 @@ import { streamChat, hasApiKey } from "../lib/chat.js";
 import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges } from "../lib/agent.js";
 import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
 import { type AgentRole, getRoleById, fetchPrompts, type SavedPrompt } from "../lib/roles.js";
+import { checkBeforeInstall, type ScanVerdict } from "../lib/security.js";
 import RoleSelector from "../components/workspace/RoleSelector.js";
 import PromptLibrary from "../components/workspace/PromptLibrary.js";
+import SecurityScanResult from "../components/workspace/SecurityScanResult.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
   {
@@ -77,6 +79,11 @@ export default function Workspace() {
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
   const [activePromptIds, setActivePromptIds] = useState<Set<string>>(new Set());
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
+
+  // Security scan state
+  const [securityVerdict, setSecurityVerdict] = useState<ScanVerdict | null>(null);
+  const [securityPackageName, setSecurityPackageName] = useState<string>("");
+  const [pendingInstallAllow, setPendingInstallAllow] = useState<(() => void) | null>(null);
 
   // Agent session state
   const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
@@ -248,6 +255,28 @@ export default function Workspace() {
     });
   }, [askProvider, askModel, askThinking, askMessages]);
 
+  // Helper: proceed with tool allow after permission/security check
+  const proceedToolAllow = useCallback(
+    (toolCallId: string, toolName: string, toolArgs: Record<string, unknown> | string, assistantMsgId: string) => {
+      setAgentMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantMsgId) return m;
+          const existing = m.toolCalls || [];
+          const idx = existing.findIndex((tc) => tc.id === toolCallId);
+          const tc: ToolCall = { id: toolCallId, name: toolName, args: toolArgs, status: "running" };
+          const updated = [...existing];
+          if (idx >= 0) {
+            updated[idx] = { ...updated[idx], status: "running", args: toolArgs };
+          } else {
+            updated.push(tc);
+          }
+          return { ...m, toolCalls: updated };
+        })
+      );
+    },
+    []
+  );
+
   const handleAgentSend = useCallback((msg: string) => {
     if (!agentMachineId) {
       setAgentMessages((prev) => [
@@ -325,21 +354,38 @@ export default function Workspace() {
             args,
             onAllow: () => {
               setPendingTool(null);
-              setAgentMessages((prev) =>
-                prev.map((m) => {
-                  if (m.id !== assistantMsg.id) return m;
-                  const existing = m.toolCalls || [];
-                  const idx = existing.findIndex((tc) => tc.id === id);
-                  const tc: ToolCall = { id, name, args, status: "running" };
-                  const updated = [...existing];
-                  if (idx >= 0) {
-                    updated[idx] = { ...updated[idx], status: "running", args };
-                  } else {
-                    updated.push(tc);
-                  }
-                  return { ...m, toolCalls: updated };
-                })
-              );
+
+              // For install_package, run security check first
+              if (name === "install_package") {
+                const pkgName = typeof args === "string"
+                  ? args
+                  : (args.package || args.name || args.packageName || "") as string;
+                const pkgVersion = typeof args === "string"
+                  ? "latest"
+                  : (args.version || "latest") as string;
+                const ecosystem = typeof args === "string"
+                  ? "npm"
+                  : (args.ecosystem || "npm") as string;
+
+                if (pkgName) {
+                  setSecurityPackageName(pkgName);
+                  setPendingInstallAllow(() => () => {
+                    proceedToolAllow(id, name, args, assistantMsg.id);
+                  });
+
+                  checkBeforeInstall(pkgName, pkgVersion, ecosystem, agentMachineId || undefined)
+                    .then((verdict) => {
+                      setSecurityVerdict(verdict);
+                    })
+                    .catch(() => {
+                      // If scan fails, proceed anyway
+                      proceedToolAllow(id, name, args, assistantMsg.id);
+                    });
+                  return;
+                }
+              }
+
+              proceedToolAllow(id, name, args, assistantMsg.id);
             },
             onDeny: () => {
               setPendingTool(null);
@@ -683,6 +729,55 @@ export default function Workspace() {
                   });
                 }}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Security Scan Result Modal */}
+      {securityVerdict && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-[500px] mx-4 bg-surface border border-border rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
+            <div className="px-4 py-3 border-b border-border">
+              <span className="text-[13px] font-semibold text-text">🔍 Sigurnosna provjera</span>
+            </div>
+            <div className="p-4 max-h-[60vh] overflow-y-auto">
+              <SecurityScanResult
+                verdict={securityVerdict}
+                packageName={securityPackageName}
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
+              <button
+                onClick={() => {
+                  setSecurityVerdict(null);
+                  setPendingInstallAllow(null);
+                }}
+                className="text-[11px] text-text-muted hover:text-text px-3 py-1.5 rounded-lg hover:bg-surface-2 transition-colors"
+              >
+                Otkaži
+              </button>
+              {securityVerdict.verdict === "block" ? (
+                <span className="text-[11px] text-red-400 px-3 py-1.5">
+                  ⛔ Instalacija blokirana
+                </span>
+              ) : (
+                <button
+                  onClick={() => {
+                    const allowFn = pendingInstallAllow;
+                    setSecurityVerdict(null);
+                    setPendingInstallAllow(null);
+                    if (allowFn) allowFn();
+                  }}
+                  className={`text-[11px] text-white px-3 py-1.5 rounded-lg transition-colors ${
+                    securityVerdict.verdict === "warn"
+                      ? "bg-yellow-500 hover:bg-yellow-400"
+                      : "bg-accent hover:bg-accent-light"
+                  }`}
+                >
+                  {securityVerdict.verdict === "warn" ? "⚠ Nastavi unatoč upozorenju" : "✓ Nastavi instalaciju"}
+                </button>
+              )}
             </div>
           </div>
         </div>

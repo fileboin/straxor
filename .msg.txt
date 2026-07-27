@@ -1,1 +1,1 @@
-Block 26: System Prompt / Agent Role  
+Block 27: Security Scanner Adapter  
