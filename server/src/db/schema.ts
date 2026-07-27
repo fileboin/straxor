@@ -295,3 +295,50 @@ export const worktreesRelations = relations(worktrees, ({ one }) => ({
   user: one(users, { fields: [worktrees.userId], references: [users.id] }),
   machine: one(machines, { fields: [worktrees.machineId], references: [machines.id] }),
 }));
+
+export const sessions = pgTable("sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  machineId: uuid("machine_id")
+    .notNull()
+    .references(() => machines.id, { onDelete: "cascade" }),
+  opencodeSessionId: varchar("opencode_session_id", { length: 255 }),
+  title: varchar("title", { length: 255 }),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  agentConfig: text("agent_config"),
+  askConfig: text("ask_config"),
+  activePromptIds: text("active_prompt_ids"),
+  lastTask: text("last_task"),
+  context: text("context"),
+  todoSnapshot: text("todo_snapshot"),
+  errorLog: text("error_log"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, { fields: [sessions.userId], references: [users.id] }),
+  project: one(projects, { fields: [sessions.projectId], references: [projects.id] }),
+  machine: one(machines, { fields: [sessions.machineId], references: [machines.id] }),
+}));
+
+export const sessionMessages = pgTable("session_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => sessions.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 20 }).notNull(),
+  content: text("content").notNull().default(""),
+  label: varchar("label", { length: 100 }),
+  toolCalls: text("tool_calls"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const sessionMessagesRelations = relations(sessionMessages, ({ one }) => ({
+  session: one(sessions, { fields: [sessionMessages.sessionId], references: [sessions.id] }),
+}));

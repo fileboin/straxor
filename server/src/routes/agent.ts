@@ -7,36 +7,54 @@ const router = Router();
 // POST /api/agent/send — send message to OpenCode via adapter
 router.post("/send", async (req: Request, res: Response) => {
   const userId = (req as any).userId as string;
-  const { machineId, sessionId, text, mode } = req.body as {
+  const { machineId, sessionId, text, message, mode } = req.body as {
     machineId: string;
-    sessionId: string;
-    text: string;
+    sessionId?: string;
+    text?: string;
+    message?: string;
     mode?: "sync" | "async";
   };
 
-  if (!machineId || !sessionId || !text) {
-    res.status(400).json({ error: "Missing required fields" });
+  // Support both `text` and `message` field names
+  const msgText = text || message;
+
+  if (!machineId || !msgText) {
+    res.status(400).json({ error: "Missing required fields: machineId, text/message" });
     return;
+  }
+
+  // Auto-create session if none provided
+  let activeSessionId = sessionId;
+  if (!activeSessionId) {
+    try {
+      const adapter = getAdapters().runtime(userId);
+      const result = await adapter.createSession(machineId, "Straxor Session");
+      activeSessionId = result.id;
+    } catch (err) {
+      res.status(500).json({ error: "Failed to create session" });
+      return;
+    }
   }
 
   try {
     const adapter = getAdapters().runtime(userId);
 
-    // Try async first (prompt_async)
-    const effectiveMode = mode || "async";
-    let result;
-    try {
-      result = await adapter.sendMessage(machineId, sessionId, text, effectiveMode);
-    } catch {
-      // prompt_async may not be supported, fall back to sync
-      result = await adapter.sendMessage(machineId, sessionId, text, "sync");
-    }
-
-    // Set SSE headers for the response
+    // Emit session ID to client
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no");
+    res.write(`data: ${JSON.stringify({ type: "session", sessionId: activeSessionId })}\n\n`);
+
+    // Try async first (prompt_async)
+    const effectiveMode = mode || "async";
+    let result;
+    try {
+      result = await adapter.sendMessage(machineId, activeSessionId, msgText, effectiveMode);
+    } catch {
+      // prompt_async may not be supported, fall back to sync
+      result = await adapter.sendMessage(machineId, activeSessionId, msgText, "sync");
+    }
 
     // If we got parts back from sync, forward them as events
     if (result?.parts) {

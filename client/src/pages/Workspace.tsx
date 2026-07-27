@@ -25,7 +25,17 @@ import NotificationSettings from "../components/workspace/NotificationSettings.j
 import CommandPalette from "../components/workspace/CommandPalette.js";
 import WorktreeManager from "../components/workspace/WorktreeManager.js";
 import BrowserVerifier from "../components/workspace/BrowserVerifier.js";
+import SessionPicker from "../components/workspace/SessionPicker.js";
 import type { VerificationResult } from "../lib/verify.js";
+import {
+  fetchSessions,
+  fetchSession,
+  createSession,
+  updateSession,
+  saveMessage,
+  restoreMessages,
+  type Session,
+} from "../lib/sessions.js";
 import type { Command } from "../lib/commands.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [
@@ -101,6 +111,12 @@ export default function Workspace() {
   const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
   const [agentMachineId, setAgentMachineId] = useState<string | null>(null);
 
+  // Resume system state
+  const [dbSessionId, setDbSessionId] = useState<string | null>(null);
+  const [dbSessions, setDbSessions] = useState<Session[]>([]);
+  const [showSessionPicker, setShowSessionPicker] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(false);
+
   // Agent todo state
   const [agentTodos, setAgentTodos] = useState<TodoStep[]>([]);
   const [confirmedSteps, setConfirmedSteps] = useState<Set<string>>(new Set());
@@ -126,11 +142,108 @@ export default function Workspace() {
     hasApiKey(askProvider).then(setAskHasKey);
   }, [askProvider]);
 
-  // Load permissions on mount
+  // Load permissions and saved prompts on mount
   useEffect(() => {
     fetchPermissions().then(setPermissions);
     fetchPrompts().then(setSavedPrompts);
   }, []);
+
+  // Resume system — load sessions on mount
+  useEffect(() => {
+    const PROJECT_ID = "straxor-landing";
+    fetchSessions(PROJECT_ID).then(setDbSessions);
+  }, []);
+
+  // Resume system — restore latest active session
+  const restoreLatestSession = useCallback(async () => {
+    if (dbSessions.length === 0) return;
+    const latest = dbSessions[0];
+    if (!latest) return;
+
+    setSessionLoading(true);
+    try {
+      const full = await fetchSession(latest.id);
+      if (!full) return;
+
+      // Restore DB session ID
+      setDbSessionId(full.id);
+
+      // Restore OpenCode session ID
+      if (full.opencodeSessionId) {
+        setAgentSessionId(full.opencodeSessionId);
+      }
+
+      // Restore machine ID
+      if (full.machineId) {
+        setAgentMachineId(full.machineId);
+        setVpsStatus("ready");
+      }
+
+      // Restore agent config
+      if (full.agentConfig) {
+        try {
+          const cfg = JSON.parse(full.agentConfig);
+          if (cfg.provider) setAgentProvider(cfg.provider);
+          if (cfg.model) setAgentModel(cfg.model);
+          if (cfg.thinking) setAgentThinking(cfg.thinking);
+          if (cfg.role) setAgentRole(cfg.role);
+          if (cfg.planAct) setAgentPlanAct(cfg.planAct);
+        } catch {}
+      }
+
+      // Restore ask config
+      if (full.askConfig) {
+        try {
+          const cfg = JSON.parse(full.askConfig);
+          if (cfg.provider) setAskProvider(cfg.provider);
+          if (cfg.model) setAskModel(cfg.model);
+          if (cfg.thinking) setAskThinking(cfg.thinking);
+          if (cfg.planAct) setAskPlanAct(cfg.planAct);
+        } catch {}
+      }
+
+      // Restore active prompts
+      if (full.activePromptIds) {
+        try {
+          const ids = JSON.parse(full.activePromptIds);
+          setActivePromptIds(new Set(ids));
+        } catch {}
+      }
+
+      // Restore messages
+      if (full.messages && full.messages.length > 0) {
+        const restored = restoreMessages(full.messages);
+        setAgentMessages(restored as ChatMessage[]);
+      }
+
+      // Restore todos
+      if (full.todoSnapshot) {
+        try {
+          const todos = JSON.parse(full.todoSnapshot);
+          setAgentTodos(todos);
+        } catch {}
+      }
+    } finally {
+      setSessionLoading(false);
+    }
+  }, [dbSessions]);
+
+  // Auto-restore on mount if there's an active session
+  useEffect(() => {
+    if (dbSessions.length > 0 && !dbSessionId && !sessionLoading) {
+      restoreLatestSession();
+    }
+  }, [dbSessions, dbSessionId, sessionLoading, restoreLatestSession]);
+
+  // Auto-save todos to DB session when they change
+  useEffect(() => {
+    if (dbSessionId && agentTodos.length > 0) {
+      const timeout = setTimeout(() => {
+        updateSession(dbSessionId, { todoSnapshot: JSON.stringify(agentTodos) }).catch(() => {});
+      }, 1000);
+      return () => clearTimeout(timeout);
+    }
+  }, [dbSessionId, agentTodos]);
 
   // Command palette keyboard shortcut (CTRL/CMD + K)
   useEffect(() => {
@@ -312,7 +425,7 @@ export default function Workspace() {
     []
   );
 
-  const handleAgentSend = useCallback((msg: string) => {
+  const handleAgentSend = useCallback(async (msg: string) => {
     if (!agentMachineId) {
       setAgentMessages((prev) => [
         ...prev,
@@ -324,6 +437,32 @@ export default function Workspace() {
         },
       ]);
       return;
+    }
+
+    // Auto-create DB session on first message
+    let activeDbSessionId = dbSessionId;
+    if (!activeDbSessionId) {
+      try {
+        const PROJECT_ID = "straxor-landing";
+        const sess = await createSession(
+          PROJECT_ID,
+          agentMachineId,
+          msg.slice(0, 100),
+          { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, planAct: agentPlanAct },
+          { provider: askProvider, model: askModel, thinking: askThinking, planAct: askPlanAct }
+        );
+        activeDbSessionId = sess.id;
+        setDbSessionId(sess.id);
+        // Refresh session list
+        fetchSessions(PROJECT_ID).then(setDbSessions);
+      } catch (err) {
+        console.error("Failed to create DB session:", err);
+      }
+    }
+
+    // Save user message to DB
+    if (activeDbSessionId) {
+      saveMessage(activeDbSessionId, "user", msg).catch(() => {});
     }
 
     // Build system context from role + active prompts
@@ -475,6 +614,32 @@ export default function Workspace() {
         setAgentLoading(false);
         // Refresh todos after agent finishes
         setTimeout(() => refreshTodos(), 300);
+
+        // Save assistant message to DB
+        if (dbSessionId) {
+          const msgId = assistantMsg.id;
+          // Get the assistant message content from the current state
+          setAgentMessages((prev) => {
+            const found = prev.find((m) => m.id === msgId);
+            if (found && found.content) {
+              saveMessage(
+                dbSessionId,
+                "assistant",
+                found.content,
+                found.label,
+                found.toolCalls
+              ).catch(() => {});
+            }
+            return prev;
+          });
+
+          // Save session metadata
+          updateSession(dbSessionId, {
+            lastTask: msg.slice(0, 500),
+            agentConfig: JSON.stringify({ provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, planAct: agentPlanAct }),
+            activePromptIds: JSON.stringify(Array.from(activePromptIds)),
+          }).catch(() => {});
+        }
       },
       onError: (error) => {
         setAgentMessages((prev) =>
@@ -488,7 +653,7 @@ export default function Workspace() {
         setAgentLoading(false);
       },
     });
-  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds]);
+  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, agentPlanAct, askProvider, askModel, askThinking, askPlanAct]);
 
   // Confirm a step — send message to agent to continue
   const handleConfirmStep = useCallback(
@@ -677,6 +842,31 @@ export default function Workspace() {
       category: "action",
       keywords: ["browser", "playwright", "screenshot", "test", "web"],
       action: () => setShowBrowserVerify(true),
+    },
+    {
+      id: "action-new-session",
+      label: "Nova sesija",
+      description: "Resetuj agent sesiju i započni novu",
+      icon: "🔄",
+      category: "action",
+      keywords: ["session", "sesija", "novi", "reset", "restart"],
+      action: () => {
+        setDbSessionId(null);
+        setAgentSessionId(null);
+        setAgentMessages([]);
+        setAgentTodos([]);
+        setConfirmedSteps(new Set());
+        setDiffCache({});
+      },
+    },
+    {
+      id: "action-session-history",
+      label: "Prethodne sesije",
+      description: "Prikaži i nastavi prethodne sesije",
+      icon: "📋",
+      category: "action",
+      keywords: ["session", "sesija", "povijest", "nastavi", "resume"],
+      action: () => setShowSessionPicker(true),
     },
 
     // Settings commands
@@ -1101,6 +1291,58 @@ export default function Workspace() {
         <BrowserVerifier
           machineId={agentMachineId}
           onClose={() => setShowBrowserVerify(false)}
+        />
+      )}
+
+      {showSessionPicker && (
+        <SessionPicker
+          sessions={dbSessions}
+          currentSessionId={dbSessionId}
+          onSelect={async (session) => {
+            setShowSessionPicker(false);
+            setDbSessionId(session.id);
+            if (session.opencodeSessionId) {
+              setAgentSessionId(session.opencodeSessionId);
+            }
+            if (session.machineId) {
+              setAgentMachineId(session.machineId);
+              setVpsStatus("ready");
+            }
+            // Load full session with messages
+            const full = await fetchSession(session.id);
+            if (full?.messages) {
+              setAgentMessages(restoreMessages(full.messages) as ChatMessage[]);
+            }
+            if (full?.todoSnapshot) {
+              try { setAgentTodos(JSON.parse(full.todoSnapshot)); } catch {}
+            }
+            if (full?.agentConfig) {
+              try {
+                const cfg = JSON.parse(full.agentConfig);
+                if (cfg.provider) setAgentProvider(cfg.provider);
+                if (cfg.model) setAgentModel(cfg.model);
+                if (cfg.role) setAgentRole(cfg.role);
+              } catch {}
+            }
+          }}
+          onNewSession={() => {
+            setShowSessionPicker(false);
+            setDbSessionId(null);
+            setAgentSessionId(null);
+            setAgentMessages([]);
+            setAgentTodos([]);
+            setConfirmedSteps(new Set());
+          }}
+          onDelete={async (id) => {
+            await import("../lib/sessions.js").then((m) => m.deleteSession(id));
+            setDbSessions((prev) => prev.filter((s) => s.id !== id));
+            if (dbSessionId === id) {
+              setDbSessionId(null);
+              setAgentSessionId(null);
+              setAgentMessages([]);
+            }
+          }}
+          onClose={() => setShowSessionPicker(false)}
         />
       )}
 
