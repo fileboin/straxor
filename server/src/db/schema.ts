@@ -102,3 +102,46 @@ export const logs = pgTable("logs", {
 export const logsRelations = relations(logs, ({ one }) => ({
   user: one(users, { fields: [logs.userId], references: [users.id] }),
 }));
+
+export const projectEnvs = pgTable("project_envs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  key: varchar("key", { length: 255 }).notNull(),
+  value: text("value").notNull(),
+  description: text("description"),
+  isSecret: boolean("is_secret").default(false),
+  isRequired: boolean("is_required").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const projectEnvsRelations = relations(projectEnvs, ({ one }) => ({
+  project: one(projects, { fields: [projectEnvs.projectId], references: [projects.id] }),
+  user: one(users, { fields: [projectEnvs.userId], references: [users.id] }),
+}));
+
+export const projectEnvHistory = pgTable("project_env_history", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  envId: uuid("env_id"),
+  action: varchar("action", { length: 20 }).notNull(),
+  key: varchar("key", { length: 255 }).notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const projectEnvHistoryRelations = relations(projectEnvHistory, ({ one }) => ({
+  project: one(projects, { fields: [projectEnvHistory.projectId], references: [projects.id] }),
+  user: one(users, { fields: [projectEnvHistory.userId], references: [users.id] }),
+}));

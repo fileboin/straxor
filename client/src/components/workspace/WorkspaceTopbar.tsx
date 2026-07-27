@@ -9,6 +9,7 @@ interface Props {
   onOrchestratorChange: (value: boolean) => void;
   vpsStatus?: "disconnected" | "connecting" | "provisioning" | "ready" | "error";
   onConnectVps?: () => void;
+  onOpenEnv?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -35,6 +36,7 @@ export default function WorkspaceTopbar({
   onOrchestratorChange,
   vpsStatus = "disconnected",
   onConnectVps,
+  onOpenEnv,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -95,6 +97,12 @@ export default function WorkspaceTopbar({
           <span className="hidden lg:inline">{VPS_STATUS_LABELS[vpsStatus]}</span>
         </button>
 
+        <button
+          onClick={onOpenEnv}
+          className="hidden sm:flex px-2.5 py-1.5 rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+        >
+          .env
+        </button>
         <button className="hidden sm:flex px-2.5 py-1.5 rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors">
           Deploy
         </button>
