@@ -41,6 +41,7 @@ import GitRemotePanel from "../components/workspace/GitRemotePanel.js";
 import UsagePanel from "../components/workspace/UsagePanel.js";
 import RuntimeSelector from "../components/workspace/RuntimeSelector.js";
 import QuickStartPanel from "../components/workspace/QuickStartPanel.js";
+import KanbanCommandCenter from "../components/workspace/KanbanCommandCenter.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -114,6 +115,7 @@ export default function Workspace() {
   const [showUsage, setShowUsage] = useState(false);
   const [showRuntimeManager, setShowRuntimeManager] = useState(false);
   const [showQuickStart, setShowQuickStart] = useState(false);
+  const [showKanban, setShowKanban] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -1018,6 +1020,15 @@ export default function Workspace() {
       action: () => setShowQuickStart(true),
     },
     {
+      id: "kanban",
+      label: "Komandni Centar",
+      description: "Kanban pregled sesija, deployeva i VPS-a",
+      icon: "📋",
+      category: "action",
+      keywords: ["kanban", "komandni", "centar", "board", "sesije", "deploy", "vps"],
+      action: () => setShowKanban(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1550,6 +1561,7 @@ export default function Workspace() {
               usage: () => setShowUsage(true),
               "runtime-manager": () => setShowRuntimeManager(true),
               "quick-start": () => setShowQuickStart(true),
+              kanban: () => setShowKanban(true),
             };
             const handler = panelMap[action];
             if (handler) handler();
@@ -1583,6 +1595,23 @@ export default function Workspace() {
 
       {showQuickStart && (
         <QuickStartPanel onClose={() => setShowQuickStart(false)} />
+      )}
+
+      {showKanban && (
+        <KanbanCommandCenter
+          onClose={() => setShowKanban(false)}
+          onNavigate={(sessionId, machineId) => {
+            setShowKanban(false);
+            setDbSessionId(sessionId);
+            setAgentMachineId(machineId);
+            setVpsStatus("ready");
+          }}
+          runtimes={[
+            { id: "opencode", name: "OpenCode" },
+            { id: "crush", name: "Crush" },
+            { id: "claude-code", name: "Claude Code" },
+          ]}
+        />
       )}
 
       {showSessionPicker && (

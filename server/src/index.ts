@@ -39,6 +39,7 @@ import designRoutes from "./routes/design.js";
 import webResearchRoutes from "./routes/web-research.js";
 import acpRoutes from "./routes/acp.js";
 import gitRemoteRoutes from "./routes/git-remote.js";
+import kanbanRoutes from "./routes/kanban.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -88,6 +89,7 @@ app.use("/api/design", designRoutes);
 app.use("/api/web-research", webResearchRoutes);
 app.use("/api/acp", acpRoutes);
 app.use("/api/git-remote", gitRemoteRoutes);
+app.use("/api/kanban", kanbanRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

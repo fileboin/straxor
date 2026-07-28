@@ -272,6 +272,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "tools",
     action: "quick-start",
   },
+  {
+    id: "kanban",
+    name: "Komandni Centar",
+    description: "Kanban pregled sesija, deployeva i VPS statusa",
+    icon: "📋",
+    color: "purple",
+    category: "system",
+    action: "kanban",
+  },
 ];
 
 // ── API ──
