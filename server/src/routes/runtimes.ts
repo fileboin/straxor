@@ -4,6 +4,8 @@ import { getRuntimeManager } from "../runtime/manager.js";
 import { createOpenCodeUniversalAdapter } from "../runtime/opencode-universal.js";
 import { createCrushAdapter } from "../runtime/crush/adapter.js";
 import { createFreeClaudeCodeAdapter } from "../runtime/free-claude-code/adapter.js";
+import { createAgentRuntimeAdapter } from "../runtime/agent-runtime/adapter.js";
+import { AGENT_RUNTIME_META } from "../runtime/agent-runtime/types.js";
 import type {
   RuntimeId, RuntimeDefinition, RuntimeHealth, RuntimeChannel,
   ProviderConfig, MCPServerConfig,
@@ -64,6 +66,25 @@ function ensureInit(userId: string) {
     },
     createFreeClaudeCodeAdapter()
   );
+
+  // Register Agent Runtimes (Faza 4 — Advanced Adapter Ecosystem)
+  const agentRuntimes = ["openhands", "deerflow", "voltagent", "langgraph", "crewai", "autogen", "agentarius"] as const;
+  for (const agentId of agentRuntimes) {
+    const meta = AGENT_RUNTIME_META[agentId];
+    mgr.register(
+      {
+        id: agentId as RuntimeId,
+        name: meta.name,
+        description: meta.description,
+        icon: meta.icon,
+        color: meta.color,
+        repoUrl: meta.repoUrl,
+        isInstalled: false,
+        isEnabled: true,
+      },
+      createAgentRuntimeAdapter(agentId)
+    );
+  }
 
   // Future placeholders
   const futureRuntimes: RuntimeDefinition[] = [

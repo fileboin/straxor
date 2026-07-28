@@ -14,6 +14,13 @@ export type RuntimeId =
   | "cline"
   | "continue"
   | "goose"
+  | "openhands"
+  | "deerflow"
+  | "voltagent"
+  | "langgraph"
+  | "crewai"
+  | "autogen"
+  | "agentarius"
   | "custom";
 
 export interface RuntimeDefinition {

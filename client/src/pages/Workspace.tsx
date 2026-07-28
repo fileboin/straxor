@@ -36,6 +36,7 @@ import MultiAgentPanel from "../components/workspace/MultiAgentPanel.js";
 import HomeCenter from "../components/workspace/HomeCenter.js";
 import DesignAssetsPanel from "../components/workspace/DesignAssetsPanel.js";
 import DesignStudio from "../components/workspace/DesignStudio.js";
+import WebResearchPanel from "../components/workspace/WebResearchPanel.js";
 import UsagePanel from "../components/workspace/UsagePanel.js";
 import RuntimeSelector from "../components/workspace/RuntimeSelector.js";
 import QuickStartPanel from "../components/workspace/QuickStartPanel.js";
@@ -107,6 +108,7 @@ export default function Workspace() {
   const [showHomeCenter, setShowHomeCenter] = useState(false);
   const [showDesignAssets, setShowDesignAssets] = useState(false);
   const [showDesignStudio, setShowDesignStudio] = useState(false);
+  const [showWebResearch, setShowWebResearch] = useState(false);
   const [showUsage, setShowUsage] = useState(false);
   const [showRuntimeManager, setShowRuntimeManager] = useState(false);
   const [showQuickStart, setShowQuickStart] = useState(false);
@@ -1507,6 +1509,7 @@ export default function Workspace() {
               docs: () => window.open("https://straxor.dev/docs", "_blank"),
               "design-assets": () => setShowDesignAssets(true),
               "design-studio": () => setShowDesignStudio(true),
+              "web-research": () => setShowWebResearch(true),
               usage: () => setShowUsage(true),
               "runtime-manager": () => setShowRuntimeManager(true),
               "quick-start": () => setShowQuickStart(true),
@@ -1523,6 +1526,10 @@ export default function Workspace() {
 
       {showDesignStudio && (
         <DesignStudio onClose={() => setShowDesignStudio(false)} />
+      )}
+
+      {showWebResearch && (
+        <WebResearchPanel onClose={() => setShowWebResearch(false)} />
       )}
 
       {showUsage && (

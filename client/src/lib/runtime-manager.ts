@@ -12,6 +12,13 @@ export type RuntimeId =
   | "cline"
   | "continue"
   | "goose"
+  | "openhands"
+  | "deerflow"
+  | "voltagent"
+  | "langgraph"
+  | "crewai"
+  | "autogen"
+  | "agentarius"
   | "custom";
 
 export type RuntimeChannel = "stable" | "beta" | "custom";
@@ -88,6 +95,13 @@ export const RUNTIME_ICONS: Record<RuntimeId, string> = {
   cline: "⚡",
   continue: "▶",
   goose: "🪿",
+  openhands: "✋",
+  deerflow: "🦌",
+  voltagent: "⚡",
+  langgraph: "🔗",
+  crewai: "👥",
+  autogen: "🔄",
+  agentarius: "🌐",
   custom: "⚙",
 };
 
@@ -101,6 +115,13 @@ export const RUNTIME_COLORS: Record<RuntimeId, string> = {
   cline: "text-cyan-400",
   continue: "text-emerald-400",
   goose: "text-amber-400",
+  openhands: "text-blue-400",
+  deerflow: "text-amber-400",
+  voltagent: "text-yellow-400",
+  langgraph: "text-green-400",
+  crewai: "text-orange-400",
+  autogen: "text-purple-400",
+  agentarius: "text-cyan-400",
   custom: "text-gray-400",
 };
 

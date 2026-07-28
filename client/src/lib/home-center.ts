@@ -217,7 +217,15 @@ export const HOME_TILES: HomeTile[] = [
     color: "pink",
     category: "tools",
     action: "design-studio",
-    badge: "NEW",
+  },
+  {
+    id: "web-research",
+    name: "Web Research",
+    description: "Firecrawl, Tavily, Brave, SearXNG, Custom Crawler",
+    icon: "🔍",
+    color: "green",
+    category: "tools",
+    action: "web-research",
   },
   {
     id: "design-assets",

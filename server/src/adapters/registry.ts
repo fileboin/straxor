@@ -12,6 +12,7 @@ import type { DatabaseAdapter } from "./database/adapter.js";
 import type { RollbackAdapter } from "./rollback/adapter.js";
 import type { ContextEngine } from "./context/adapter.js";
 import type { GatewayAdapter } from "./gateway/adapter.js";
+import type { WebResearchAdapter } from "./web-research/registry.js";
 import { createBoundAdapter, type BoundAdapter } from "./runtime/opencode.js";
 import { createHttpAIProviderAdapter } from "./ai-provider/http.js";
 import { createStubGitAdapter } from "./git/local.js";
@@ -25,6 +26,7 @@ import { createVPSPreviewAdapter } from "./preview/vps.js";
 import { createPostgresAdapter } from "./database/postgres.js";
 import { createVPSRollbackAdapter } from "./rollback/vps.js";
 import { createContextEngine } from "./context/engine.js";
+import { createWebResearchAdapter } from "./web-research/registry.js";
 
 export interface AdapterRegistry {
   runtime: (userId: string) => BoundAdapter;
@@ -41,6 +43,7 @@ export interface AdapterRegistry {
   rollback: (userId: string) => RollbackAdapter;
   context: ContextEngine;
   gateway: GatewayAdapter | null;
+  webResearch: WebResearchAdapter;
 }
 
 let registry: AdapterRegistry | null = null;
@@ -73,6 +76,7 @@ export function initAdapters(): AdapterRegistry {
     },
     context: createContextEngine(),
     gateway: null, // Initialized lazily via GatewayRouter singleton
+    webResearch: createWebResearchAdapter(),
   };
   return registry;
 }
