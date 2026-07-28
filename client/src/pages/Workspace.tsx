@@ -31,6 +31,7 @@ import RollbackPanel from "../components/workspace/RollbackPanel.js";
 import ContextPanel from "../components/workspace/ContextPanel.js";
 import GatewayPanel from "../components/workspace/GatewayPanel.js";
 import ProvidersPanel from "../components/workspace/ProvidersPanel.js";
+import MultiAgentPanel from "../components/workspace/MultiAgentPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -94,6 +95,7 @@ export default function Workspace() {
   const [showContext, setShowContext] = useState(false);
   const [showGateway, setShowGateway] = useState(false);
   const [showProviders, setShowProviders] = useState(false);
+  const [showMultiAgent, setShowMultiAgent] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -907,6 +909,15 @@ export default function Workspace() {
       action: () => setShowProviders(true),
     },
     {
+      id: "action-multi-agent",
+      label: "Multi-Agent Sistem",
+      description: "Upravljaj agentima, zadacima i workflow-ovima",
+      icon: "🤖",
+      category: "action",
+      keywords: ["multi-agent", "agenti", "crewai", "langgraph", "workflow", "zadaci"],
+      action: () => setShowMultiAgent(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1023,7 +1034,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent,
   ]);
 
   return (
@@ -1047,6 +1058,7 @@ export default function Workspace() {
         onOpenContext={() => setShowContext(true)}
         onOpenGateway={() => setShowGateway(true)}
         onOpenProviders={() => setShowProviders(true)}
+        onOpenMultiAgent={() => setShowMultiAgent(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -1392,6 +1404,10 @@ export default function Workspace() {
 
       {showProviders && (
         <ProvidersPanel onClose={() => setShowProviders(false)} />
+      )}
+
+      {showMultiAgent && (
+        <MultiAgentPanel onClose={() => setShowMultiAgent(false)} />
       )}
 
       {showSessionPicker && (

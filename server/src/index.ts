@@ -29,6 +29,7 @@ import rollbackRoutes from "./routes/rollback.js";
 import contextRoutes from "./routes/context.js";
 import gatewayRoutes from "./routes/gateway.js";
 import providerRoutes from "./routes/providers.js";
+import multiAgentRoutes from "./routes/multi-agent.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -68,6 +69,7 @@ app.use("/api/rollback", rollbackRoutes);
 app.use("/api/context", contextRoutes);
 app.use("/api/gateway", gatewayRoutes);
 app.use("/api/providers", providerRoutes);
+app.use("/api/multi-agent", multiAgentRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

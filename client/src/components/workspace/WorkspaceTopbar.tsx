@@ -22,6 +22,7 @@ interface Props {
   onOpenContext?: () => void;
   onOpenGateway?: () => void;
   onOpenProviders?: () => void;
+  onOpenMultiAgent?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -60,6 +61,7 @@ export default function WorkspaceTopbar({
   onOpenContext,
   onOpenGateway,
   onOpenProviders,
+  onOpenMultiAgent,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -156,6 +158,15 @@ export default function WorkspaceTopbar({
             🔗
           </button>
         )}
+        {onOpenMultiAgent && (
+          <button
+            onClick={onOpenMultiAgent}
+            className="hidden sm:flex px-2.5 py-1.5 rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+            title="Multi-Agent Sistem"
+          >
+            🤖
+          </button>
+        )}
         <HomeMenu
           onOpenHowItWorks={onOpenHowItWorks}
           onOpenSettings={onOpenSettings}
@@ -167,6 +178,7 @@ export default function WorkspaceTopbar({
           onOpenContext={onOpenContext}
           onOpenGateway={onOpenGateway}
           onOpenProviders={onOpenProviders}
+          onOpenMultiAgent={onOpenMultiAgent}
         />
       </div>
     </header>
