@@ -1,38 +1,16 @@
-export type DeploymentStatus = "building" | "running" | "failed" | "stopped";
-export type DeploymentTarget = "vps" | "docker" | "render" | "railway" | "vercel" | "netlify" | "cloudflare";
-
-export interface Deployment {
-  id: string;
-  projectId: string;
-  userId: string;
-  target: DeploymentTarget;
-  status: DeploymentStatus;
-  liveUrl: string | null;
-  branch: string;
-  commitHash: string | null;
-  commitMessage: string | null;
-  startedAt: Date;
-  finishedAt: Date | null;
-  duration: number | null;
-  createdAt: Date;
-}
-
-export interface BuildLogEntry {
-  timestamp: Date;
-  level: "info" | "warn" | "error";
-  message: string;
-}
-
-export interface DeployParams {
-  target: DeploymentTarget;
-  branch?: string;
-  envVars?: Record<string, string>;
-}
+// Re-export all types from the new types module for backward compatibility.
+export type {
+  DeploymentStatus,
+  DeploymentTarget,
+  Deployment,
+  BuildLogEntry,
+  DeployParams,
+} from "./types.js";
 
 export interface DeploymentAdapter {
-  deploy(projectId: string, params: DeployParams): Promise<Deployment>;
-  getStatus(deploymentId: string): Promise<Deployment>;
-  getBuildLog(deploymentId: string): Promise<BuildLogEntry[]>;
+  deploy(projectId: string, params: import("./types.js").DeployParams): Promise<import("./types.js").Deployment>;
+  getStatus(deploymentId: string): Promise<import("./types.js").Deployment>;
+  getBuildLog(deploymentId: string): Promise<import("./types.js").BuildLogEntry[]>;
   stop(deploymentId: string): Promise<void>;
-  listByProject(projectId: string): Promise<Deployment[]>;
+  listByProject(projectId: string): Promise<import("./types.js").Deployment[]>;
 }

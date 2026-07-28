@@ -4,9 +4,50 @@ import { db } from "../db/index.js";
 import { deployments, deploymentBuildLogs } from "../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import { createBoundDeploymentAdapter } from "../adapters/deployment/db.js";
-import type { DeploymentTarget } from "../adapters/deployment/adapter.js";
+import type { DeploymentTarget } from "../adapters/deployment/types.js";
+import { configureProvider, getProviderConfig, isProviderConfigured, TARGET_META } from "../adapters/deployment/registry.js";
 
 const router = Router();
+
+// ── Provider config ──
+
+// GET /api/deployments/providers — list all providers with config status
+router.get("/providers", async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const result = Object.entries(TARGET_META).map(([id, meta]) => ({
+    id,
+    name: meta.name,
+    icon: meta.icon,
+    color: meta.color,
+    configured: isProviderConfigured(userId, id as DeploymentTarget),
+  }));
+  res.json(result);
+});
+
+// GET /api/deployments/providers/:target — get provider config
+router.get("/providers/:target", async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const target = req.params.target as DeploymentTarget;
+  const config = getProviderConfig(userId, target);
+  const meta = TARGET_META[target];
+  res.json({
+    configured: !!config && Object.keys(config).length > 0,
+    fields: Object.entries(config || {}).map(([key, value]) => ({ key, value: meta?.configFields.find(f => f.key === key)?.secret ? "••••••" : value })),
+  });
+});
+
+// POST /api/deployments/providers/:target — configure provider
+router.post("/providers/:target", async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const target = req.params.target as DeploymentTarget;
+  const { config } = req.body as { config: Record<string, string> };
+
+  configureProvider(userId, target, config || {});
+
+  res.json({ target, configured: isProviderConfigured(userId, target) });
+});
+
+// ── Existing deployment endpoints ──
 
 // GET /api/deployments/:projectId — list deployments for project
 router.get("/:projectId", async (req: Request, res: Response) => {
@@ -133,11 +174,8 @@ router.post("/stop/:deploymentId", async (req: Request, res: Response) => {
   const deploymentId = req.params.deploymentId as string;
 
   try {
-    await db
-      .update(deployments)
-      .set({ status: "stopped", finishedAt: new Date() })
-      .where(eq(deployments.id, deploymentId));
-
+    const adapter = createBoundDeploymentAdapter((req as any).userId as string);
+    await adapter.stop(deploymentId);
     res.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

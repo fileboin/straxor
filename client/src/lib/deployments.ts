@@ -1,5 +1,10 @@
 export type DeploymentStatus = "building" | "running" | "failed" | "stopped";
-export type DeploymentTarget = "vps" | "docker" | "render" | "railway" | "vercel" | "netlify" | "cloudflare";
+
+export type DeploymentTarget =
+  | "vps" | "docker"
+  | "coolify" | "dokploy" | "caprover"
+  | "render" | "railway" | "flyio" | "digitalocean"
+  | "vercel" | "netlify" | "cloudflare";
 
 export interface Deployment {
   id: string;
@@ -22,6 +27,14 @@ export interface BuildLogEntry {
   message: string;
 }
 
+export interface ProviderInfo {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  configured: boolean;
+}
+
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 function authHeaders(): Record<string, string> {
@@ -29,10 +42,26 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function fetchDeployments(projectId: string): Promise<Deployment[]> {
-  const res = await fetch(`${API_BASE}/api/deployments/${projectId}`, {
-    headers: authHeaders(),
+// ── Provider config ──
+
+export async function fetchProviders(): Promise<ProviderInfo[]> {
+  const res = await fetch(`${API_BASE}/api/deployments/providers`, { headers: authHeaders() });
+  if (!res.ok) throw new Error("Failed to fetch providers");
+  return res.json();
+}
+
+export async function configureDeployProvider(target: DeploymentTarget, config: Record<string, string>): Promise<void> {
+  await fetch(`${API_BASE}/api/deployments/providers/${target}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ config }),
   });
+}
+
+// ── Deployments ──
+
+export async function fetchDeployments(projectId: string): Promise<Deployment[]> {
+  const res = await fetch(`${API_BASE}/api/deployments/${projectId}`, { headers: authHeaders() });
   if (!res.ok) throw new Error("Failed to fetch deployments");
   return res.json();
 }
@@ -55,17 +84,13 @@ export async function triggerDeployment(
 }
 
 export async function fetchDeployment(deploymentId: string): Promise<Deployment> {
-  const res = await fetch(`${API_BASE}/api/deployments/detail/${deploymentId}`, {
-    headers: authHeaders(),
-  });
+  const res = await fetch(`${API_BASE}/api/deployments/detail/${deploymentId}`, { headers: authHeaders() });
   if (!res.ok) throw new Error("Failed to fetch deployment");
   return res.json();
 }
 
 export async function fetchBuildLog(deploymentId: string): Promise<BuildLogEntry[]> {
-  const res = await fetch(`${API_BASE}/api/deployments/log/${deploymentId}`, {
-    headers: authHeaders(),
-  });
+  const res = await fetch(`${API_BASE}/api/deployments/log/${deploymentId}`, { headers: authHeaders() });
   if (!res.ok) throw new Error("Failed to fetch build log");
   return res.json();
 }
@@ -79,13 +104,30 @@ export async function stopDeployment(deploymentId: string): Promise<void> {
 }
 
 export const TARGET_LABELS: Record<DeploymentTarget, string> = {
-  vps: "VPS",
+  vps: "VPS (SSH)",
   docker: "Docker",
+  coolify: "Coolify",
+  dokploy: "Dokploy",
+  caprover: "CapRover",
   render: "Render",
   railway: "Railway",
+  flyio: "Fly.io",
+  digitalocean: "DigitalOcean",
   vercel: "Vercel",
   netlify: "Netlify",
   cloudflare: "Cloudflare Pages",
+};
+
+export const TARGET_ICONS: Record<DeploymentTarget, string> = {
+  vps: "🖥", docker: "🐳", coolify: "❄", dokploy: "⚓", caprover: "⚓",
+  render: "⚡", railway: "🚆", flyio: "🪰", digitalocean: "🌊",
+  vercel: "▲", netlify: "🌐", cloudflare: "☁",
+};
+
+export const TARGET_COLORS: Record<DeploymentTarget, string> = {
+  vps: "blue", docker: "cyan", coolify: "green", dokploy: "blue", caprover: "orange",
+  render: "purple", railway: "red", flyio: "pink", digitalocean: "blue",
+  vercel: "gray", netlify: "green", cloudflare: "orange",
 };
 
 export const STATUS_COLORS: Record<DeploymentStatus, string> = {
@@ -96,8 +138,8 @@ export const STATUS_COLORS: Record<DeploymentStatus, string> = {
 };
 
 export const STATUS_ICONS: Record<DeploymentStatus, string> = {
-  building: "⟳",
-  running: "●",
-  failed: "✕",
-  stopped: "■",
+  building: "\u27F3",
+  running: "\u25CF",
+  failed: "\u2715",
+  stopped: "\u25A0",
 };

@@ -4,10 +4,14 @@ import {
   triggerDeployment,
   fetchBuildLog,
   stopDeployment,
+  fetchProviders,
+  configureDeployProvider,
   type Deployment,
   type BuildLogEntry,
   type DeploymentTarget,
+  type ProviderInfo,
   TARGET_LABELS,
+  TARGET_ICONS,
   STATUS_COLORS,
   STATUS_ICONS,
 } from "../../lib/deployments";
@@ -17,7 +21,7 @@ interface Props {
   onClose: () => void;
 }
 
-const TARGETS: DeploymentTarget[] = ["vps", "docker", "render", "railway", "vercel", "netlify", "cloudflare"];
+const TARGETS: DeploymentTarget[] = ["vps", "docker", "coolify", "dokploy", "caprover", "render", "railway", "flyio", "digitalocean", "vercel", "netlify", "cloudflare"];
 
 export default function DeploymentPanel({ projectId, onClose }: Props) {
   const [deployments, setDeployments] = useState<Deployment[]>([]);
@@ -27,6 +31,9 @@ export default function DeploymentPanel({ projectId, onClose }: Props) {
   const [triggerTarget, setTriggerTarget] = useState<DeploymentTarget>("vps");
   const [triggerBranch, setTriggerBranch] = useState("main");
   const [loading, setLoading] = useState(false);
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [showProviders, setShowProviders] = useState(false);
+  const [configTarget, setConfigTarget] = useState<DeploymentTarget | null>(null);
 
   const loadDeployments = useCallback(async () => {
     try {
@@ -37,6 +44,7 @@ export default function DeploymentPanel({ projectId, onClose }: Props) {
 
   useEffect(() => {
     loadDeployments();
+    fetchProviders().then(setProviders).catch(() => {});
   }, [loadDeployments]);
 
   const loadBuildLog = useCallback(async (deploymentId: string) => {
@@ -102,6 +110,12 @@ export default function DeploymentPanel({ projectId, onClose }: Props) {
           <h2 className="text-sm font-semibold text-text">Deployment</h2>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowProviders(!showProviders)}
+              className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-border bg-surface-2/50 text-text-secondary hover:text-text hover:border-border-light transition-colors"
+            >
+              ⚙ Provideri
+            </button>
+            <button
               onClick={() => setShowTrigger(!showTrigger)}
               className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-accent bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
             >
@@ -116,6 +130,48 @@ export default function DeploymentPanel({ projectId, onClose }: Props) {
           </div>
         </div>
 
+        {/* Provider config */}
+        {showProviders && (
+          <div className="px-3 py-3 border-b border-border bg-surface-2/30 sm:px-4 space-y-2">
+            <div className="text-[11px] font-medium text-text-secondary mb-2">Provideri — konfiguracija</div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5">
+              {TARGETS.map((t) => {
+                const p = providers.find((x) => x.id === t);
+                const configured = p?.configured || false;
+                return (
+                  <button
+                    key={t}
+                    onClick={() => { setConfigTarget(t); }}
+                    className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg border text-[10px] transition-colors ${
+                      configTarget === t
+                        ? "border-accent bg-accent/10 text-accent"
+                        : configured
+                        ? "border-green-500/30 bg-green-500/5 text-text-secondary"
+                        : "border-border bg-transparent text-text-muted"
+                    }`}
+                  >
+                    <span className="text-sm">{TARGET_ICONS[t]}</span>
+                    <span className="truncate w-full text-center">{TARGET_LABELS[t]}</span>
+                    {configured && <span className="text-[8px] text-green-400">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {configTarget && (
+              <DeployProviderConfig
+                target={configTarget}
+                onSave={async (vals) => {
+                  await configureDeployProvider(configTarget, vals);
+                  const updated = await fetchProviders();
+                  setProviders(updated);
+                  setConfigTarget(null);
+                }}
+                onCancel={() => setConfigTarget(null)}
+              />
+            )}
+          </div>
+        )}
+
         {/* Trigger form */}
         {showTrigger && (
           <div className="px-3 py-3 border-b border-border bg-surface-2/30 sm:px-4">
@@ -127,7 +183,7 @@ export default function DeploymentPanel({ projectId, onClose }: Props) {
                 className="px-2 py-1.5 text-[11px] bg-bg border border-border rounded focus:outline-none focus:border-accent text-text"
               >
                 {TARGETS.map((t) => (
-                  <option key={t} value={t}>{TARGET_LABELS[t]}</option>
+                  <option key={t} value={t}>{TARGET_ICONS[t]} {TARGET_LABELS[t]}</option>
                 ))}
               </select>
               <input
@@ -215,7 +271,7 @@ export default function DeploymentPanel({ projectId, onClose }: Props) {
                     {STATUS_ICONS[selected.status]} {selected.status.toUpperCase()}
                   </span>
                   <span className="text-[11px] text-text-secondary">
-                    {TARGET_LABELS[selected.target]}
+                    {TARGET_ICONS[selected.target]} {TARGET_LABELS[selected.target]}
                   </span>
                   <span className="text-[10px] text-text-muted font-mono">{selected.branch}</span>
                   {selected.commitHash && (
@@ -282,6 +338,58 @@ export default function DeploymentPanel({ projectId, onClose }: Props) {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+const PROVIDER_CONFIG_FIELDS: Record<string, { key: string; label: string; secret?: boolean }[]> = {
+  vps: [{ key: "host", label: "Host" }, { key: "port", label: "Port" }, { key: "user", label: "User" }, { key: "key", label: "SSH Key", secret: true }, { key: "deployPath", label: "Deploy Path" }],
+  docker: [{ key: "host", label: "Docker Host" }, { key: "composeFile", label: "Compose File" }, { key: "serviceName", label: "Service Name" }],
+  coolify: [{ key: "serverUrl", label: "Server URL" }, { key: "token", label: "API Token", secret: true }],
+  dokploy: [{ key: "serverUrl", label: "Server URL" }, { key: "apiKey", label: "API Key", secret: true }],
+  caprover: [{ key: "serverUrl", label: "Captain URL" }, { key: "apiKey", label: "API Key", secret: true }, { key: "appName", label: "App Name" }],
+  render: [{ key: "token", label: "API Token", secret: true }],
+  railway: [{ key: "token", label: "API Token", secret: true }],
+  flyio: [{ key: "token", label: "API Token", secret: true }, { key: "org", label: "Organization" }],
+  digitalocean: [{ key: "token", label: "API Token", secret: true }],
+  vercel: [{ key: "token", label: "API Token", secret: true }],
+  netlify: [{ key: "token", label: "API Token", secret: true }],
+  cloudflare: [{ key: "token", label: "API Token", secret: true }, { key: "accountId", label: "Account ID" }],
+};
+
+function DeployProviderConfig({ target, onSave, onCancel }: {
+  target: DeploymentTarget;
+  onSave: (vals: Record<string, string>) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [vals, setVals] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const fields = PROVIDER_CONFIG_FIELDS[target] || [];
+
+  return (
+    <div className="mt-2 p-3 bg-surface-2/50 rounded-lg border border-border space-y-2">
+      <div className="text-[11px] font-medium text-text">{TARGET_ICONS[target]} {TARGET_LABELS[target]}</div>
+      {fields.map((f) => (
+        <div key={f.key}>
+          <label className="text-[10px] text-text-muted block mb-0.5">{f.label}</label>
+          <input
+            type={f.secret ? "password" : "text"}
+            value={vals[f.key] || ""}
+            onChange={(e) => setVals((prev) => ({ ...prev, [f.key]: e.target.value }))}
+            className="w-full px-2 py-1 text-[11px] bg-bg border border-border rounded focus:outline-none focus:border-accent text-text placeholder:text-text-muted"
+          />
+        </div>
+      ))}
+      <div className="flex gap-2 pt-1">
+        <button
+          onClick={async () => { setSaving(true); await onSave(vals); setSaving(false); }}
+          disabled={saving}
+          className="px-3 py-1 text-[11px] font-medium rounded border border-accent bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Sačuvaj"}
+        </button>
+        <button onClick={onCancel} className="px-2 py-1 text-[11px] text-text-muted hover:text-text transition-colors">Odustani</button>
       </div>
     </div>
   );
