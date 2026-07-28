@@ -42,6 +42,9 @@ import gitRemoteRoutes from "./routes/git-remote.js";
 import kanbanRoutes from "./routes/kanban.js";
 import mcpMarketplaceRoutes from "./routes/mcp-marketplace.js";
 import infrastructureRoutes from "./routes/infrastructure.js";
+import teamsRoutes from "./routes/teams.js";
+import collaboratorsRoutes from "./routes/collaborators.js";
+import commentsRoutes from "./routes/comments.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -94,6 +97,9 @@ app.use("/api/git-remote", gitRemoteRoutes);
 app.use("/api/kanban", kanbanRoutes);
 app.use("/api/mcp-marketplace", mcpMarketplaceRoutes);
 app.use("/api/infrastructure", infrastructureRoutes);
+app.use("/api/teams", teamsRoutes);
+app.use("/api/projects/:projectId/collaborators", collaboratorsRoutes);
+app.use("/api/projects/:projectId/comments", commentsRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

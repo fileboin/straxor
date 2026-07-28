@@ -299,6 +299,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "system",
     action: "infrastructure",
   },
+  {
+    id: "teams",
+    name: "Team Collaboration",
+    description: "Timovi, RBAC, deljenje projekata, kod komentari",
+    icon: "👥",
+    color: "green",
+    category: "system",
+    action: "teams",
+  },
 ];
 
 // ── API ──

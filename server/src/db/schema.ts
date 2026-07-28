@@ -479,3 +479,71 @@ export const infraConfigsRelations = relations(infraConfigs, ({ one }) => ({
   project: one(projects, { fields: [infraConfigs.projectId], references: [projects.id] }),
   machine: one(machines, { fields: [infraConfigs.machineId], references: [machines.id] }),
 }));
+
+// ── Team Collaboration ──
+
+export const teams = pgTable("teams", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  ownerId: uuid("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const teamsRelations = relations(teams, ({ one, many }) => ({
+  owner: one(users, { fields: [teams.ownerId], references: [users.id] }),
+  members: many(teamMembers),
+}));
+
+export const teamMembers = pgTable("team_members", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  teamId: uuid("team_id").notNull().references(() => teams.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 20 }).notNull().default("member"),
+  invitedBy: uuid("invited_by").references(() => users.id),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+});
+
+export const teamMembersRelations = relations(teamMembers, ({ one }) => ({
+  team: one(teams, { fields: [teamMembers.teamId], references: [teams.id] }),
+  user: one(users, { fields: [teamMembers.userId], references: [users.id] }),
+  inviter: one(users, { fields: [teamMembers.invitedBy], references: [users.id] }),
+}));
+
+export const projectCollaborators = pgTable("project_collaborators", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 20 }).notNull().default("member"),
+  permissions: text("permissions").default("{}"),
+  addedBy: uuid("added_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const projectCollaboratorsRelations = relations(projectCollaborators, ({ one }) => ({
+  project: one(projects, { fields: [projectCollaborators.projectId], references: [projects.id] }),
+  user: one(users, { fields: [projectCollaborators.userId], references: [users.id] }),
+  adder: one(users, { fields: [projectCollaborators.addedBy], references: [users.id] }),
+}));
+
+export const codeComments = pgTable("code_comments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  filePath: varchar("file_path", { length: 500 }).notNull(),
+  lineStart: integer("line_start").notNull(),
+  lineEnd: integer("line_end").notNull(),
+  content: text("content").notNull(),
+  parentId: uuid("parent_id").references(() => codeComments.id, { onDelete: "cascade" }),
+  isResolved: boolean("is_resolved").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const codeCommentsRelations = relations(codeComments, ({ one, many }) => ({
+  project: one(projects, { fields: [codeComments.projectId], references: [projects.id] }),
+  user: one(users, { fields: [codeComments.userId], references: [users.id] }),
+  parent: one(codeComments, { fields: [codeComments.parentId], references: [codeComments.id] }),
+  replies: many(codeComments, { relationName: "commentReplies" }),
+}));
