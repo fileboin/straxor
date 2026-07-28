@@ -41,6 +41,7 @@ import acpRoutes from "./routes/acp.js";
 import gitRemoteRoutes from "./routes/git-remote.js";
 import kanbanRoutes from "./routes/kanban.js";
 import mcpMarketplaceRoutes from "./routes/mcp-marketplace.js";
+import infrastructureRoutes from "./routes/infrastructure.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -92,6 +93,7 @@ app.use("/api/acp", acpRoutes);
 app.use("/api/git-remote", gitRemoteRoutes);
 app.use("/api/kanban", kanbanRoutes);
 app.use("/api/mcp-marketplace", mcpMarketplaceRoutes);
+app.use("/api/infrastructure", infrastructureRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

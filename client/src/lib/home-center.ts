@@ -290,6 +290,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "system",
     action: "mcp-marketplace",
   },
+  {
+    id: "infrastructure",
+    name: "Infrastructure",
+    description: "DNS, SSL, Proxy, Tunnel, Uptime Monitoring & Alerts",
+    icon: "🏗",
+    color: "orange",
+    category: "system",
+    action: "infrastructure",
+  },
 ];
 
 // ── API ──

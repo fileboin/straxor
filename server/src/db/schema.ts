@@ -453,3 +453,29 @@ export const mcpServers = pgTable("mcp_servers", {
 export const mcpServersRelations = relations(mcpServers, ({ one }) => ({
   user: one(users, { fields: [mcpServers.userId], references: [users.id] }),
 }));
+
+export const infraConfigs = pgTable("infra_configs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  machineId: uuid("machine_id").references(() => machines.id, { onDelete: "set null" }),
+  type: varchar("type", { length: 30 }).notNull(),
+  adapter: varchar("adapter", { length: 50 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  domain: varchar("domain", { length: 255 }),
+  status: varchar("status", { length: 20 }).default("pending"),
+  config: text("config").default("{}"),
+  credentials: text("credentials").default("{}"),
+  lastChecked: timestamp("last_checked"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const infraConfigsRelations = relations(infraConfigs, ({ one }) => ({
+  user: one(users, { fields: [infraConfigs.userId], references: [users.id] }),
+  project: one(projects, { fields: [infraConfigs.projectId], references: [projects.id] }),
+  machine: one(machines, { fields: [infraConfigs.machineId], references: [machines.id] }),
+}));
