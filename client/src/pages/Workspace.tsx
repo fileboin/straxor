@@ -30,6 +30,7 @@ import SearchPanel from "../components/workspace/SearchPanel.js";
 import RollbackPanel from "../components/workspace/RollbackPanel.js";
 import ContextPanel from "../components/workspace/ContextPanel.js";
 import GatewayPanel from "../components/workspace/GatewayPanel.js";
+import ProvidersPanel from "../components/workspace/ProvidersPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -92,6 +93,7 @@ export default function Workspace() {
   const [showRollback, setShowRollback] = useState(false);
   const [showContext, setShowContext] = useState(false);
   const [showGateway, setShowGateway] = useState(false);
+  const [showProviders, setShowProviders] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -896,6 +898,15 @@ export default function Workspace() {
       action: () => setShowGateway(true),
     },
     {
+      id: "action-providers",
+      label: "Direktni Provideri",
+      description: "BYOK konekcije na OpenAI, Anthropic, Google i druge",
+      icon: "🔗",
+      category: "action",
+      keywords: ["providers", "api", "key", "openai", "anthropic", "google", "byok", "direktno"],
+      action: () => setShowProviders(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1012,7 +1023,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders,
   ]);
 
   return (
@@ -1035,6 +1046,7 @@ export default function Workspace() {
         onOpenRollback={() => setShowRollback(true)}
         onOpenContext={() => setShowContext(true)}
         onOpenGateway={() => setShowGateway(true)}
+        onOpenProviders={() => setShowProviders(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -1376,6 +1388,10 @@ export default function Workspace() {
 
       {showGateway && (
         <GatewayPanel onClose={() => setShowGateway(false)} />
+      )}
+
+      {showProviders && (
+        <ProvidersPanel onClose={() => setShowProviders(false)} />
       )}
 
       {showSessionPicker && (

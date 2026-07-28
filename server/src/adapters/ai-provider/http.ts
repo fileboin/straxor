@@ -101,13 +101,17 @@ const PROVIDER_CONFIG: Record<string, ProviderConfig> = {
   },
 };
 
-const OPENAI_COMPATIBLE = ["openrouter", "qwen", "moonshot", "minimax", "custom"];
+const OPENAI_COMPATIBLE = ["openrouter", "qwen", "moonshot", "minimax", "mistral", "xai", "groq", "ollama", "custom"];
 
 const COMPAT_BASE_URLS: Record<string, string> = {
   openrouter: "https://openrouter.ai/api/v1/chat/completions",
   qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
   moonshot: "https://api.moonshot.cn/v1/chat/completions",
   minimax: "https://api.minimax.chat/v1/text/chatcompletion_v2",
+  mistral: "https://api.mistral.ai/v1/chat/completions",
+  xai: "https://api.x.ai/v1/chat/completions",
+  groq: "https://api.groq.com/openai/v1/chat/completions",
+  ollama: "http://localhost:11434/v1/chat/completions",
   custom: "http://localhost:11434/v1/chat/completions",
 };
 

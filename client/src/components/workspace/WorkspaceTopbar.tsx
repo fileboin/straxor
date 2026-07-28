@@ -21,6 +21,7 @@ interface Props {
   onOpenRollback?: () => void;
   onOpenContext?: () => void;
   onOpenGateway?: () => void;
+  onOpenProviders?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -58,6 +59,7 @@ export default function WorkspaceTopbar({
   onOpenRollback,
   onOpenContext,
   onOpenGateway,
+  onOpenProviders,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -145,6 +147,15 @@ export default function WorkspaceTopbar({
             ⚡
           </button>
         )}
+        {onOpenProviders && (
+          <button
+            onClick={onOpenProviders}
+            className="hidden sm:flex px-2.5 py-1.5 rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+            title="Direktni Provideri"
+          >
+            🔗
+          </button>
+        )}
         <HomeMenu
           onOpenHowItWorks={onOpenHowItWorks}
           onOpenSettings={onOpenSettings}
@@ -155,6 +166,7 @@ export default function WorkspaceTopbar({
           onOpenRollback={onOpenRollback}
           onOpenContext={onOpenContext}
           onOpenGateway={onOpenGateway}
+          onOpenProviders={onOpenProviders}
         />
       </div>
     </header>

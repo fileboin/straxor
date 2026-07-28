@@ -28,6 +28,7 @@ import databaseRoutes from "./routes/database.js";
 import rollbackRoutes from "./routes/rollback.js";
 import contextRoutes from "./routes/context.js";
 import gatewayRoutes from "./routes/gateway.js";
+import providerRoutes from "./routes/providers.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -66,6 +67,7 @@ app.use("/api/database", databaseRoutes);
 app.use("/api/rollback", rollbackRoutes);
 app.use("/api/context", contextRoutes);
 app.use("/api/gateway", gatewayRoutes);
+app.use("/api/providers", providerRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
