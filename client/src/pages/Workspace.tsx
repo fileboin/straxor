@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar.js";
+import { useTheme } from "../lib/theme.js";
 import ChatPanel from "../components/workspace/ChatPanel.js";
 import TodoList, { type TodoStep } from "../components/workspace/TodoList.js";
 import BottomBar from "../components/workspace/BottomBar.js";
@@ -32,6 +33,7 @@ import ContextPanel from "../components/workspace/ContextPanel.js";
 import GatewayPanel from "../components/workspace/GatewayPanel.js";
 import ProvidersPanel from "../components/workspace/ProvidersPanel.js";
 import MultiAgentPanel from "../components/workspace/MultiAgentPanel.js";
+import HomeCenter from "../components/workspace/HomeCenter.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -59,6 +61,7 @@ const INITIAL_ASK_MESSAGES: ChatMessage[] = [
 ];
 
 export default function Workspace() {
+  const { toggleTheme } = useTheme();
   const [orchestrator, setOrchestrator] = useState(false);
 
   const [askProvider, setAskProvider] = useState("anthropic");
@@ -96,6 +99,7 @@ export default function Workspace() {
   const [showGateway, setShowGateway] = useState(false);
   const [showProviders, setShowProviders] = useState(false);
   const [showMultiAgent, setShowMultiAgent] = useState(false);
+  const [showHomeCenter, setShowHomeCenter] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -268,6 +272,11 @@ export default function Workspace() {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "F") {
         e.preventDefault();
         setShowSearch((prev) => !prev);
+      }
+      // Home Center (Ctrl+H)
+      if ((e.metaKey || e.ctrlKey) && e.key === "h") {
+        e.preventDefault();
+        setShowHomeCenter((prev) => !prev);
       }
     };
     window.addEventListener("keydown", handler);
@@ -918,6 +927,16 @@ export default function Workspace() {
       action: () => setShowMultiAgent(true),
     },
     {
+      id: "home-center",
+      label: "Home Center",
+      description: "Centralno upravljanje svim alatima",
+      icon: "🏠",
+      category: "navigation",
+      shortcut: "MOD+H",
+      keywords: ["home", "dashboard", "centar", "početna", "alati"],
+      action: () => setShowHomeCenter(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1034,7 +1053,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter,
   ]);
 
   return (
@@ -1059,6 +1078,7 @@ export default function Workspace() {
         onOpenGateway={() => setShowGateway(true)}
         onOpenProviders={() => setShowProviders(true)}
         onOpenMultiAgent={() => setShowMultiAgent(true)}
+        onOpenHomeCenter={() => setShowHomeCenter(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -1408,6 +1428,38 @@ export default function Workspace() {
 
       {showMultiAgent && (
         <MultiAgentPanel onClose={() => setShowMultiAgent(false)} />
+      )}
+
+      {showHomeCenter && (
+        <HomeCenter
+          onClose={() => setShowHomeCenter(false)}
+          onNavigate={(action) => {
+            setShowHomeCenter(false);
+            // Map tile actions to panel states
+            const panelMap: Record<string, () => void> = {
+              providers: () => setShowProviders(true),
+              gateway: () => setShowGateway(true),
+              "multi-agent": () => setShowMultiAgent(true),
+              ssh: () => setShowSshModal(true),
+              deploy: () => setShowDeployModal(true),
+              worktrees: () => setShowWorktrees(true),
+              prompts: () => setShowPromptLibrary(true),
+              context: () => setShowContext(true),
+              logs: () => window.dispatchEvent(new CustomEvent("straxor:open-logs")),
+              console: () => window.dispatchEvent(new CustomEvent("straxor:open-console")),
+              env: () => setShowEnvModal(true),
+              permissions: () => setShowPermissionsModal(true),
+              rollback: () => setShowRollback(true),
+              notifications: () => setShowNotifications(true),
+              export: () => setShowExportModal(true),
+              sessions: () => setShowSessionPicker(true),
+              theme: () => toggleTheme(),
+              docs: () => window.open("https://straxor.dev/docs", "_blank"),
+            };
+            const handler = panelMap[action];
+            if (handler) handler();
+          }}
+        />
       )}
 
       {showSessionPicker && (

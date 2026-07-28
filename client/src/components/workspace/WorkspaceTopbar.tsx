@@ -23,6 +23,7 @@ interface Props {
   onOpenGateway?: () => void;
   onOpenProviders?: () => void;
   onOpenMultiAgent?: () => void;
+  onOpenHomeCenter?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -62,6 +63,7 @@ export default function WorkspaceTopbar({
   onOpenGateway,
   onOpenProviders,
   onOpenMultiAgent,
+  onOpenHomeCenter,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -167,6 +169,15 @@ export default function WorkspaceTopbar({
             🤖
           </button>
         )}
+        {onOpenHomeCenter && (
+          <button
+            onClick={onOpenHomeCenter}
+            className="hidden sm:flex px-2.5 py-1.5 rounded-lg border border-accent/30 bg-accent/5 text-accent text-xs font-medium hover:bg-accent/10 transition-colors"
+            title="Home Center (Ctrl+H)"
+          >
+            🏠
+          </button>
+        )}
         <HomeMenu
           onOpenHowItWorks={onOpenHowItWorks}
           onOpenSettings={onOpenSettings}
@@ -179,6 +190,7 @@ export default function WorkspaceTopbar({
           onOpenGateway={onOpenGateway}
           onOpenProviders={onOpenProviders}
           onOpenMultiAgent={onOpenMultiAgent}
+          onOpenHomeCenter={onOpenHomeCenter}
         />
       </div>
     </header>

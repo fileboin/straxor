@@ -13,6 +13,7 @@ interface Props {
   onOpenGateway?: () => void;
   onOpenProviders?: () => void;
   onOpenMultiAgent?: () => void;
+  onOpenHomeCenter?: () => void;
 }
 
 const EDITORS = [
@@ -36,7 +37,7 @@ const EDITORS = [
   },
 ];
 
-export default function HomeMenu({ onOpenHowItWorks, onOpenSettings, onOpenExport, onOpenNotifications, onOpenWorktrees, onOpenBrowserVerify, onOpenRollback, onOpenContext, onOpenGateway, onOpenProviders, onOpenMultiAgent }: Props) {
+export default function HomeMenu({ onOpenHowItWorks, onOpenSettings, onOpenExport, onOpenNotifications, onOpenWorktrees, onOpenBrowserVerify, onOpenRollback, onOpenContext, onOpenGateway, onOpenProviders, onOpenMultiAgent, onOpenHomeCenter }: Props) {
   const [open, setOpen] = useState(false);
   const [showEditors, setShowEditors] = useState(false);
   const { user, logout } = useAuth();
@@ -83,6 +84,17 @@ export default function HomeMenu({ onOpenHowItWorks, onOpenSettings, onOpenExpor
               <div className="text-xs font-medium text-text truncate">{user.email}</div>
             </div>
           )}
+
+          {/* How it works */}
+          <button
+            onClick={() => { onOpenHomeCenter?.(); setOpen(false); }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-text-secondary hover:bg-surface-2 hover:text-text transition-colors text-left"
+          >
+            <span className="w-4 text-center text-[11px]">🏠</span>
+            Home Center
+          </button>
+
+          <div className="border-t border-border my-1" />
 
           {/* How it works */}
           <button
