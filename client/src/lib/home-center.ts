@@ -218,6 +218,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "tools",
     action: "design-assets",
   },
+  {
+    id: "usage",
+    name: "Usage & Cost",
+    description: "Troškovi, tokeni, budžeti, cjenovnik",
+    icon: "📊",
+    color: "orange",
+    category: "system",
+    action: "usage",
+  },
 ];
 
 // ── API ──
