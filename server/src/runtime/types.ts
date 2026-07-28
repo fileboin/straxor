@@ -14,6 +14,8 @@ export type RuntimeId =
   | "cline"
   | "continue"
   | "goose"
+  | "qwen-code"
+  | "acp"
   | "openhands"
   | "deerflow"
   | "voltagent"

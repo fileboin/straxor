@@ -37,6 +37,7 @@ import runtimesRoutes from "./routes/runtimes.js";
 import quickstartRoutes from "./routes/quickstart.js";
 import designRoutes from "./routes/design.js";
 import webResearchRoutes from "./routes/web-research.js";
+import acpRoutes from "./routes/acp.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -84,6 +85,7 @@ app.use("/api/runtimes", runtimesRoutes);
 app.use("/api/quickstart", quickstartRoutes);
 app.use("/api/design", designRoutes);
 app.use("/api/web-research", webResearchRoutes);
+app.use("/api/acp", acpRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

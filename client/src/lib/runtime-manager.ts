@@ -12,6 +12,8 @@ export type RuntimeId =
   | "cline"
   | "continue"
   | "goose"
+  | "qwen-code"
+  | "acp"
   | "openhands"
   | "deerflow"
   | "voltagent"
@@ -95,6 +97,8 @@ export const RUNTIME_ICONS: Record<RuntimeId, string> = {
   cline: "⚡",
   continue: "▶",
   goose: "🪿",
+  "qwen-code": "🐉",
+  acp: "🔌",
   openhands: "✋",
   deerflow: "🦌",
   voltagent: "⚡",
@@ -115,6 +119,8 @@ export const RUNTIME_COLORS: Record<RuntimeId, string> = {
   cline: "text-cyan-400",
   continue: "text-emerald-400",
   goose: "text-amber-400",
+  "qwen-code": "text-red-400",
+  acp: "text-white",
   openhands: "text-blue-400",
   deerflow: "text-amber-400",
   voltagent: "text-yellow-400",

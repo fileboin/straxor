@@ -6,6 +6,8 @@ import { createCrushAdapter } from "../runtime/crush/adapter.js";
 import { createFreeClaudeCodeAdapter } from "../runtime/free-claude-code/adapter.js";
 import { createAgentRuntimeAdapter } from "../runtime/agent-runtime/adapter.js";
 import { AGENT_RUNTIME_META } from "../runtime/agent-runtime/types.js";
+import { createACPAdapter } from "../runtime/acp/adapter.js";
+import { ACP_AGENT_META } from "../runtime/acp/types.js";
 import type {
   RuntimeId, RuntimeDefinition, RuntimeHealth, RuntimeChannel,
   ProviderConfig, MCPServerConfig,
@@ -86,18 +88,31 @@ function ensureInit(userId: string) {
     );
   }
 
-  // Future placeholders
+  // Register ACP / Agent Protocol runtimes (Faza 4 — Block 50)
+  const acpAgents = ["acp", "claude-code", "codex", "gemini-cli", "cline", "goose", "qwen-code"] as const;
+  for (const agentId of acpAgents) {
+    const meta = ACP_AGENT_META[agentId];
+    mgr.register(
+      {
+        id: agentId as RuntimeId,
+        name: meta.name,
+        description: meta.description,
+        icon: meta.icon,
+        color: meta.color,
+        repoUrl: meta.repoUrl,
+        isInstalled: false,
+        isEnabled: true,
+      },
+      createACPAdapter(agentId)
+    );
+  }
+
+  // Future placeholders (remain as stubs)
   const futureRuntimes: RuntimeDefinition[] = [
-    { id: "claude-code", name: "Claude Code", description: "Anthropic's official CLI agent", icon: "◆", color: "text-orange-400", isInstalled: false, isEnabled: false },
-    { id: "codex", name: "Codex CLI", description: "OpenAI's coding agent CLI", icon: "◉", color: "text-green-400", isInstalled: false, isEnabled: false },
-    { id: "gemini-cli", name: "Gemini CLI", description: "Google's Gemini coding agent", icon: "◇", color: "text-blue-400", isInstalled: false, isEnabled: false },
-    { id: "cline", name: "Cline", description: "VS Code AI coding extension", icon: "⚡", color: "text-cyan-400", isInstalled: false, isEnabled: false },
     { id: "continue", name: "Continue", description: "Open-source AI code assistant", icon: "▶", color: "text-emerald-400", isInstalled: false, isEnabled: false },
-    { id: "goose", name: "Goose", description: "Block's AI coding agent", icon: "🪿", color: "text-amber-400", isInstalled: false, isEnabled: false },
   ];
 
   for (const def of futureRuntimes) {
-    // Only register definition, no adapter yet
     mgr.register(def, {
       id: def.id,
       name: def.name,
