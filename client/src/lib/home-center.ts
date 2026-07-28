@@ -353,6 +353,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "system",
     action: "scale",
   },
+  {
+    id: "resilience",
+    name: "Enterprise Resilience",
+    description: "Secrets vault, guardrails, backup/DR, offline/air-gapped mode",
+    icon: "🛡",
+    color: "purple",
+    category: "system",
+    action: "resilience",
+  },
 ];
 
 // ── API ──

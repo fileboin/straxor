@@ -856,3 +856,74 @@ export const scalingPolicies = pgTable("scaling_policies", {
 });
 
 export const scalingPoliciesRelations = relations(scalingPolicies, () => ({}));
+
+// ── Enterprise Security, Disaster Recovery & Offline Mode ──
+
+export const vaultSecrets = pgTable("vault_secrets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: varchar("type", { length: 50 }).notNull().default("api_key"),
+  encryptedValue: text("encrypted_value").notNull(),
+  algorithm: varchar("algorithm", { length: 50 }).notNull().default("aes-256-gcm"),
+  metadata: text("metadata").default("{}"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const vaultSecretsRelations = relations(vaultSecrets, ({ one }) => ({
+  org: one(organizations, { fields: [vaultSecrets.orgId], references: [organizations.id] }),
+}));
+
+export const sessionGuardrails = pgTable("session_guardrails", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  sessionId: uuid("session_id").references(() => agentSessions.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  maxTokens: integer("max_tokens"),
+  maxCost: integer("max_cost"),
+  currentTokens: integer("current_tokens").notNull().default(0),
+  currentCost: integer("current_cost").notNull().default(0),
+  isPaused: boolean("is_paused").notNull().default(false),
+  triggeredAt: timestamp("triggered_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const sessionGuardrailsRelations = relations(sessionGuardrails, ({ one }) => ({
+  session: one(agentSessions, { fields: [sessionGuardrails.sessionId], references: [agentSessions.id] }),
+  project: one(projects, { fields: [sessionGuardrails.projectId], references: [projects.id] }),
+}));
+
+export const systemSnapshots = pgTable("system_snapshots", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: varchar("type", { length: 50 }).notNull().default("full"),
+  filePath: varchar("file_path", { length: 500 }),
+  size: integer("size"),
+  checksum: varchar("checksum", { length: 128 }),
+  encryptionKey: varchar("encryption_key", { length: 500 }),
+  metadata: text("metadata").default("{}"),
+  status: varchar("status", { length: 30 }).notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const systemSnapshotsRelations = relations(systemSnapshots, () => ({}));
+
+export const offlineConfig = pgTable("offline_config", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  isEnabled: boolean("is_enabled").notNull().default(false),
+  localModelProvider: varchar("local_model_provider", { length: 100 }).default("ollama"),
+  localModelName: varchar("local_model_name", { length: 255 }).default("llama3"),
+  localGitPath: varchar("local_git_path", { length: 500 }),
+  localRuntime: varchar("local_runtime", { length: 100 }).default("opencode"),
+  airGapped: boolean("air_gapped").notNull().default(false),
+  allowedDomains: text("allowed_domains").default("[]"),
+  syncOnReconnect: boolean("sync_on_reconnect").notNull().default(true),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const offlineConfigRelations = relations(offlineConfig, () => ({}));

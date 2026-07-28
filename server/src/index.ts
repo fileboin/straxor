@@ -50,6 +50,7 @@ import enterpriseRoutes from "./routes/enterprise.js";
 import pluginRoutes from "./routes/plugins.js";
 import marketplaceRoutes from "./routes/marketplace.js";
 import scaleRoutes from "./routes/scale.js";
+import resilienceRoutes from "./routes/resilience.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -110,6 +111,7 @@ app.use("/api/enterprise", enterpriseRoutes);
 app.use("/api/plugins", pluginRoutes);
 app.use("/api/marketplace", marketplaceRoutes);
 app.use("/api/scale", scaleRoutes);
+app.use("/api/resilience", resilienceRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

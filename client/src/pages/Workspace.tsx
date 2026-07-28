@@ -49,6 +49,7 @@ import EnterpriseSecurity from "../components/workspace/EnterpriseSecurity.js";
 import PluginManager from "../components/workspace/PluginManager.js";
 import Marketplace from "../components/workspace/Marketplace.js";
 import GlobalScalePanel from "../components/workspace/GlobalScalePanel.js";
+import EnterpriseResilience from "../components/workspace/EnterpriseResilience.js";
 import CollaboratorsPanel from "../components/workspace/CollaboratorsPanel.js";
 import OrganizationDashboard from "../components/workspace/OrganizationDashboard.js";
 import type { VerificationResult } from "../lib/verify.js";
@@ -134,6 +135,7 @@ export default function Workspace() {
   const [showPlugins, setShowPlugins] = useState(false);
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [showScale, setShowScale] = useState(false);
+  const [showResilience, setShowResilience] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -1119,6 +1121,15 @@ export default function Workspace() {
       action: () => setShowScale(true),
     },
     {
+      id: "resilience",
+      label: "Enterprise Resilience & Offline Mode",
+      description: "Secrets vault, budget guardrails, disaster recovery, air-gapped mode",
+      icon: "🛡",
+      category: "action",
+      keywords: ["resilience", "vault", "secrets", "guardrail", "budget", "disaster", "backup", "snapshot", "offline", "air-gapped", "encryption"],
+      action: () => setShowResilience(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1235,7 +1246,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization, setShowEnterprise, setShowPlugins, setShowMarketplace, setShowScale,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization, setShowEnterprise, setShowPlugins, setShowMarketplace, setShowScale, setShowResilience,
   ]);
 
   return (
@@ -1660,6 +1671,7 @@ export default function Workspace() {
               plugins: () => setShowPlugins(true),
               marketplace: () => setShowMarketplace(true),
               scale: () => setShowScale(true),
+              resilience: () => setShowResilience(true),
             };
             const handler = panelMap[action];
             if (handler) handler();
@@ -1732,6 +1744,10 @@ export default function Workspace() {
 
       {showScale && (
         <GlobalScalePanel onClose={() => setShowScale(false)} />
+      )}
+
+      {showResilience && (
+        <EnterpriseResilience onClose={() => setShowResilience(false)} />
       )}
 
       {showKanban && (
