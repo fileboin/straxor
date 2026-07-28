@@ -163,6 +163,26 @@ export async function rejectChanges(
   });
 }
 
+export async function sendSteerInstruction(
+  machineId: string,
+  sessionId: string,
+  message: string
+): Promise<void> {
+  const token = localStorage.getItem("token");
+  const response = await fetch("/api/agent/steer", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: JSON.stringify({ machineId, sessionId, message }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Steer failed" }));
+    throw new Error(err.error || "Failed to send instruction");
+  }
+}
+
 export async function fetchFileContent(
   machineId: string,
   sessionId: string,

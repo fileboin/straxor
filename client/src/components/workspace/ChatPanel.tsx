@@ -49,6 +49,9 @@ interface Props {
   isExpanded?: boolean;
   onToggleExpand?: () => void;
   enablePlanPreview?: boolean;
+  isSteerable?: boolean;
+  onSteerSend?: (message: string) => void;
+  steerStatusText?: string;
 }
 
 function ToolCallCard({ tool }: { tool: ToolCall }) {
@@ -127,6 +130,9 @@ export default function ChatPanel({
   isExpanded,
   onToggleExpand,
   enablePlanPreview,
+  isSteerable,
+  onSteerSend,
+  steerStatusText,
 }: Props) {
   const [input, setInput] = useState("");
   const [showPlanPreview, setShowPlanPreview] = useState(false);
@@ -147,7 +153,16 @@ export default function ChatPanel({
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = input.trim();
-    if (!trimmed || loading) return;
+    if (!trimmed) return;
+
+    // Steer mode — send instruction to running agent
+    if (isSteerable && onSteerSend) {
+      onSteerSend(trimmed);
+      setInput("");
+      return;
+    }
+
+    if (loading) return;
 
     if (enablePlanPreview) {
       setPendingMessage(trimmed);
@@ -273,6 +288,16 @@ export default function ChatPanel({
         <div ref={messagesEndRef} />
       </div>
 
+          {/* Steer status bar */}
+      {isSteerable && (
+        <div className="px-3 py-1.5 border-t border-accent/30 bg-accent/5 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+          <span className="text-[11px] text-accent font-medium">
+            {steerStatusText || "Agent je aktivan — pošalji instrukciju za preusmjeravanje"}
+          </span>
+        </div>
+      )}
+
       {/* Input */}
       <div className="px-2 py-2 border-t border-border bg-surface shrink-0 sm:px-3 sm:py-2.5">
         {/* Plan Preview */}
@@ -301,18 +326,18 @@ export default function ChatPanel({
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={inputPlaceholder}
-            disabled={loading}
+            placeholder={isSteerable ? "Instrukcija za aktivnog agenta..." : inputPlaceholder}
+            disabled={loading && !isSteerable}
             className="flex-1 bg-transparent text-text text-[13px] placeholder-text-muted outline-none border-none disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={loading || !input.trim()}
+            disabled={(loading && !isSteerable) || !input.trim()}
             className={`w-[30px] h-[30px] rounded-full border-none text-white text-sm flex items-center justify-center transition-opacity shrink-0 disabled:opacity-30 ${
-              iconColor === "blue" ? "bg-accent-blue" : "bg-accent"
+              isSteerable ? "bg-accent" : iconColor === "blue" ? "bg-accent-blue" : "bg-accent"
             } hover:opacity-85`}
           >
-            ↑
+            {isSteerable ? "\u2191" : "\u2191"}
           </button>
         </form>
       </div>

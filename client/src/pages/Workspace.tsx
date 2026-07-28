@@ -14,7 +14,7 @@ import type { ChatMessage, ToolCall } from "../components/workspace/ChatPanel.js
 import type { PlanActMode } from "../components/workspace/PlanActToggle.js";
 import type { ThinkingBudget } from "../lib/models.js";
 import { streamChat, hasApiKey } from "../lib/chat.js";
-import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges } from "../lib/agent.js";
+import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges, sendSteerInstruction } from "../lib/agent.js";
 import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
 import { type AgentRole, getRoleById, fetchPrompts, type SavedPrompt } from "../lib/roles.js";
 import { checkBeforeInstall, type ScanVerdict } from "../lib/security.js";
@@ -397,6 +397,37 @@ export default function Workspace() {
     } catch {}
     setDiffLoading(false);
   }, [agentMachineId, agentSessionId, refreshTodos]);
+
+  const isAgentSteerable = !!agentSessionId && !!agentMachineId && agentLoading;
+
+  const handleSteerSend = useCallback(async (msg: string) => {
+    if (!agentMachineId || !agentSessionId) return;
+
+    // Echo user message in Ask panel
+    const userMsg: ChatMessage = { id: `steer-${Date.now()}`, role: "user", content: msg, label: "Steer \u2192 Agent" };
+    setAskMessages((prev) => [...prev, userMsg]);
+
+    try {
+      await sendSteerInstruction(agentMachineId, agentSessionId, msg);
+
+      // Add system acknowledgment
+      const ackMsg: ChatMessage = {
+        id: `steer-ack-${Date.now()}`,
+        role: "assistant",
+        content: "\u2192 Instrukcija poslana agentu. Agent nastavlja sa smjernicama.",
+        label: "System",
+      };
+      setAskMessages((prev) => [...prev, ackMsg]);
+    } catch (err: any) {
+      const errMsg: ChatMessage = {
+        id: `steer-err-${Date.now()}`,
+        role: "assistant",
+        content: `\u26A0 Gre\u0161ka pri slanju instrukcije: ${err.message}`,
+        label: "System",
+      };
+      setAskMessages((prev) => [...prev, errMsg]);
+    }
+  }, [agentMachineId, agentSessionId]);
 
   const handleAskSend = useCallback((msg: string) => {
     const userMsg: ChatMessage = { id: `a-${Date.now()}`, role: "user", content: msg };
@@ -1201,6 +1232,9 @@ export default function Workspace() {
             prefill={askPrefill}
             isExpanded={panelMode === "ask-full"}
             onToggleExpand={toggleAskExpand}
+            isSteerable={isAgentSteerable}
+            onSteerSend={handleSteerSend}
+            steerStatusText={agentTodos.length > 0 ? `Agent izvršava ${agentTodos.filter(t => t.status !== "completed").length} koraka — pošalji instrukciju` : undefined}
           />
         </div>
 

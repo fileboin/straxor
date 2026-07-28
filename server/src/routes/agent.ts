@@ -149,6 +149,34 @@ router.post("/send", async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/agent/steer — send mid-task instruction to an active session
+router.post("/steer", async (req: Request, res: Response) => {
+  const userId = (req as any).userId as string;
+  const { machineId, sessionId, text, message } = req.body as {
+    machineId: string;
+    sessionId: string;
+    text?: string;
+    message?: string;
+  };
+
+  const msgText = text || message;
+
+  if (!machineId || !sessionId || !msgText) {
+    res.status(400).json({ error: "Missing required fields: machineId, sessionId, text/message" });
+    return;
+  }
+
+  try {
+    const adapter = getAdapters().runtime(userId);
+    // Send as async — the response arrives on the existing event stream
+    await adapter.sendMessage(machineId, sessionId, msgText, "async");
+    res.json({ ok: true, sessionId });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
 // GET /api/agent/sessions/:machineId — list OpenCode sessions
 router.get("/sessions/:machineId", async (req: Request, res: Response) => {
   const userId = (req as any).userId as string;
