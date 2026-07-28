@@ -93,6 +93,15 @@ export const HOME_TILES: HomeTile[] = [
     action: "worktrees",
   },
   {
+    id: "git-remote",
+    name: "Git Platforme",
+    description: "GitHub, GitLab, Forgejo, Gitea, Bitbucket, HF Hub",
+    icon: "🔗",
+    color: "blue",
+    category: "tools",
+    action: "git-remote",
+  },
+  {
     id: "prompts",
     name: "Prompt Library",
     description: "Spremljeni prompti, agent uloge",

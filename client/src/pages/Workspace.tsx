@@ -37,6 +37,7 @@ import HomeCenter from "../components/workspace/HomeCenter.js";
 import DesignAssetsPanel from "../components/workspace/DesignAssetsPanel.js";
 import DesignStudio from "../components/workspace/DesignStudio.js";
 import WebResearchPanel from "../components/workspace/WebResearchPanel.js";
+import GitRemotePanel from "../components/workspace/GitRemotePanel.js";
 import UsagePanel from "../components/workspace/UsagePanel.js";
 import RuntimeSelector from "../components/workspace/RuntimeSelector.js";
 import QuickStartPanel from "../components/workspace/QuickStartPanel.js";
@@ -109,6 +110,7 @@ export default function Workspace() {
   const [showDesignAssets, setShowDesignAssets] = useState(false);
   const [showDesignStudio, setShowDesignStudio] = useState(false);
   const [showWebResearch, setShowWebResearch] = useState(false);
+  const [showGitRemote, setShowGitRemote] = useState(false);
   const [showUsage, setShowUsage] = useState(false);
   const [showRuntimeManager, setShowRuntimeManager] = useState(false);
   const [showQuickStart, setShowQuickStart] = useState(false);
@@ -1510,6 +1512,7 @@ export default function Workspace() {
               "design-assets": () => setShowDesignAssets(true),
               "design-studio": () => setShowDesignStudio(true),
               "web-research": () => setShowWebResearch(true),
+              "git-remote": () => setShowGitRemote(true),
               usage: () => setShowUsage(true),
               "runtime-manager": () => setShowRuntimeManager(true),
               "quick-start": () => setShowQuickStart(true),
@@ -1526,6 +1529,10 @@ export default function Workspace() {
 
       {showDesignStudio && (
         <DesignStudio onClose={() => setShowDesignStudio(false)} />
+      )}
+
+      {showGitRemote && (
+        <GitRemotePanel onClose={() => setShowGitRemote(false)} />
       )}
 
       {showWebResearch && (
