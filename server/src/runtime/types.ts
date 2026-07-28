@@ -7,6 +7,7 @@
 export type RuntimeId =
   | "opencode"
   | "crush"
+  | "free-claude-code"
   | "claude-code"
   | "codex"
   | "gemini-cli"

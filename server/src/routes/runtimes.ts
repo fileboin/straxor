@@ -3,6 +3,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { getRuntimeManager } from "../runtime/manager.js";
 import { createOpenCodeUniversalAdapter } from "../runtime/opencode-universal.js";
 import { createCrushAdapter } from "../runtime/crush/adapter.js";
+import { createFreeClaudeCodeAdapter } from "../runtime/free-claude-code/adapter.js";
 import type {
   RuntimeId, RuntimeDefinition, RuntimeHealth, RuntimeChannel,
   ProviderConfig, MCPServerConfig,
@@ -47,6 +48,21 @@ function ensureInit(userId: string) {
       isEnabled: true,
     },
     createCrushAdapter()
+  );
+
+  // Register Free Claude Code
+  mgr.register(
+    {
+      id: "free-claude-code",
+      name: "Free Claude Code",
+      description: "Python-based AI coding proxy — 29 providers, Claude Code/Codex/Pi support",
+      icon: "🆓",
+      color: "text-yellow-400",
+      repoUrl: "https://github.com/Alishahryar1/free-claude-code",
+      isInstalled: false,
+      isEnabled: true,
+    },
+    createFreeClaudeCodeAdapter()
   );
 
   // Future placeholders

@@ -5,6 +5,7 @@ import { api } from "./api.js";
 export type RuntimeId =
   | "opencode"
   | "crush"
+  | "free-claude-code"
   | "claude-code"
   | "codex"
   | "gemini-cli"
@@ -80,6 +81,7 @@ export interface MCPServerConfig {
 export const RUNTIME_ICONS: Record<RuntimeId, string> = {
   opencode: "◇",
   crush: "💎",
+  "free-claude-code": "🆓",
   "claude-code": "◆",
   codex: "◉",
   "gemini-cli": "◇",
@@ -92,6 +94,7 @@ export const RUNTIME_ICONS: Record<RuntimeId, string> = {
 export const RUNTIME_COLORS: Record<RuntimeId, string> = {
   opencode: "text-blue-400",
   crush: "text-purple-400",
+  "free-claude-code": "text-yellow-400",
   "claude-code": "text-orange-400",
   codex: "text-green-400",
   "gemini-cli": "text-blue-400",
