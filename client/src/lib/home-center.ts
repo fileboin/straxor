@@ -236,6 +236,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "system",
     action: "runtime-manager",
   },
+  {
+    id: "quick-start",
+    name: "Quick Start",
+    description: "Predlošci za brzi početak projekta",
+    icon: "✨",
+    color: "green",
+    category: "tools",
+    action: "quick-start",
+  },
 ];
 
 // ── API ──

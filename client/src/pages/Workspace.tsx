@@ -37,6 +37,7 @@ import HomeCenter from "../components/workspace/HomeCenter.js";
 import DesignAssetsPanel from "../components/workspace/DesignAssetsPanel.js";
 import UsagePanel from "../components/workspace/UsagePanel.js";
 import RuntimeSelector from "../components/workspace/RuntimeSelector.js";
+import QuickStartPanel from "../components/workspace/QuickStartPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -106,6 +107,7 @@ export default function Workspace() {
   const [showDesignAssets, setShowDesignAssets] = useState(false);
   const [showUsage, setShowUsage] = useState(false);
   const [showRuntimeManager, setShowRuntimeManager] = useState(false);
+  const [showQuickStart, setShowQuickStart] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -970,6 +972,15 @@ export default function Workspace() {
       action: () => setShowRuntimeManager(true),
     },
     {
+      id: "quick-start",
+      label: "Quick Start",
+      description: "Predlošci za brzi početak projekta",
+      icon: "✨",
+      category: "action",
+      keywords: ["quick", "start", "template", "predložak", "scaffold", "projekat"],
+      action: () => setShowQuickStart(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1086,7 +1097,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart,
   ]);
 
   return (
@@ -1115,6 +1126,7 @@ export default function Workspace() {
         onOpenDesignAssets={() => setShowDesignAssets(true)}
         onOpenUsage={() => setShowUsage(true)}
         onOpenRuntimeManager={() => setShowRuntimeManager(true)}
+        onOpenQuickStart={() => setShowQuickStart(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -1494,6 +1506,7 @@ export default function Workspace() {
               "design-assets": () => setShowDesignAssets(true),
               usage: () => setShowUsage(true),
               "runtime-manager": () => setShowRuntimeManager(true),
+              "quick-start": () => setShowQuickStart(true),
             };
             const handler = panelMap[action];
             if (handler) handler();
@@ -1511,6 +1524,10 @@ export default function Workspace() {
 
       {showRuntimeManager && (
         <RuntimeSelector machineId={agentMachineId} onClose={() => setShowRuntimeManager(false)} />
+      )}
+
+      {showQuickStart && (
+        <QuickStartPanel onClose={() => setShowQuickStart(false)} />
       )}
 
       {showSessionPicker && (

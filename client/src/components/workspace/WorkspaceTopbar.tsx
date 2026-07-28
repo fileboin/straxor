@@ -27,6 +27,7 @@ interface Props {
   onOpenDesignAssets?: () => void;
   onOpenUsage?: () => void;
   onOpenRuntimeManager?: () => void;
+  onOpenQuickStart?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -70,6 +71,7 @@ export default function WorkspaceTopbar({
   onOpenDesignAssets,
   onOpenUsage,
   onOpenRuntimeManager,
+  onOpenQuickStart,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -211,6 +213,15 @@ export default function WorkspaceTopbar({
             ⚙
           </button>
         )}
+        {onOpenQuickStart && (
+          <button
+            onClick={onOpenQuickStart}
+            className="hidden sm:flex px-2.5 py-1.5 rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+            title="Quick Start — predlošci za brzi početak"
+          >
+            ✨
+          </button>
+        )}
         <HomeMenu
           onOpenHowItWorks={onOpenHowItWorks}
           onOpenSettings={onOpenSettings}
@@ -227,6 +238,7 @@ export default function WorkspaceTopbar({
           onOpenDesignAssets={onOpenDesignAssets}
           onOpenUsage={onOpenUsage}
           onOpenRuntimeManager={onOpenRuntimeManager}
+          onOpenQuickStart={onOpenQuickStart}
         />
       </div>
     </header>
