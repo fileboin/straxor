@@ -789,3 +789,70 @@ export const marketplaceInstallationsRelations = relations(marketplaceInstallati
   user: one(users, { fields: [marketplaceInstallations.userId], references: [users.id] }),
   project: one(projects, { fields: [marketplaceInstallations.projectId], references: [projects.id] }),
 }));
+
+// ── Global Scale & High Availability ──
+
+export const runtimeNodes = pgTable("runtime_nodes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  url: varchar("url", { length: 500 }),
+  status: varchar("status", { length: 30 }).notNull().default("offline"),
+  capabilities: text("capabilities").default("[]"),
+  region: varchar("region", { length: 100 }).default("default"),
+  version: varchar("version", { length: 20 }).default("1.0.0"),
+  config: text("config").default("{}"),
+  priority: integer("priority").notNull().default(0),
+  lastHeartbeat: timestamp("last_heartbeat"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const runtimeNodesRelations = relations(runtimeNodes, () => ({}));
+
+export const loadBalancerConfigs = pgTable("load_balancer_configs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  provider: varchar("provider", { length: 100 }),
+  strategy: varchar("strategy", { length: 50 }).notNull().default("round-robin"),
+  targets: text("targets").default("[]"),
+  rules: text("rules").default("[]"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const loadBalancerConfigsRelations = relations(loadBalancerConfigs, () => ({}));
+
+export const failoverConfigs = pgTable("failover_configs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  provider: varchar("provider", { length: 100 }).notNull(),
+  primaryEndpoint: varchar("primary_endpoint", { length: 500 }),
+  backupEndpoints: text("backup_endpoints").default("[]"),
+  strategy: varchar("strategy", { length: 50 }).notNull().default("auto"),
+  healthCheckInterval: integer("health_check_interval").notNull().default(30),
+  maxRetries: integer("max_retries").notNull().default(3),
+  cooldownPeriod: integer("cooldown_period").notNull().default(60),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const failoverConfigsRelations = relations(failoverConfigs, () => ({}));
+
+export const scalingPolicies = pgTable("scaling_policies", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  target: varchar("target", { length: 100 }).notNull().default("multi-agent"),
+  metric: varchar("metric", { length: 100 }).notNull().default("concurrent_sessions"),
+  minInstances: integer("min_instances").notNull().default(1),
+  maxInstances: integer("max_instances").notNull().default(10),
+  scaleUpThreshold: integer("scale_up_threshold").notNull().default(80),
+  scaleDownThreshold: integer("scale_down_threshold").notNull().default(30),
+  cooldownSeconds: integer("cooldown_seconds").notNull().default(120),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const scalingPoliciesRelations = relations(scalingPolicies, () => ({}));

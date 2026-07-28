@@ -344,6 +344,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "system",
     action: "marketplace",
   },
+  {
+    id: "scale",
+    name: "Global Scale & HA",
+    description: "Runtime nodovi, load balancer, failover, auto-scaling",
+    icon: "🌍",
+    color: "red",
+    category: "system",
+    action: "scale",
+  },
 ];
 
 // ── API ──

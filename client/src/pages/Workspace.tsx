@@ -48,6 +48,7 @@ import TeamPanel from "../components/workspace/TeamPanel.js";
 import EnterpriseSecurity from "../components/workspace/EnterpriseSecurity.js";
 import PluginManager from "../components/workspace/PluginManager.js";
 import Marketplace from "../components/workspace/Marketplace.js";
+import GlobalScalePanel from "../components/workspace/GlobalScalePanel.js";
 import CollaboratorsPanel from "../components/workspace/CollaboratorsPanel.js";
 import OrganizationDashboard from "../components/workspace/OrganizationDashboard.js";
 import type { VerificationResult } from "../lib/verify.js";
@@ -132,6 +133,7 @@ export default function Workspace() {
   const [showEnterprise, setShowEnterprise] = useState(false);
   const [showPlugins, setShowPlugins] = useState(false);
   const [showMarketplace, setShowMarketplace] = useState(false);
+  const [showScale, setShowScale] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -1108,6 +1110,15 @@ export default function Workspace() {
       action: () => setShowMarketplace(true),
     },
     {
+      id: "scale",
+      label: "Global Scale & High Availability",
+      description: "Runtime nodovi, load balancer, failover, auto-scaling politike",
+      icon: "🌍",
+      category: "action",
+      keywords: ["scale", "ha", "cluster", "node", "load balancer", "failover", "distributed", "availability"],
+      action: () => setShowScale(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1224,7 +1235,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization, setShowEnterprise, setShowPlugins, setShowMarketplace,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization, setShowEnterprise, setShowPlugins, setShowMarketplace, setShowScale,
   ]);
 
   return (
@@ -1648,6 +1659,7 @@ export default function Workspace() {
               enterprise: () => setShowEnterprise(true),
               plugins: () => setShowPlugins(true),
               marketplace: () => setShowMarketplace(true),
+              scale: () => setShowScale(true),
             };
             const handler = panelMap[action];
             if (handler) handler();
@@ -1716,6 +1728,10 @@ export default function Workspace() {
 
       {showMarketplace && (
         <Marketplace onClose={() => setShowMarketplace(false)} />
+      )}
+
+      {showScale && (
+        <GlobalScalePanel onClose={() => setShowScale(false)} />
       )}
 
       {showKanban && (
