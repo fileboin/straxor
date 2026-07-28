@@ -335,6 +335,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "system",
     action: "plugins",
   },
+  {
+    id: "marketplace",
+    name: "Marketplace",
+    description: "Community template-i, agenti, promptovi, MCP serveri, radni okviri",
+    icon: "🏪",
+    color: "green",
+    category: "system",
+    action: "marketplace",
+  },
 ];
 
 // ── API ──

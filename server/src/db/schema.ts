@@ -727,3 +727,65 @@ export const pluginEvents = pgTable("plugin_events", {
 export const pluginEventsRelations = relations(pluginEvents, ({ one }) => ({
   plugin: one(plugins, { fields: [pluginEvents.pluginId], references: [plugins.id] }),
 }));
+
+// ── Marketplace & Community Templates ──
+
+export type MarketplaceItemType = "template" | "agent" | "prompt" | "mcp" | "workflow" | "plugin";
+
+export const marketplaceItems = pgTable("marketplace_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: varchar("type", { length: 50 }).notNull(),
+  version: varchar("version", { length: 20 }).notNull().default("1.0.0"),
+  description: text("description"),
+  longDescription: text("long_description"),
+  icon: varchar("icon", { length: 50 }).default("📦"),
+  authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+  authorName: varchar("author_name", { length: 255 }),
+  tags: text("tags").default("[]"),
+  category: varchar("category", { length: 100 }),
+  content: text("content").default("{}"),
+  configSchema: text("config_schema").default("{}"),
+  isPublic: boolean("is_public").notNull().default(true),
+  orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+  installCount: integer("install_count").notNull().default(0),
+  rating: integer("rating").notNull().default(0),
+  reviewCount: integer("review_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const marketplaceItemsRelations = relations(marketplaceItems, ({ one, many }) => ({
+  author: one(users, { fields: [marketplaceItems.authorId], references: [users.id] }),
+  org: one(organizations, { fields: [marketplaceItems.orgId], references: [organizations.id] }),
+  reviews: many(marketplaceReviews),
+}));
+
+export const marketplaceReviews = pgTable("marketplace_reviews", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  itemId: uuid("item_id").notNull().references(() => marketplaceItems.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  rating: integer("rating").notNull().default(5),
+  comment: text("comment"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const marketplaceReviewsRelations = relations(marketplaceReviews, ({ one }) => ({
+  item: one(marketplaceItems, { fields: [marketplaceReviews.itemId], references: [marketplaceItems.id] }),
+  user: one(users, { fields: [marketplaceReviews.userId], references: [users.id] }),
+}));
+
+export const marketplaceInstallations = pgTable("marketplace_installations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  itemId: uuid("item_id").notNull().references(() => marketplaceItems.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  config: text("config").default("{}"),
+  installedAt: timestamp("installed_at").defaultNow().notNull(),
+});
+
+export const marketplaceInstallationsRelations = relations(marketplaceInstallations, ({ one }) => ({
+  item: one(marketplaceItems, { fields: [marketplaceInstallations.itemId], references: [marketplaceItems.id] }),
+  user: one(users, { fields: [marketplaceInstallations.userId], references: [users.id] }),
+  project: one(projects, { fields: [marketplaceInstallations.projectId], references: [projects.id] }),
+}));
