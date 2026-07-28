@@ -431,3 +431,25 @@ export const webResearch = pgTable("web_research", {
 export const webResearchRelations = relations(webResearch, ({ one }) => ({
   user: one(users, { fields: [webResearch.userId], references: [users.id] }),
 }));
+
+export const mcpServers = pgTable("mcp_servers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  icon: varchar("icon", { length: 50 }).default("🔌"),
+  category: varchar("category", { length: 50 }).default("custom"),
+  command: varchar("command", { length: 255 }).notNull(),
+  args: text("args").default("[]"),
+  env: text("env").default("{}"),
+  tools: text("tools").default("[]"),
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const mcpServersRelations = relations(mcpServers, ({ one }) => ({
+  user: one(users, { fields: [mcpServers.userId], references: [users.id] }),
+}));

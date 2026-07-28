@@ -42,6 +42,7 @@ import UsagePanel from "../components/workspace/UsagePanel.js";
 import RuntimeSelector from "../components/workspace/RuntimeSelector.js";
 import QuickStartPanel from "../components/workspace/QuickStartPanel.js";
 import KanbanCommandCenter from "../components/workspace/KanbanCommandCenter.js";
+import McpMarketplace from "../components/workspace/McpMarketplace.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -116,6 +117,7 @@ export default function Workspace() {
   const [showRuntimeManager, setShowRuntimeManager] = useState(false);
   const [showQuickStart, setShowQuickStart] = useState(false);
   const [showKanban, setShowKanban] = useState(false);
+  const [showMcpMarketplace, setShowMcpMarketplace] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -1029,6 +1031,15 @@ export default function Workspace() {
       action: () => setShowKanban(true),
     },
     {
+      id: "mcp-marketplace",
+      label: "MCP Marketplace",
+      description: "MCP server registry — instaliraj i upravljaj MCP serverima",
+      icon: "🔌",
+      category: "action",
+      keywords: ["mcp", "marketplace", "server", "firecrawl", "database", "docs", "extension"],
+      action: () => setShowMcpMarketplace(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1145,7 +1156,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace,
   ]);
 
   return (
@@ -1562,6 +1573,7 @@ export default function Workspace() {
               "runtime-manager": () => setShowRuntimeManager(true),
               "quick-start": () => setShowQuickStart(true),
               kanban: () => setShowKanban(true),
+              "mcp-marketplace": () => setShowMcpMarketplace(true),
             };
             const handler = panelMap[action];
             if (handler) handler();
@@ -1595,6 +1607,13 @@ export default function Workspace() {
 
       {showQuickStart && (
         <QuickStartPanel onClose={() => setShowQuickStart(false)} />
+      )}
+
+      {showMcpMarketplace && (
+        <McpMarketplace
+          onClose={() => setShowMcpMarketplace(false)}
+          machineId={agentMachineId}
+        />
       )}
 
       {showKanban && (

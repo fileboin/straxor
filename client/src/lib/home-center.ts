@@ -281,6 +281,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "system",
     action: "kanban",
   },
+  {
+    id: "mcp-marketplace",
+    name: "MCP Marketplace",
+    description: "MCP server registry — Firecrawl, Database, Docs, GitHub, Slack...",
+    icon: "🔌",
+    color: "blue",
+    category: "system",
+    action: "mcp-marketplace",
+  },
 ];
 
 // ── API ──
