@@ -227,6 +227,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "system",
     action: "usage",
   },
+  {
+    id: "runtime-manager",
+    name: "Runtime Manager",
+    description: "OpenCode, Crush, Claude Code — izaberi runtime",
+    icon: "⚙",
+    color: "blue",
+    category: "system",
+    action: "runtime-manager",
+  },
 ];
 
 // ── API ──

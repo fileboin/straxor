@@ -33,6 +33,7 @@ import multiAgentRoutes from "./routes/multi-agent.js";
 import homeCenterRoutes from "./routes/home-center.js";
 import designAssetsRoutes from "./routes/design-assets.js";
 import usageRoutes from "./routes/usage.js";
+import runtimesRoutes from "./routes/runtimes.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -76,6 +77,7 @@ app.use("/api/multi-agent", multiAgentRoutes);
 app.use("/api/home-center", homeCenterRoutes);
 app.use("/api/design-assets", designAssetsRoutes);
 app.use("/api/usage", usageRoutes);
+app.use("/api/runtimes", runtimesRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

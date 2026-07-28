@@ -36,6 +36,7 @@ import MultiAgentPanel from "../components/workspace/MultiAgentPanel.js";
 import HomeCenter from "../components/workspace/HomeCenter.js";
 import DesignAssetsPanel from "../components/workspace/DesignAssetsPanel.js";
 import UsagePanel from "../components/workspace/UsagePanel.js";
+import RuntimeSelector from "../components/workspace/RuntimeSelector.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -104,6 +105,7 @@ export default function Workspace() {
   const [showHomeCenter, setShowHomeCenter] = useState(false);
   const [showDesignAssets, setShowDesignAssets] = useState(false);
   const [showUsage, setShowUsage] = useState(false);
+  const [showRuntimeManager, setShowRuntimeManager] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -959,6 +961,15 @@ export default function Workspace() {
       action: () => setShowUsage(true),
     },
     {
+      id: "runtime-manager",
+      label: "Runtime Manager",
+      description: "OpenCode, Crush, Claude Code — izaberi runtime",
+      icon: "⚙",
+      category: "action",
+      keywords: ["runtime", "opencode", "crush", "engine", "switch", "mcp"],
+      action: () => setShowRuntimeManager(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1075,7 +1086,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager,
   ]);
 
   return (
@@ -1103,6 +1114,7 @@ export default function Workspace() {
         onOpenHomeCenter={() => setShowHomeCenter(true)}
         onOpenDesignAssets={() => setShowDesignAssets(true)}
         onOpenUsage={() => setShowUsage(true)}
+        onOpenRuntimeManager={() => setShowRuntimeManager(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -1481,6 +1493,7 @@ export default function Workspace() {
               docs: () => window.open("https://straxor.dev/docs", "_blank"),
               "design-assets": () => setShowDesignAssets(true),
               usage: () => setShowUsage(true),
+              "runtime-manager": () => setShowRuntimeManager(true),
             };
             const handler = panelMap[action];
             if (handler) handler();
@@ -1494,6 +1507,10 @@ export default function Workspace() {
 
       {showUsage && (
         <UsagePanel onClose={() => setShowUsage(false)} />
+      )}
+
+      {showRuntimeManager && (
+        <RuntimeSelector machineId={agentMachineId} onClose={() => setShowRuntimeManager(false)} />
       )}
 
       {showSessionPicker && (

@@ -26,6 +26,7 @@ interface Props {
   onOpenHomeCenter?: () => void;
   onOpenDesignAssets?: () => void;
   onOpenUsage?: () => void;
+  onOpenRuntimeManager?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -68,6 +69,7 @@ export default function WorkspaceTopbar({
   onOpenHomeCenter,
   onOpenDesignAssets,
   onOpenUsage,
+  onOpenRuntimeManager,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -200,6 +202,15 @@ export default function WorkspaceTopbar({
             📊
           </button>
         )}
+        {onOpenRuntimeManager && (
+          <button
+            onClick={onOpenRuntimeManager}
+            className="hidden sm:flex px-2.5 py-1.5 rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+            title="Runtime Manager"
+          >
+            ⚙
+          </button>
+        )}
         <HomeMenu
           onOpenHowItWorks={onOpenHowItWorks}
           onOpenSettings={onOpenSettings}
@@ -215,6 +226,7 @@ export default function WorkspaceTopbar({
           onOpenHomeCenter={onOpenHomeCenter}
           onOpenDesignAssets={onOpenDesignAssets}
           onOpenUsage={onOpenUsage}
+          onOpenRuntimeManager={onOpenRuntimeManager}
         />
       </div>
     </header>
