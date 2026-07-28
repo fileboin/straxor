@@ -46,6 +46,7 @@ import McpMarketplace from "../components/workspace/McpMarketplace.js";
 import InfrastructurePanel from "../components/workspace/InfrastructurePanel.js";
 import TeamPanel from "../components/workspace/TeamPanel.js";
 import CollaboratorsPanel from "../components/workspace/CollaboratorsPanel.js";
+import OrganizationDashboard from "../components/workspace/OrganizationDashboard.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -124,6 +125,7 @@ export default function Workspace() {
   const [showInfrastructure, setShowInfrastructure] = useState(false);
   const [showTeams, setShowTeams] = useState(false);
   const [showCollaborators, setShowCollaborators] = useState(false);
+  const [showOrganization, setShowOrganization] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -1064,6 +1066,15 @@ export default function Workspace() {
       action: () => setShowTeams(true),
     },
     {
+      id: "organization",
+      label: "Organization Dashboard",
+      description: "Organizacije, budžeti, deljeni API ključevi, security politike",
+      icon: "🏢",
+      category: "action",
+      keywords: ["organization", "org", "billing", "budget", "company", "company"],
+      action: () => setShowOrganization(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1180,7 +1191,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization,
   ]);
 
   return (
@@ -1600,6 +1611,7 @@ export default function Workspace() {
               "mcp-marketplace": () => setShowMcpMarketplace(true),
               infrastructure: () => setShowInfrastructure(true),
               teams: () => setShowTeams(true),
+              organization: () => setShowOrganization(true),
             };
             const handler = panelMap[action];
             if (handler) handler();
@@ -1652,6 +1664,10 @@ export default function Workspace() {
 
       {showTeams && (
         <TeamPanel onClose={() => setShowTeams(false)} />
+      )}
+
+      {showOrganization && (
+        <OrganizationDashboard onClose={() => setShowOrganization(false)} />
       )}
 
       {showKanban && (

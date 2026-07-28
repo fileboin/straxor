@@ -547,3 +547,84 @@ export const codeCommentsRelations = relations(codeComments, ({ one, many }) => 
   parent: one(codeComments, { fields: [codeComments.parentId], references: [codeComments.id] }),
   replies: many(codeComments, { relationName: "commentReplies" }),
 }));
+
+// ── Organization ──
+
+export const organizations = pgTable("organizations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  ownerId: uuid("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  billingEmail: varchar("billing_email", { length: 255 }),
+  plan: varchar("plan", { length: 50 }).default("free"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const organizationsRelations = relations(organizations, ({ one, many }) => ({
+  owner: one(users, { fields: [organizations.ownerId], references: [users.id] }),
+  members: many(organizationMembers),
+  apiKeys: many(organizationApiKeys),
+  policies: many(organizationPolicies),
+  budgets: many(budgetLimits),
+}));
+
+export const organizationMembers = pgTable("organization_members", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 20 }).notNull().default("member"),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+});
+
+export const organizationMembersRelations = relations(organizationMembers, ({ one }) => ({
+  org: one(organizations, { fields: [organizationMembers.orgId], references: [organizations.id] }),
+  user: one(users, { fields: [organizationMembers.userId], references: [users.id] }),
+}));
+
+export const organizationApiKeys = pgTable("organization_api_keys", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  provider: varchar("provider", { length: 50 }).notNull(),
+  label: varchar("label", { length: 255 }),
+  encryptedKey: text("encrypted_key").notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const organizationApiKeysRelations = relations(organizationApiKeys, ({ one }) => ({
+  org: one(organizations, { fields: [organizationApiKeys.orgId], references: [organizations.id] }),
+  creator: one(users, { fields: [organizationApiKeys.createdBy], references: [users.id] }),
+}));
+
+export const organizationPolicies = pgTable("organization_policies", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 30 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  config: text("config").default("{}"),
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const organizationPoliciesRelations = relations(organizationPolicies, ({ one }) => ({
+  org: one(organizations, { fields: [organizationPolicies.orgId], references: [organizations.id] }),
+}));
+
+export const budgetLimits = pgTable("budget_limits", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  monthlyLimit: integer("monthly_limit").notNull().default(0),
+  currentUsage: integer("current_usage").notNull().default(0),
+  currency: varchar("currency", { length: 10 }).default("USD"),
+  alertAtPercent: integer("alert_at_percent").default(80),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const budgetLimitsRelations = relations(budgetLimits, ({ one }) => ({
+  org: one(organizations, { fields: [budgetLimits.orgId], references: [organizations.id] }),
+  project: one(projects, { fields: [budgetLimits.projectId], references: [projects.id] }),
+}));

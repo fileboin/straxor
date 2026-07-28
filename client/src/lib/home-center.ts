@@ -308,6 +308,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "system",
     action: "teams",
   },
+  {
+    id: "organization",
+    name: "Organization Dashboard",
+    description: "Organizacije, budžeti, deljeni API ključevi, security politike",
+    icon: "🏢",
+    color: "purple",
+    category: "system",
+    action: "organization",
+  },
 ];
 
 // ── API ──

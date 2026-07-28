@@ -45,6 +45,7 @@ import infrastructureRoutes from "./routes/infrastructure.js";
 import teamsRoutes from "./routes/teams.js";
 import collaboratorsRoutes from "./routes/collaborators.js";
 import commentsRoutes from "./routes/comments.js";
+import organizationRoutes from "./routes/organizations.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -100,6 +101,7 @@ app.use("/api/infrastructure", infrastructureRoutes);
 app.use("/api/teams", teamsRoutes);
 app.use("/api/projects/:projectId/collaborators", collaboratorsRoutes);
 app.use("/api/projects/:projectId/comments", commentsRoutes);
+app.use("/api/organizations", organizationRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
