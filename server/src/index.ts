@@ -35,6 +35,7 @@ import designAssetsRoutes from "./routes/design-assets.js";
 import usageRoutes from "./routes/usage.js";
 import runtimesRoutes from "./routes/runtimes.js";
 import quickstartRoutes from "./routes/quickstart.js";
+import designRoutes from "./routes/design.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -80,6 +81,7 @@ app.use("/api/design-assets", designAssetsRoutes);
 app.use("/api/usage", usageRoutes);
 app.use("/api/runtimes", runtimesRoutes);
 app.use("/api/quickstart", quickstartRoutes);
+app.use("/api/design", designRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
