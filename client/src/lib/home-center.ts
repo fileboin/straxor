@@ -326,6 +326,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "system",
     action: "enterprise",
   },
+  {
+    id: "plugins",
+    name: "Plugin Manager",
+    description: "Custom plugini, adapteri, UI dodaci, SDK — ekosistem proširenja",
+    icon: "🧩",
+    color: "blue",
+    category: "system",
+    action: "plugins",
+  },
 ];
 
 // ── API ──

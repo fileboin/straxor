@@ -46,6 +46,7 @@ import McpMarketplace from "../components/workspace/McpMarketplace.js";
 import InfrastructurePanel from "../components/workspace/InfrastructurePanel.js";
 import TeamPanel from "../components/workspace/TeamPanel.js";
 import EnterpriseSecurity from "../components/workspace/EnterpriseSecurity.js";
+import PluginManager from "../components/workspace/PluginManager.js";
 import CollaboratorsPanel from "../components/workspace/CollaboratorsPanel.js";
 import OrganizationDashboard from "../components/workspace/OrganizationDashboard.js";
 import type { VerificationResult } from "../lib/verify.js";
@@ -128,6 +129,7 @@ export default function Workspace() {
   const [showCollaborators, setShowCollaborators] = useState(false);
   const [showOrganization, setShowOrganization] = useState(false);
   const [showEnterprise, setShowEnterprise] = useState(false);
+  const [showPlugins, setShowPlugins] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -1086,6 +1088,15 @@ export default function Workspace() {
       action: () => setShowEnterprise(true),
     },
     {
+      id: "plugins",
+      label: "Plugin Manager & SDK",
+      description: "Custom plugini, adapteri, UI dodaci, SDK dokumentacija",
+      icon: "🧩",
+      category: "action",
+      keywords: ["plugin", "sdk", "extension", "addon", "marketplace", "custom"],
+      action: () => setShowPlugins(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1202,7 +1213,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization, setShowEnterprise,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization, setShowEnterprise, setShowPlugins,
   ]);
 
   return (
@@ -1624,6 +1635,7 @@ export default function Workspace() {
               teams: () => setShowTeams(true),
               organization: () => setShowOrganization(true),
               enterprise: () => setShowEnterprise(true),
+              plugins: () => setShowPlugins(true),
             };
             const handler = panelMap[action];
             if (handler) handler();
@@ -1684,6 +1696,10 @@ export default function Workspace() {
 
       {showEnterprise && (
         <EnterpriseSecurity onClose={() => setShowEnterprise(false)} />
+      )}
+
+      {showPlugins && (
+        <PluginManager onClose={() => setShowPlugins(false)} />
       )}
 
       {showKanban && (

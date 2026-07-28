@@ -692,3 +692,38 @@ export const complianceReports = pgTable("compliance_reports", {
 export const complianceReportsRelations = relations(complianceReports, ({ one }) => ({
   org: one(organizations, { fields: [complianceReports.orgId], references: [organizations.id] }),
 }));
+
+// ── Plugin & Extension SDK ──
+
+export const plugins = pgTable("plugins", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  type: varchar("type", { length: 50 }).notNull().default("custom"),
+  version: varchar("version", { length: 20 }).notNull().default("1.0.0"),
+  description: text("description"),
+  author: varchar("author", { length: 255 }),
+  icon: varchar("icon", { length: 50 }).default("🧩"),
+  configSchema: text("config_schema").default("{}"),
+  permissions: text("permissions").default("[]"),
+  entryPoint: varchar("entry_point", { length: 500 }),
+  settings: text("settings").default("{}"),
+  isInstalled: boolean("is_installed").notNull().default(false),
+  isBuiltin: boolean("is_builtin").notNull().default(false),
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const pluginsRelations = relations(plugins, () => ({}));
+
+export const pluginEvents = pgTable("plugin_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  pluginId: uuid("plugin_id").notNull().references(() => plugins.id, { onDelete: "cascade" }),
+  event: varchar("event", { length: 255 }).notNull(),
+  handler: varchar("handler", { length: 500 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const pluginEventsRelations = relations(pluginEvents, ({ one }) => ({
+  plugin: one(plugins, { fields: [pluginEvents.pluginId], references: [plugins.id] }),
+}));

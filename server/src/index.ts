@@ -47,6 +47,7 @@ import collaboratorsRoutes from "./routes/collaborators.js";
 import commentsRoutes from "./routes/comments.js";
 import organizationRoutes from "./routes/organizations.js";
 import enterpriseRoutes from "./routes/enterprise.js";
+import pluginRoutes from "./routes/plugins.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -104,6 +105,7 @@ app.use("/api/projects/:projectId/collaborators", collaboratorsRoutes);
 app.use("/api/projects/:projectId/comments", commentsRoutes);
 app.use("/api/organizations", organizationRoutes);
 app.use("/api/enterprise", enterpriseRoutes);
+app.use("/api/plugins", pluginRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
