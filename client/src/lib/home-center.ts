@@ -209,6 +209,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "info",
     action: "docs",
   },
+  {
+    id: "design-assets",
+    name: "Design Assets",
+    description: "Ikone, tokeni, SVG kolekcije, brand",
+    icon: "🎨",
+    color: "purple",
+    category: "tools",
+    action: "design-assets",
+  },
 ];
 
 // ── API ──

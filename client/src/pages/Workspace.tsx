@@ -34,6 +34,7 @@ import GatewayPanel from "../components/workspace/GatewayPanel.js";
 import ProvidersPanel from "../components/workspace/ProvidersPanel.js";
 import MultiAgentPanel from "../components/workspace/MultiAgentPanel.js";
 import HomeCenter from "../components/workspace/HomeCenter.js";
+import DesignAssetsPanel from "../components/workspace/DesignAssetsPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -100,6 +101,7 @@ export default function Workspace() {
   const [showProviders, setShowProviders] = useState(false);
   const [showMultiAgent, setShowMultiAgent] = useState(false);
   const [showHomeCenter, setShowHomeCenter] = useState(false);
+  const [showDesignAssets, setShowDesignAssets] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -937,6 +939,15 @@ export default function Workspace() {
       action: () => setShowHomeCenter(true),
     },
     {
+      id: "design-assets",
+      label: "Design Assets",
+      description: "Ikone, tokeni, SVG kolekcije, brand",
+      icon: "🎨",
+      category: "action",
+      keywords: ["design", "assets", "ikone", "tokeni", "svg", "lucide", "brand"],
+      action: () => setShowDesignAssets(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1053,7 +1064,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets,
   ]);
 
   return (
@@ -1079,6 +1090,7 @@ export default function Workspace() {
         onOpenProviders={() => setShowProviders(true)}
         onOpenMultiAgent={() => setShowMultiAgent(true)}
         onOpenHomeCenter={() => setShowHomeCenter(true)}
+        onOpenDesignAssets={() => setShowDesignAssets(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -1455,11 +1467,16 @@ export default function Workspace() {
               sessions: () => setShowSessionPicker(true),
               theme: () => toggleTheme(),
               docs: () => window.open("https://straxor.dev/docs", "_blank"),
+              "design-assets": () => setShowDesignAssets(true),
             };
             const handler = panelMap[action];
             if (handler) handler();
           }}
         />
+      )}
+
+      {showDesignAssets && (
+        <DesignAssetsPanel onClose={() => setShowDesignAssets(false)} />
       )}
 
       {showSessionPicker && (

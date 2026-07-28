@@ -24,6 +24,7 @@ interface Props {
   onOpenProviders?: () => void;
   onOpenMultiAgent?: () => void;
   onOpenHomeCenter?: () => void;
+  onOpenDesignAssets?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -64,6 +65,7 @@ export default function WorkspaceTopbar({
   onOpenProviders,
   onOpenMultiAgent,
   onOpenHomeCenter,
+  onOpenDesignAssets,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -178,6 +180,15 @@ export default function WorkspaceTopbar({
             🏠
           </button>
         )}
+        {onOpenDesignAssets && (
+          <button
+            onClick={onOpenDesignAssets}
+            className="hidden sm:flex px-2.5 py-1.5 rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+            title="Design Assets"
+          >
+            🎨
+          </button>
+        )}
         <HomeMenu
           onOpenHowItWorks={onOpenHowItWorks}
           onOpenSettings={onOpenSettings}
@@ -191,6 +202,7 @@ export default function WorkspaceTopbar({
           onOpenProviders={onOpenProviders}
           onOpenMultiAgent={onOpenMultiAgent}
           onOpenHomeCenter={onOpenHomeCenter}
+          onOpenDesignAssets={onOpenDesignAssets}
         />
       </div>
     </header>
