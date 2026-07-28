@@ -628,3 +628,67 @@ export const budgetLimitsRelations = relations(budgetLimits, ({ one }) => ({
   org: one(organizations, { fields: [budgetLimits.orgId], references: [organizations.id] }),
   project: one(projects, { fields: [budgetLimits.projectId], references: [projects.id] }),
 }));
+
+// ── Enterprise Security & Compliance ──
+
+export const auditLogs = pgTable("audit_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+  action: varchar("action", { length: 100 }).notNull(),
+  resource: varchar("resource", { length: 255 }),
+  details: text("details").default("{}"),
+  ip: varchar("ip", { length: 45 }),
+  userAgent: text("user_agent"),
+  severity: varchar("severity", { length: 20 }).default("info"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  user: one(users, { fields: [auditLogs.userId], references: [users.id] }),
+  org: one(organizations, { fields: [auditLogs.orgId], references: [organizations.id] }),
+}));
+
+export const ssoConfigs = pgTable("sso_configs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  provider: varchar("provider", { length: 50 }).notNull(),
+  label: varchar("label", { length: 255 }),
+  config: text("config").default("{}"),
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const ssoConfigsRelations = relations(ssoConfigs, ({ one }) => ({
+  org: one(organizations, { fields: [ssoConfigs.orgId], references: [organizations.id] }),
+}));
+
+export const encryptionKeys = pgTable("encryption_keys", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  algorithm: varchar("algorithm", { length: 50 }).notNull().default("aes-256-gcm"),
+  keyData: text("key_data"),
+  isActive: boolean("is_active").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const encryptionKeysRelations = relations(encryptionKeys, ({ one }) => ({
+  org: one(organizations, { fields: [encryptionKeys.orgId], references: [organizations.id] }),
+}));
+
+export const complianceReports = pgTable("compliance_reports", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  standard: varchar("standard", { length: 50 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  findings: text("findings").default("[]"),
+  summary: text("summary"),
+  generatedAt: timestamp("generated_at").defaultNow().notNull(),
+});
+
+export const complianceReportsRelations = relations(complianceReports, ({ one }) => ({
+  org: one(organizations, { fields: [complianceReports.orgId], references: [organizations.id] }),
+}));

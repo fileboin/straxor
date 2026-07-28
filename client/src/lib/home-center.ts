@@ -317,6 +317,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "system",
     action: "organization",
   },
+  {
+    id: "enterprise",
+    name: "Enterprise Security",
+    description: "Audit logovi, SSO/SAML, enkripcija, compliance, private deployment",
+    icon: "🏭",
+    color: "red",
+    category: "system",
+    action: "enterprise",
+  },
 ];
 
 // ── API ──

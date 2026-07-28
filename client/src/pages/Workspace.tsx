@@ -45,6 +45,7 @@ import KanbanCommandCenter from "../components/workspace/KanbanCommandCenter.js"
 import McpMarketplace from "../components/workspace/McpMarketplace.js";
 import InfrastructurePanel from "../components/workspace/InfrastructurePanel.js";
 import TeamPanel from "../components/workspace/TeamPanel.js";
+import EnterpriseSecurity from "../components/workspace/EnterpriseSecurity.js";
 import CollaboratorsPanel from "../components/workspace/CollaboratorsPanel.js";
 import OrganizationDashboard from "../components/workspace/OrganizationDashboard.js";
 import type { VerificationResult } from "../lib/verify.js";
@@ -126,6 +127,7 @@ export default function Workspace() {
   const [showTeams, setShowTeams] = useState(false);
   const [showCollaborators, setShowCollaborators] = useState(false);
   const [showOrganization, setShowOrganization] = useState(false);
+  const [showEnterprise, setShowEnterprise] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -1075,6 +1077,15 @@ export default function Workspace() {
       action: () => setShowOrganization(true),
     },
     {
+      id: "enterprise",
+      label: "Enterprise Security & Compliance",
+      description: "Audit log, SSO/SAML, enkripcija, compliance, privatni deployment",
+      icon: "🏭",
+      category: "action",
+      keywords: ["enterprise", "security", "audit", "sso", "saml", "compliance", "encryption", "deployment", "air-gapped"],
+      action: () => setShowEnterprise(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1191,7 +1202,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization, setShowEnterprise,
   ]);
 
   return (
@@ -1612,6 +1623,7 @@ export default function Workspace() {
               infrastructure: () => setShowInfrastructure(true),
               teams: () => setShowTeams(true),
               organization: () => setShowOrganization(true),
+              enterprise: () => setShowEnterprise(true),
             };
             const handler = panelMap[action];
             if (handler) handler();
@@ -1668,6 +1680,10 @@ export default function Workspace() {
 
       {showOrganization && (
         <OrganizationDashboard onClose={() => setShowOrganization(false)} />
+      )}
+
+      {showEnterprise && (
+        <EnterpriseSecurity onClose={() => setShowEnterprise(false)} />
       )}
 
       {showKanban && (
