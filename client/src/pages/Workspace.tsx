@@ -29,6 +29,7 @@ import SessionPicker from "../components/workspace/SessionPicker.js";
 import SearchPanel from "../components/workspace/SearchPanel.js";
 import RollbackPanel from "../components/workspace/RollbackPanel.js";
 import ContextPanel from "../components/workspace/ContextPanel.js";
+import GatewayPanel from "../components/workspace/GatewayPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -90,6 +91,7 @@ export default function Workspace() {
   const [showSearch, setShowSearch] = useState(false);
   const [showRollback, setShowRollback] = useState(false);
   const [showContext, setShowContext] = useState(false);
+  const [showGateway, setShowGateway] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -885,6 +887,15 @@ export default function Workspace() {
       action: () => setShowContext(true),
     },
     {
+      id: "action-gateway",
+      label: "AI Gateway",
+      description: "Upravljaj AI gateway-em, cache-m i metrikama",
+      icon: "⚡",
+      category: "action",
+      keywords: ["gateway", "proxy", "router", "cache", "fallback"],
+      action: () => setShowGateway(true),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1001,7 +1012,7 @@ export default function Workspace() {
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway,
   ]);
 
   return (
@@ -1023,6 +1034,7 @@ export default function Workspace() {
         onOpenBrowserVerify={() => setShowBrowserVerify(true)}
         onOpenRollback={() => setShowRollback(true)}
         onOpenContext={() => setShowContext(true)}
+        onOpenGateway={() => setShowGateway(true)}
       />
 
       {/* Mobile tab switcher */}
@@ -1360,6 +1372,10 @@ export default function Workspace() {
             }
           }}
         />
+      )}
+
+      {showGateway && (
+        <GatewayPanel onClose={() => setShowGateway(false)} />
       )}
 
       {showSessionPicker && (

@@ -11,6 +11,7 @@ import type { PreviewAdapter } from "./preview/adapter.js";
 import type { DatabaseAdapter } from "./database/adapter.js";
 import type { RollbackAdapter } from "./rollback/adapter.js";
 import type { ContextEngine } from "./context/adapter.js";
+import type { GatewayAdapter } from "./gateway/adapter.js";
 import { createBoundAdapter, type BoundAdapter } from "./runtime/opencode.js";
 import { createHttpAIProviderAdapter } from "./ai-provider/http.js";
 import { createStubGitAdapter } from "./git/local.js";
@@ -39,6 +40,7 @@ export interface AdapterRegistry {
   database: (userId: string) => DatabaseAdapter;
   rollback: (userId: string) => RollbackAdapter;
   context: ContextEngine;
+  gateway: GatewayAdapter | null;
 }
 
 let registry: AdapterRegistry | null = null;
@@ -70,6 +72,7 @@ export function initAdapters(): AdapterRegistry {
       return createVPSRollbackAdapter((machineId, cmd) => runtime.executeCommand(machineId, cmd));
     },
     context: createContextEngine(),
+    gateway: null, // Initialized lazily via GatewayRouter singleton
   };
   return registry;
 }

@@ -20,6 +20,7 @@ interface Props {
   onOpenBrowserVerify?: () => void;
   onOpenRollback?: () => void;
   onOpenContext?: () => void;
+  onOpenGateway?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -56,6 +57,7 @@ export default function WorkspaceTopbar({
   onOpenBrowserVerify,
   onOpenRollback,
   onOpenContext,
+  onOpenGateway,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -134,6 +136,15 @@ export default function WorkspaceTopbar({
             🌳
           </button>
         )}
+        {onOpenGateway && (
+          <button
+            onClick={onOpenGateway}
+            className="hidden sm:flex px-2.5 py-1.5 rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+            title="AI Gateway"
+          >
+            ⚡
+          </button>
+        )}
         <HomeMenu
           onOpenHowItWorks={onOpenHowItWorks}
           onOpenSettings={onOpenSettings}
@@ -143,6 +154,7 @@ export default function WorkspaceTopbar({
           onOpenBrowserVerify={onOpenBrowserVerify}
           onOpenRollback={onOpenRollback}
           onOpenContext={onOpenContext}
+          onOpenGateway={onOpenGateway}
         />
       </div>
     </header>
