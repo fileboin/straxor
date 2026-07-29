@@ -236,9 +236,21 @@ export function createCrushAdapter(): UniversalRuntimeAdapter {
       // Crush SSE endpoint
       const stream = await ssh.execStream(`curl -sN http://127.0.0.1:${port}/event`);
 
-      stream.on("close", () => {
+      let closed = false;
+      const cleanup = () => {
+        if (closed) return;
+        closed = true;
+        try { stream.destroy(); } catch {}
         try { ssh.close(); } catch {}
-      });
+      };
+
+      // SSH transport errors (half-open TCP, network timeout, DNS failure)
+      ssh.client.on("error", cleanup);
+      ssh.client.on("close", cleanup);
+
+      // Stream-level close triggers SSH cleanup
+      stream.on("close", cleanup);
+      stream.on("error", cleanup);
 
       return stream;
     },

@@ -16,6 +16,13 @@ import {
   plugins,
   systemSettings,
   notificationConfigs,
+  supportTickets,
+  supportMessages,
+  feedback,
+  featureRequests,
+  featureVotes,
+  deployProviderSettings,
+  publishLinks,
 } from "../db/schema.js";
 import { eq, and, or, like, desc, count, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
@@ -702,6 +709,163 @@ router.delete("/notifications/:id", requireAdmin, async (req: Request, res: Resp
   } catch (error) {
     console.error("Notification config delete error:", error);
     res.status(500).json({ error: "Failed to delete notification config" });
+  }
+});
+
+// ── 16. SUPPORT (admin) ──
+
+router.get("/support/tickets", requireAdmin, async (req: Request, res: Response) => {
+  const { status, limit, offset } = req.query as Record<string, string>;
+  try {
+    const numLimit = Math.min(parseInt(limit || "50"), 200);
+    const numOffset = parseInt(offset || "0");
+    const conditions = status ? [eq(supportTickets.status, status)] : [];
+    const list = await db.select().from(supportTickets)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(supportTickets.updatedAt)).limit(numLimit).offset(numOffset);
+    const [{ total }] = await db.select({ total: count() }).from(supportTickets)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    res.json({ tickets: list, total, limit: numLimit, offset: numOffset });
+  } catch (error) {
+    console.error("Admin support tickets error:", error);
+    res.status(500).json({ error: "Failed to list tickets" });
+  }
+});
+
+router.get("/support/tickets/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, req.params.id));
+    if (!ticket) { res.status(404).json({ error: "Ticket not found" }); return; }
+    const messages = await db.select().from(supportMessages).where(eq(supportMessages.ticketId, ticket.id)).orderBy(supportMessages.createdAt);
+    const [userData] = await db.select({ id: users.id, email: users.email, role: users.role }).from(users).where(eq(users.id, ticket.userId));
+    res.json({ ...ticket, messages, user: userData });
+  } catch (error) {
+    console.error("Admin ticket get error:", error);
+    res.status(500).json({ error: "Failed to get ticket" });
+  }
+});
+
+router.put("/support/tickets/:id/status", requireAdmin, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status, assignedTo } = req.body;
+  try {
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    if (status) updateData.status = status;
+    if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
+    const [updated] = await db.update(supportTickets).set(updateData).where(eq(supportTickets.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: "Ticket not found" }); return; }
+    res.json(updated);
+  } catch (error) {
+    console.error("Ticket status error:", error);
+    res.status(500).json({ error: "Failed to update ticket" });
+  }
+});
+
+router.post("/support/tickets/:id/reply", requireAdmin, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { message } = req.body;
+  if (!message) { res.status(400).json({ error: "message required" }); return; }
+  try {
+    const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, id));
+    if (!ticket) { res.status(404).json({ error: "Ticket not found" }); return; }
+    const [msg] = await db.insert(supportMessages).values({ ticketId: id, userId: req.user!.userId, message, isAdmin: true }).returning();
+    await db.update(supportTickets).set({ status: "in_progress", updatedAt: new Date() }).where(eq(supportTickets.id, id));
+    res.json(msg);
+  } catch (error) {
+    console.error("Reply error:", error);
+    res.status(500).json({ error: "Failed to reply" });
+  }
+});
+
+router.get("/support/feedback", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const list = await db.select().from(feedback).orderBy(desc(feedback.createdAt));
+    res.json(list);
+  } catch (error) {
+    console.error("Admin feedback error:", error);
+    res.status(500).json({ error: "Failed to list feedback" });
+  }
+});
+
+router.put("/support/feature-requests/:id/status", requireAdmin, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const valid = ["new", "reviewing", "planned", "in_development", "completed", "rejected"];
+  if (!status || !valid.includes(status)) { res.status(400).json({ error: "Invalid status" }); return; }
+  try {
+    const [updated] = await db.update(featureRequests).set({ status, updatedAt: new Date() }).where(eq(featureRequests.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: "Feature request not found" }); return; }
+    res.json(updated);
+  } catch (error) {
+    console.error("Feature request status error:", error);
+    res.status(500).json({ error: "Failed to update status" });
+  }
+});
+
+router.get("/support/stats", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const openTickets = (await db.select({ count: count() }).from(supportTickets).where(eq(supportTickets.status, "open")))[0]?.count || 0;
+    const inProgress = (await db.select({ count: count() }).from(supportTickets).where(eq(supportTickets.status, "in_progress")))[0]?.count || 0;
+    const resolved = (await db.select({ count: count() }).from(supportTickets).where(eq(supportTickets.status, "resolved")))[0]?.count || 0;
+    const totalFeedback = (await db.select({ count: count() }).from(feedback))[0]?.count || 0;
+    const totalRequests = (await db.select({ count: count() }).from(featureRequests))[0]?.count || 0;
+    const topRequests = await db.select().from(featureRequests).orderBy(desc(featureRequests.voteCount)).limit(5);
+    res.json({ tickets: { open: openTickets, inProgress, resolved }, totalFeedback, totalRequests, topRequests });
+  } catch (error) {
+    console.error("Support stats error:", error);
+    res.status(500).json({ error: "Failed to get support stats" });
+  }
+});
+
+// ── 17. DEPLOY PROVIDERS (admin) ──
+
+router.get("/deploy-providers", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const providers = await db.select().from(deployProviderSettings).orderBy(deployProviderSettings.sortOrder);
+    res.json(providers);
+  } catch (error) {
+    console.error("Deploy providers list error:", error);
+    res.status(500).json({ error: "Failed to list providers" });
+  }
+});
+
+router.post("/deploy-providers", requireAdmin, async (req: Request, res: Response) => {
+  const { providerId, name, description, icon, color, isEnabled, configSchema, minTariff, maxDeploys, sortOrder } = req.body;
+  if (!providerId || !name) { res.status(400).json({ error: "providerId and name required" }); return; }
+  try {
+    const [provider] = await db.insert(deployProviderSettings).values({ providerId, name, description, icon, color, isEnabled, configSchema, minTariff, maxDeploys, sortOrder }).returning();
+    res.status(201).json(provider);
+  } catch (error) {
+    console.error("Deploy provider create error:", error);
+    res.status(500).json({ error: "Failed to create provider" });
+  }
+});
+
+router.put("/deploy-providers/:id", requireAdmin, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const fields = ["providerId", "name", "description", "icon", "color", "isEnabled", "configSchema", "minTariff", "maxDeploys", "sortOrder"];
+  const update: Record<string, unknown> = { updatedAt: new Date() };
+  for (const f of fields) {
+    if (req.body[f] !== undefined) update[f] = req.body[f];
+  }
+  try {
+    const [updated] = await db.update(deployProviderSettings).set(update).where(eq(deployProviderSettings.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: "Provider not found" }); return; }
+    res.json(updated);
+  } catch (error) {
+    console.error("Deploy provider update error:", error);
+    res.status(500).json({ error: "Failed to update provider" });
+  }
+});
+
+router.delete("/deploy-providers/:id", requireAdmin, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    await db.delete(deployProviderSettings).where(eq(deployProviderSettings.id, id));
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Deploy provider delete error:", error);
+    res.status(500).json({ error: "Failed to delete provider" });
   }
 });
 

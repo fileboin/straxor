@@ -95,6 +95,9 @@ export default function Dashboard() {
               Admin
             </button>
           )}
+          <button onClick={() => navigate("/help")} className="text-sm px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-text-secondary hover:text-text transition-colors">
+            Help
+          </button>
           <span className="text-sm text-text-secondary hidden sm:inline">{user?.email}</span>
           <button onClick={logout} className="text-sm text-text-muted hover:text-text transition-colors">
             Odjavi se
@@ -254,6 +257,15 @@ export default function Dashboard() {
                 <span className="text-[11px] text-text-muted px-2 py-0.5 rounded-md bg-surface-3 shrink-0">
                   {p.template}
                 </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/project/${p.id}/deploy`);
+                  }}
+                  className="text-[11px] px-2 py-1 rounded-lg bg-surface-3 text-text-secondary hover:text-accent hover:bg-accent/10 transition-colors shrink-0"
+                >
+                  🚀
+                </button>
                 <span className="text-text-muted text-sm shrink-0">→</span>
                 <button
                   onClick={(e) => {

@@ -9,6 +9,10 @@ import Dashboard from "./pages/Dashboard.js";
 import Workspace from "./pages/Workspace.js";
 import OnboardingPage from "./pages/Onboarding.js";
 import Admin from "./pages/Admin.js";
+import Help from "./pages/Help.js";
+import DeployManager from "./pages/DeployManager.js";
+import Knowledge from "./pages/Knowledge.js";
+import ImageStudio from "./pages/ImageStudio.js";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -84,6 +88,38 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Workspace />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/project/:id/deploy"
+              element={
+                <ProtectedRoute>
+                  <DeployManager />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/project/:id/image"
+              element={
+                <ProtectedRoute>
+                  <ImageStudio />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/project/:id/knowledge"
+              element={
+                <ProtectedRoute>
+                  <Knowledge />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/help"
+              element={
+                <ProtectedRoute>
+                  <Help />
                 </ProtectedRoute>
               }
             />

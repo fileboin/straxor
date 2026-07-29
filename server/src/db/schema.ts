@@ -883,6 +883,24 @@ export const vaultSecretsRelations = relations(vaultSecrets, ({ one }) => ({
   org: one(organizations, { fields: [vaultSecrets.orgId], references: [organizations.id] }),
 }));
 
+export const agentSessions = pgTable("agent_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  agentType: varchar("agent_type", { length: 50 }).notNull().default("general"),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  metadata: text("metadata").default("{}"),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  endedAt: timestamp("ended_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const agentSessionsRelations = relations(agentSessions, ({ one }) => ({
+  project: one(projects, { fields: [agentSessions.projectId], references: [projects.id] }),
+  user: one(users, { fields: [agentSessions.userId], references: [users.id] }),
+}));
+
 export const sessionGuardrails = pgTable("session_guardrails", {
   id: uuid("id").defaultRandom().primaryKey(),
   sessionId: uuid("session_id").references(() => agentSessions.id, { onDelete: "cascade" }),
@@ -1069,3 +1087,140 @@ export const systemSettings = pgTable("system_settings", {
 });
 
 export const systemSettingsRelations = relations(systemSettings, () => ({}));
+
+// ── Block 66 — Support, Community & Feedback ──
+
+export const supportTickets = pgTable("support_tickets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  category: varchar("category", { length: 50 }).notNull().default("general"),
+  priority: varchar("priority", { length: 20 }).notNull().default("normal"),
+  status: varchar("status", { length: 30 }).notNull().default("open"),
+  attachment: text("attachment"),
+  logData: text("log_data"),
+  assignedTo: uuid("assigned_to").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const supportTicketsRelations = relations(supportTickets, ({ one, many }) => ({
+  user: one(users, { fields: [supportTickets.userId], references: [users.id] }),
+  assignee: one(users, { fields: [supportTickets.assignedTo], references: [users.id] }),
+  messages: many(supportMessages),
+}));
+
+export const supportMessages = pgTable("support_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ticketId: uuid("ticket_id").notNull().references(() => supportTickets.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  message: text("message").notNull(),
+  isAdmin: boolean("is_admin").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const supportMessagesRelations = relations(supportMessages, ({ one }) => ({
+  ticket: one(supportTickets, { fields: [supportMessages.ticketId], references: [supportTickets.id] }),
+  user: one(users, { fields: [supportMessages.userId], references: [users.id] }),
+}));
+
+export const feedback = pgTable("feedback", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 30 }).notNull(),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  description: text("description"),
+  screenshot: text("screenshot"),
+  logData: text("log_data"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const feedbackRelations = relations(feedback, ({ one }) => ({
+  user: one(users, { fields: [feedback.userId], references: [users.id] }),
+}));
+
+export const featureRequests = pgTable("feature_requests", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 50 }).default("general"),
+  status: varchar("status", { length: 30 }).notNull().default("new"),
+  voteCount: integer("vote_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const featureRequestsRelations = relations(featureRequests, ({ one, many }) => ({
+  user: one(users, { fields: [featureRequests.userId], references: [users.id] }),
+  votes: many(featureVotes),
+}));
+
+export const featureVotes = pgTable("feature_votes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  featureRequestId: uuid("feature_request_id").notNull().references(() => featureRequests.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const featureVotesRelations = relations(featureVotes, ({ one }) => ({
+  featureRequest: one(featureRequests, { fields: [featureVotes.featureRequestId], references: [featureRequests.id] }),
+  user: one(users, { fields: [featureVotes.userId], references: [users.id] }),
+}));
+
+// ── Block 67 — Publish & Deploy ──
+
+export const publishLinks = pgTable("publish_links", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  slug: varchar("slug", { length: 64 }).notNull().unique(),
+  url: text("url").notNull(),
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  passwordHash: text("password_hash"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const publishLinksRelations = relations(publishLinks, ({ one }) => ({
+  project: one(projects, { fields: [publishLinks.projectId], references: [projects.id] }),
+  user: one(users, { fields: [publishLinks.userId], references: [users.id] }),
+}));
+
+export const projectDeployConfigs = pgTable("project_deploy_configs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id").notNull().unique().references(() => projects.id, { onDelete: "cascade" }),
+  target: varchar("target", { length: 30 }).notNull().default("vps"),
+  branch: varchar("branch", { length: 100 }).notNull().default("main"),
+  buildCommand: text("build_command"),
+  outputDir: varchar("output_dir", { length: 255 }).default("dist"),
+  rootDir: varchar("root_dir", { length: 255 }).default("/"),
+  envOverride: text("env_override"),
+  autoDeploy: boolean("auto_deploy").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const projectDeployConfigsRelations = relations(projectDeployConfigs, ({ one }) => ({
+  project: one(projects, { fields: [projectDeployConfigs.projectId], references: [projects.id] }),
+}));
+
+export const deployProviderSettings = pgTable("deploy_provider_settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  providerId: varchar("provider_id", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  icon: varchar("icon", { length: 10 }).default("🚀"),
+  color: varchar("color", { length: 7 }).default("#6366f1"),
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  configSchema: text("config_schema"),
+  minTariff: varchar("min_tariff", { length: 30 }).default("free"),
+  maxDeploys: integer("max_deploys").default(-1),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const deployProviderSettingsRelations = relations(deployProviderSettings, () => ({}));

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar.js";
 import { useTheme } from "../lib/theme.js";
 import ChatPanel from "../components/workspace/ChatPanel.js";
@@ -82,6 +82,7 @@ const INITIAL_ASK_MESSAGES: ChatMessage[] = [
 
 export default function Workspace() {
   const navigate = useNavigate();
+  const { id: projectIdFromUrl } = useParams<{ id: string }>();
   const { toggleTheme } = useTheme();
   const [orchestrator, setOrchestrator] = useState(false);
 
@@ -1287,10 +1288,12 @@ export default function Workspace() {
         onOpenMultiAgent={() => setShowMultiAgent(true)}
         onOpenHomeCenter={() => setShowHomeCenter(true)}
         onOpenDesignAssets={() => setShowDesignAssets(true)}
-        onOpenUsage={() => setShowUsage(true)}
-        onOpenRuntimeManager={() => setShowRuntimeManager(true)}
-        onOpenQuickStart={() => setShowQuickStart(true)}
-      />
+          onOpenUsage={() => setShowUsage(true)}
+          onOpenRuntimeManager={() => setShowRuntimeManager(true)}
+          onOpenQuickStart={() => setShowQuickStart(true)}
+          onOpenImage={() => navigate(`/project/${projectIdFromUrl || "unknown"}/image`)}
+          onOpenKnowledge={() => navigate(`/project/${projectIdFromUrl || "unknown"}/knowledge`)}
+        />
 
       {/* Mobile tab switcher */}
       <div className="flex border-b border-border bg-surface shrink-0 md:hidden">

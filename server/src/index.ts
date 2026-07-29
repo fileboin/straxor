@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import authRoutes from "./routes/auth.js";
 import projectRoutes from "./routes/projects.js";
 import chatRoutes from "./routes/chat.js";
@@ -52,18 +53,81 @@ import marketplaceRoutes from "./routes/marketplace.js";
 import scaleRoutes from "./routes/scale.js";
 import resilienceRoutes from "./routes/resilience.js";
 import adminRoutes from "./routes/admin.js";
+import supportRoutes from "./routes/support.js";
+import publishRoutes from "./routes/publish.js";
+import knowledgeRoutes from "./knowledge/api/routes.js";
+import { default as imageRoutes } from "./image/api/routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
-app.use(express.json());
+// ── Security: CORS hardening ──
+// Production: set CLIENT_URL to exact origin (e.g. https://straxor.app)
+// Dev fallback: localhost:5173 (Vite default)
+const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173").split(",").map(s => s.trim());
+app.use(cors({
+  origin: (origin, cb) => {
+    // Allow requests with no origin (server-to-server, curl, etc.)
+    if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Origin ${origin} not allowed by CORS`));
+    }
+  },
+  credentials: true,
+}));
+
+// ── Security: Rate limiting ──
+// Auth endpoints: stricter limit (20 per 15 min per IP)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
+
+// General API: 500 per 15 min per IP
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
+
+app.use(express.json({ limit: "1mb" }));
+
+// ── Security: Input validation middleware ──
+app.use((req, _res, next) => {
+  // Reject requests with excessively deep nested JSON
+  if (req.body && typeof req.body === "object") {
+    const depth = (obj: unknown, d = 0): number => {
+      if (d > 20) return d;
+      if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+        return Math.max(0, ...Object.values(obj as Record<string, unknown>).map(v => depth(v, d + 1)));
+      }
+      if (Array.isArray(obj)) {
+        return Math.max(0, ...obj.map(v => depth(v, d + 1)));
+      }
+      return d;
+    };
+    if (depth(req.body) > 20) {
+      _res.status(400).json({ error: "Request body too deeply nested" });
+      return;
+    }
+  }
+  next();
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.use("/api/auth", authRoutes);
+// Apply general rate limiter to all /api routes (limits requests, not SSE duration)
+app.use("/api", apiLimiter);
+
+app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/machines", machineRoutes);
@@ -113,6 +177,10 @@ app.use("/api/plugins", pluginRoutes);
 app.use("/api/marketplace", marketplaceRoutes);
 app.use("/api/scale", scaleRoutes);
 app.use("/api/resilience", resilienceRoutes);
+app.use("/api/publish", publishRoutes);
+app.use("/api/knowledge", knowledgeRoutes);
+app.use("/api/image", imageRoutes);
+app.use("/api/support", supportRoutes);
 app.use("/api/admin", adminRoutes);
 
 app.listen(PORT, () => {

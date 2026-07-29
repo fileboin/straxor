@@ -288,3 +288,52 @@ export async function blockUser(id: string, isBlocked: boolean): Promise<any> {
 export async function setUserPlan(id: string, plan: string): Promise<any> {
   return api(`/admin/users/${id}/plan`, { method: "PUT", body: { plan } });
 }
+
+// ── Admin Support ──
+
+export async function getAdminSupportTickets(status?: string): Promise<{ tickets: any[]; total: number }> {
+  const params = status ? `?status=${status}` : "";
+  return api(`/admin/support/tickets${params}`);
+}
+
+export async function getAdminSupportTicket(id: string): Promise<any> {
+  return api(`/admin/support/tickets/${id}`);
+}
+
+export async function updateTicketStatus(id: string, data: { status?: string; assignedTo?: string | null }): Promise<any> {
+  return api(`/admin/support/tickets/${id}/status`, { method: "PUT", body: data });
+}
+
+export async function adminReplyTicket(id: string, message: string): Promise<any> {
+  return api(`/admin/support/tickets/${id}/reply`, { method: "POST", body: { message } });
+}
+
+export async function getAdminFeedback(): Promise<any[]> {
+  return api("/admin/support/feedback");
+}
+
+export async function updateFeatureRequestStatus(id: string, status: string): Promise<any> {
+  return api(`/admin/support/feature-requests/${id}/status`, { method: "PUT", body: { status } });
+}
+
+export async function getSupportStats(): Promise<any> {
+  return api("/admin/support/stats");
+}
+
+// ── Admin Deploy Providers ──
+
+export async function getAdminDeployProviders(): Promise<any[]> {
+  return api("/admin/deploy-providers");
+}
+
+export async function createAdminDeployProvider(data: any): Promise<any> {
+  return api("/admin/deploy-providers", { method: "POST", body: data });
+}
+
+export async function updateAdminDeployProvider(id: string, data: any): Promise<any> {
+  return api(`/admin/deploy-providers/${id}`, { method: "PUT", body: data });
+}
+
+export async function deleteAdminDeployProvider(id: string): Promise<any> {
+  return api(`/admin/deploy-providers/${id}`, { method: "DELETE" });
+}

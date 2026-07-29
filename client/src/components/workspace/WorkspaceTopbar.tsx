@@ -28,6 +28,8 @@ interface Props {
   onOpenUsage?: () => void;
   onOpenRuntimeManager?: () => void;
   onOpenQuickStart?: () => void;
+  onOpenKnowledge?: () => void;
+  onOpenImage?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -72,6 +74,8 @@ export default function WorkspaceTopbar({
   onOpenUsage,
   onOpenRuntimeManager,
   onOpenQuickStart,
+  onOpenKnowledge,
+  onOpenImage,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -222,6 +226,31 @@ export default function WorkspaceTopbar({
             ✨
           </button>
         )}
+        {onOpenImage && (
+          <button
+            onClick={onOpenImage}
+            className="hidden sm:flex w-8 h-8 items-center justify-center rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+            title="Image Studio"
+          >
+            🎨
+          </button>
+        )}
+        {onOpenKnowledge && (
+          <button
+            onClick={onOpenKnowledge}
+            className="hidden sm:flex w-8 h-8 items-center justify-center rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+            title="Knowledge Core"
+          >
+            🧠
+          </button>
+        )}
+        <button
+          onClick={() => navigate("/help")}
+          className="hidden sm:flex w-8 h-8 items-center justify-center rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+          title="Help & Support"
+        >
+          ?
+        </button>
         <HomeMenu
           onOpenHowItWorks={onOpenHowItWorks}
           onOpenSettings={onOpenSettings}

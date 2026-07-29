@@ -17,12 +17,15 @@ import {
   getSystemSettings, updateSystemSetting,
   getAdminNotifications, createAdminNotification, updateAdminNotification, deleteAdminNotification,
   blockUser, setUserPlan,
+  getAdminSupportTickets, getAdminSupportTicket, updateTicketStatus, adminReplyTicket,
+  getAdminFeedback, updateFeatureRequestStatus, getSupportStats,
+  getAdminDeployProviders, createAdminDeployProvider, updateAdminDeployProvider, deleteAdminDeployProvider,
   type FeatureFlag, type Tariff, type AdminRegistryEntry,
   type WalletAccount, type WalletTransaction,
   type Subscription, type PromoCode, type AdminDashboardStats,
 } from "../lib/admin.js";
 
-type Tab = "dashboard" | "users" | "flags" | "tariffs" | "registry" | "wallet" | "subscriptions" | "promos" | "logs" | "providers" | "runtimes" | "api-keys" | "plugins" | "notifications" | "security" | "settings";
+type Tab = "dashboard" | "users" | "flags" | "tariffs" | "registry" | "wallet" | "subscriptions" | "promos" | "logs" | "providers" | "runtimes" | "api-keys" | "plugins" | "notifications" | "security" | "settings" | "support" | "deploy-providers";
 
 const SIDEBAR: { id: Tab; label: string; icon: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: "📊" },
@@ -38,6 +41,8 @@ const SIDEBAR: { id: Tab; label: string; icon: string }[] = [
   { id: "api-keys", label: "API Integrations", icon: "🔑" },
   { id: "plugins", label: "Plugins", icon: "🧩" },
   { id: "notifications", label: "Notifications", icon: "🔔" },
+  { id: "deploy-providers", label: "Deploy Providers", icon: "🚀" },
+  { id: "support", label: "Support", icon: "🎫" },
   { id: "security", label: "Security Center", icon: "🛡" },
   { id: "settings", label: "Settings", icon: "⚙" },
   { id: "logs", label: "System Logs", icon: "📜" },
@@ -122,6 +127,21 @@ export default function Admin() {
   const [showNotifForm, setShowNotifForm] = useState(false);
   const [notifForm, setNotifForm] = useState({ channel: "", enabled: true, events: "[]", config: "{}" });
 
+  // Support
+  const [supportTickets, setSupportTickets] = useState<any[]>([]);
+  const [supportTicketTotal, setSupportTicketTotal] = useState(0);
+  const [supportTicketFilter, setSupportTicketFilter] = useState("");
+  const [activeTicket, setActiveTicket] = useState<any>(null);
+  const [supportReplyMsg, setSupportReplyMsg] = useState("");
+  const [supportFeedback, setSupportFeedback] = useState<any[]>([]);
+  const [supportStats, setSupportStats] = useState<any>(null);
+
+  // Deploy Providers
+  const [deployProviders, setDeployProviders] = useState<any[]>([]);
+  const [showDeployProviderForm, setShowDeployProviderForm] = useState(false);
+  const [editingDeployProvider, setEditingDeployProvider] = useState<any | null>(null);
+  const [deployProviderForm, setDeployProviderForm] = useState({ providerId: "", name: "", description: "", icon: "🚀", color: "#6366f1", isEnabled: true, minTariff: "free", maxDeploys: -1, sortOrder: 0, configSchema: "" });
+
   // ── Loaders ──
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -153,6 +173,10 @@ export default function Admin() {
   }, [auditSeverity, auditPage]);
   const loadSettings = useCallback(async () => { try { setSettings(await getSystemSettings()); } catch { flash("Greška"); } }, []);
   const loadNotifs = useCallback(async () => { try { setNotifConfigs(await getAdminNotifications()); } catch { flash("Greška"); } }, []);
+  const loadSupportTickets = useCallback(async () => { try { const res = await getAdminSupportTickets(supportTicketFilter || undefined); setSupportTickets(res.tickets); setSupportTicketTotal(res.total); } catch { flash("Greška"); } }, [supportTicketFilter]);
+  const loadSupportFeedback = useCallback(async () => { try { setSupportFeedback(await getAdminFeedback()); } catch { flash("Greška"); } }, []);
+  const loadSupportStats = useCallback(async () => { try { setSupportStats(await getSupportStats()); } catch { flash("Greška"); } }, []);
+  const loadDeployProviders = useCallback(async () => { try { setDeployProviders(await getAdminDeployProviders()); } catch { flash("Greška"); } }, []);
 
   useEffect(() => {
     if (tab === "dashboard") loadDashboard();
@@ -169,6 +193,8 @@ export default function Admin() {
     else if (tab === "security") loadAuditLogs();
     else if (tab === "settings") loadSettings();
     else if (tab === "notifications") loadNotifs();
+    else if (tab === "support") { loadSupportTickets(); loadSupportFeedback(); loadSupportStats(); }
+    else if (tab === "deploy-providers") loadDeployProviders();
   }, [tab]);
 
   // ── Actions ──
@@ -236,6 +262,13 @@ export default function Admin() {
   };
   const handleToggleNotif = async (n: any) => { try { await updateAdminNotification(n.id, { enabled: !n.enabled }); loadNotifs(); } catch { flash("Greška"); } };
   const handleDeleteNotif = async (id: string) => { try { await deleteAdminNotification(id); flash("Obrisano"); loadNotifs(); } catch { flash("Greška"); } };
+
+  // Deploy Providers
+  const handleSaveDeployProvider = async () => {
+    try { if (editingDeployProvider) { await updateAdminDeployProvider(editingDeployProvider.id, deployProviderForm); flash("Ažuriran"); } else { await createAdminDeployProvider(deployProviderForm); flash("Kreiran"); } setShowDeployProviderForm(false); setEditingDeployProvider(null); loadDeployProviders(); }
+    catch { flash("Greška"); }
+  };
+  const handleDeleteDeployProvider = async (id: string) => { try { await deleteAdminDeployProvider(id); flash("Obrisano"); loadDeployProviders(); } catch { flash("Greška"); } };
 
   // ── Render ──
   return (
@@ -593,6 +626,82 @@ export default function Admin() {
                     <div><label className="text-[11px] text-text-muted block mb-1">Channel</label><select value={notifForm.channel} onChange={(e) => setNotifForm((p) => ({ ...p, channel: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none"><option value="">Select...</option><option value="email">Email</option><option value="telegram">Telegram</option><option value="discord">Discord</option><option value="push">Push</option><option value="webhook">Webhook</option></select></div>
                     <div><label className="text-[11px] text-text-muted block mb-1">Config (JSON)</label><textarea value={notifForm.config} onChange={(e) => setNotifForm((p) => ({ ...p, config: e.target.value }))} rows={3} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[11px] text-text outline-none focus:border-accent font-mono" /></div>
                     <div className="flex items-center justify-end gap-2 pt-2"><button onClick={() => setShowNotifForm(false)} className="text-[11px] px-3 py-1.5 text-text-muted hover:text-text">Cancel</button><button onClick={handleSaveNotif} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light">Save</button></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Support ── */}
+          {!loading && tab === "support" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between"><h2 className="text-[16px] font-bold text-text">Support Dashboard</h2><span className="text-[11px] text-text-muted">{supportTicketTotal} tickets</span></div>
+              {/* Stats */}
+              {supportStats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-4 rounded-xl bg-surface-2 border border-border"><div className="text-[11px] text-text-muted">Open</div><div className="text-xl font-bold text-text mt-1">{supportStats.tickets.open}</div></div>
+                  <div className="p-4 rounded-xl bg-surface-2 border border-border"><div className="text-[11px] text-text-muted">In Progress</div><div className="text-xl font-bold text-text mt-1">{supportStats.tickets.inProgress}</div></div>
+                  <div className="p-4 rounded-xl bg-surface-2 border border-border"><div className="text-[11px] text-text-muted">Resolved</div><div className="text-xl font-bold text-text mt-1">{supportStats.tickets.resolved}</div></div>
+                  <div className="p-4 rounded-xl bg-surface-2 border border-border"><div className="text-[11px] text-text-muted">Feedback</div><div className="text-xl font-bold text-text mt-1">{supportStats.totalFeedback}</div></div>
+                </div>
+              )}
+              {!activeTicket && (
+                <>
+                  {/* Filter */}
+                  <div className="flex items-center gap-2"><select value={supportTicketFilter} onChange={(e) => setSupportTicketFilter(e.target.value)} className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-[11px] text-text outline-none"><option value="">All</option><option value="open">Open</option><option value="in_progress">In Progress</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select></div>
+                  {/* Ticket list */}
+                  <div className="space-y-1.5">{supportTickets.map((t: any) => (<div key={t.id} onClick={() => (async () => { try { const detail = await getAdminSupportTicket(t.id); setActiveTicket(detail); } catch { flash("Greška"); } })()} className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors"><div className="flex-1 min-w-0"><div className="text-[13px] font-medium text-text truncate">{t.subject}</div><div className="text-[10px] text-text-muted mt-0.5">{t.category} · {new Date(t.createdAt).toLocaleDateString()} · {t.userId?.slice(0, 8)}...</div></div><div className="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: t.status === "open" ? "#3b82f620" : t.status === "in_progress" ? "#f59e0b20" : t.status === "resolved" ? "#22c55e20" : "#6b728020", color: t.status === "open" ? "#3b82f6" : t.status === "in_progress" ? "#f59e0b" : t.status === "resolved" ? "#22c55e" : "#6b7280" }}>{t.status}</span><span className={`text-[10px] px-2 py-0.5 rounded-full ${t.priority === "high" ? "bg-red-500/20 text-red-400" : t.priority === "urgent" ? "bg-orange-500/20 text-orange-400" : "bg-surface-3 text-text-muted"}`}>{t.priority}</span></div></div>))}</div>
+                  {/* Feedback */}
+                  <div className="pt-4"><h4 className="text-[13px] font-semibold text-text mb-3">Recent Feedback ({supportFeedback.length})</h4><div className="space-y-1.5 max-h-60 overflow-y-auto">{supportFeedback.map((f: any) => (<div key={f.id} className="flex items-start gap-3 px-4 py-2.5 rounded-xl bg-surface-2 border border-border"><div><div className="text-[12px] font-medium text-text">{f.subject}</div><div className="text-[10px] text-text-muted">{f.type} · {new Date(f.createdAt).toLocaleDateString()} · {f.userId?.slice(0, 8)}...</div>{f.description && <div className="text-[11px] text-text-muted mt-1">{f.description}</div>}</div></div>))}</div></div>
+                  {/* Top feature requests */}
+                  {supportStats?.topRequests?.length > 0 && (<div className="pt-4"><h4 className="text-[13px] font-semibold text-text mb-3">Top Feature Requests</h4><div className="space-y-1.5">{supportStats.topRequests.map((r: any) => (<div key={r.id} className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-surface-2 border border-border"><div><div className="text-[12px] font-medium text-text">{r.title}</div><div className="text-[10px] text-text-muted">{r.voteCount} votes · {r.category}</div></div><select value={r.status || "new"} onChange={(e) => updateFeatureRequestStatus(r.id, e.target.value).then(loadSupportStats).catch(() => flash("Greška"))} className="bg-surface-3 border border-border rounded px-2 py-0.5 text-[10px] text-text outline-none"><option value="new">New</option><option value="reviewing">Reviewing</option><option value="planned">Planned</option><option value="in_development">In Dev</option><option value="completed">Completed</option><option value="rejected">Rejected</option></select></div>))}</div></div>)}
+                </>
+              )}
+              {/* Ticket detail */}
+              {activeTicket && (
+                <div className="space-y-4">
+                  <button onClick={() => setActiveTicket(null)} className="text-[11px] text-text-muted hover:text-text">← Back to tickets</button>
+                  <div className="flex items-center justify-between"><h3 className="text-[14px] font-bold text-text">{activeTicket.subject}</h3><span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: activeTicket.status === "open" ? "#3b82f620" : activeTicket.status === "in_progress" ? "#f59e0b20" : "#22c55e20", color: activeTicket.status === "open" ? "#3b82f6" : activeTicket.status === "in_progress" ? "#f59e0b" : "#22c55e" }}>{activeTicket.status}</span></div>
+                  <div className="flex items-center gap-3 flex-wrap"><select value={activeTicket.status} onChange={async (e) => { try { const updated = await updateTicketStatus(activeTicket.id, { status: e.target.value }); setActiveTicket((p: any) => ({ ...p, ...updated })); flash("Status updated"); loadSupportStats(); } catch { flash("Greška"); }}} className="bg-surface-2 border border-border rounded-lg px-2 py-1 text-[11px] text-text outline-none"><option value="open">Open</option><option value="in_progress">In Progress</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select></div>
+                  {activeTicket.user && <div className="text-[11px] text-text-muted">User: {activeTicket.user.email} ({activeTicket.user.role})</div>}
+                  <div className="p-4 rounded-xl bg-surface-2 border border-border"><div className="text-[11px] text-text-muted mb-2">{activeTicket.category} · {activeTicket.priority} · {new Date(activeTicket.createdAt).toLocaleString()}</div><div className="text-[12px] text-text whitespace-pre-wrap">{activeTicket.description}</div></div>
+                  {/* Messages */}
+                  <div className="space-y-2"><h4 className="text-[12px] font-semibold text-text">Conversation</h4>{activeTicket.messages?.map((m: any) => (<div key={m.id} className={`p-3 rounded-xl ${m.isAdmin ? "bg-accent/10 border border-accent/20 ml-8" : "bg-surface-2 border border-border mr-8"}`}><div className="flex items-center justify-between mb-1"><span className="text-[10px] font-medium text-text-muted">{m.isAdmin ? "Support" : activeTicket.user?.email || "User"}</span><span className="text-[9px] text-text-muted">{new Date(m.createdAt).toLocaleString()}</span></div><div className="text-[12px] text-text">{m.message}</div></div>))}</div>
+                  {/* Admin reply */}
+                  <div className="flex items-center gap-2"><input type="text" value={supportReplyMsg} onChange={(e) => setSupportReplyMsg(e.target.value)} onKeyDown={async (e) => { if (e.key === "Enter" && supportReplyMsg) { try { await adminReplyTicket(activeTicket.id, supportReplyMsg); setSupportReplyMsg(""); const detail = await getAdminSupportTicket(activeTicket.id); setActiveTicket(detail); } catch { flash("Greška"); } }}} placeholder="Type reply..." className="flex-1 px-3 py-2 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /><button onClick={async () => { if (!supportReplyMsg) return; try { await adminReplyTicket(activeTicket.id, supportReplyMsg); setSupportReplyMsg(""); const detail = await getAdminSupportTicket(activeTicket.id); setActiveTicket(detail); } catch { flash("Greška"); }}} className="px-3 py-2 rounded-lg bg-accent text-white text-[11px] hover:bg-accent-light">Reply</button></div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Deploy Providers ── */}
+          {!loading && tab === "deploy-providers" && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between mb-4"><h2 className="text-[16px] font-bold text-text">Deploy Providers</h2><button onClick={() => { setEditingDeployProvider(null); setDeployProviderForm({ providerId: "", name: "", description: "", icon: "🚀", color: "#6366f1", isEnabled: true, minTariff: "free", maxDeploys: -1, sortOrder: 0, configSchema: "" }); setShowDeployProviderForm(true); }} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light">+ Add Provider</button></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {deployProviders.map((p) => (
+                  <div key={p.id} className="p-4 rounded-xl bg-surface-2 border border-border space-y-2">
+                    <div className="flex items-center justify-between"><div className="flex items-center gap-2"><span className="text-lg">{p.icon || "🚀"}</span><span className="text-[13px] font-medium text-text">{p.name}</span></div><span className={`text-[10px] px-2 py-0.5 rounded-full ${p.isEnabled ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>{p.isEnabled ? "Enabled" : "Disabled"}</span></div>
+                    <div className="text-[10px] text-text-muted font-mono">{p.providerId}</div>
+                    {p.description && <div className="text-[11px] text-text-muted">{p.description}</div>}
+                    <div className="text-[10px] text-text-muted">Min tariff: {p.minTariff} · Max deploys: {p.maxDeploys === -1 ? "∞" : p.maxDeploys}</div>
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button onClick={() => { setEditingDeployProvider(p); setDeployProviderForm({ providerId: p.providerId, name: p.name, description: p.description || "", icon: p.icon || "🚀", color: p.color || "#6366f1", isEnabled: p.isEnabled ?? true, minTariff: p.minTariff || "free", maxDeploys: p.maxDeploys ?? -1, sortOrder: p.sortOrder ?? 0, configSchema: p.configSchema || "" }); setShowDeployProviderForm(true); }} className="text-[10px] px-2 py-1 rounded bg-surface-3 text-text-secondary hover:text-text">Edit</button>
+                      <button onClick={() => handleDeleteDeployProvider(p.id)} className="text-[10px] px-2 py-1 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20">Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {showDeployProviderForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                  <div className="w-full max-w-md mx-4 bg-surface border border-border rounded-2xl shadow-2xl p-5 space-y-4">
+                    <h4 className="text-[13px] font-bold">{editingDeployProvider ? "Edit Provider" : "New Provider"}</h4>
+                    <div className="grid grid-cols-2 gap-3"><div><label className="text-[11px] text-text-muted block mb-1">Provider ID</label><input type="text" value={deployProviderForm.providerId} onChange={(e) => setDeployProviderForm((p) => ({ ...p, providerId: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div><div><label className="text-[11px] text-text-muted block mb-1">Name</label><input type="text" value={deployProviderForm.name} onChange={(e) => setDeployProviderForm((p) => ({ ...p, name: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div></div>
+                    <div><label className="text-[11px] text-text-muted block mb-1">Description</label><input type="text" value={deployProviderForm.description} onChange={(e) => setDeployProviderForm((p) => ({ ...p, description: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div>
+                    <div className="grid grid-cols-3 gap-3"><div><label className="text-[11px] text-text-muted block mb-1">Icon</label><input type="text" value={deployProviderForm.icon} onChange={(e) => setDeployProviderForm((p) => ({ ...p, icon: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div><div><label className="text-[11px] text-text-muted block mb-1">Color</label><input type="text" value={deployProviderForm.color} onChange={(e) => setDeployProviderForm((p) => ({ ...p, color: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div><div><label className="text-[11px] text-text-muted block mb-1">Sort</label><input type="number" value={deployProviderForm.sortOrder} onChange={(e) => setDeployProviderForm((p) => ({ ...p, sortOrder: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div></div>
+                    <div className="grid grid-cols-2 gap-3"><div><label className="text-[11px] text-text-muted block mb-1">Min Tariff</label><select value={deployProviderForm.minTariff} onChange={(e) => setDeployProviderForm((p) => ({ ...p, minTariff: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none"><option value="free">Free</option><option value="hobby">Hobby</option><option value="pro">Pro</option><option value="team">Team</option><option value="enterprise">Enterprise</option></select></div><div><label className="text-[11px] text-text-muted block mb-1">Max Deploys</label><input type="number" value={deployProviderForm.maxDeploys} onChange={(e) => setDeployProviderForm((p) => ({ ...p, maxDeploys: parseInt(e.target.value) || -1 }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div></div>
+                    <div><label className="text-[11px] text-text-muted block mb-1">Config Schema (JSON)</label><textarea value={deployProviderForm.configSchema} onChange={(e) => setDeployProviderForm((p) => ({ ...p, configSchema: e.target.value }))} rows={2} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[11px] text-text outline-none focus:border-accent font-mono" /></div>
+                    <div className="flex items-center justify-end gap-2 pt-2"><button onClick={() => { setShowDeployProviderForm(false); setEditingDeployProvider(null); }} className="text-[11px] px-3 py-1.5 text-text-muted hover:text-text">Cancel</button><button onClick={handleSaveDeployProvider} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light">Save</button></div>
                   </div>
                 </div>
               )}

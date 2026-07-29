@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { getAdapters } from "../adapters/registry.js";
 
+const CONNECTION_TIMEOUT_MS = 30 * 60 * 1000; // 30 min hard timeout
 const router = Router();
 
 // POST /api/agent/send — send message to OpenCode via adapter
@@ -69,8 +70,36 @@ router.post("/send", async (req: Request, res: Response) => {
     const stream = await adapter.openEventStream(machineId);
     let buffer = "";
     let sessionStarted = false;
+    let finished = false;
+
+    const finish = (flushBuffer = true) => {
+      if (finished) return;
+      finished = true;
+
+      if (flushBuffer && buffer.trim()) {
+        try {
+          res.write(`data: ${JSON.stringify({
+            type: "text",
+            content: `[partial data flushed: ${buffer.trim().slice(0, 200)}]`,
+          })}\n\n`);
+        } catch {}
+      }
+
+      clearTimeout(timeoutHandle);
+
+      try { stream.destroy(); } catch {}
+      try {
+        res.write("data: [DONE]\n\n");
+        res.end();
+      } catch {}
+    };
+
+    const timeoutHandle = setTimeout(() => {
+      finish();
+    }, CONNECTION_TIMEOUT_MS);
 
     stream.on("data", (chunk: Buffer) => {
+      if (finished) return;
       buffer += chunk.toString();
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
@@ -84,16 +113,13 @@ router.post("/send", async (req: Request, res: Response) => {
           const event = JSON.parse(data);
           const eventType = event.properties?.type || event.type;
 
-          // Mark session as started when we see the session.idle event
           if (eventType === "session.idle") {
             sessionStarted = true;
           }
 
           if (eventType === "session.error") {
             res.write(`data: ${JSON.stringify({ type: "error", content: event.properties?.properties?.error || "Agent error" })}\n\n`);
-            stream.destroy();
-            res.write("data: [DONE]\n\n");
-            res.end();
+            finish();
             return;
           }
 
@@ -117,26 +143,23 @@ router.post("/send", async (req: Request, res: Response) => {
             }
           }
 
-          // Session finished (no more tool calls pending)
           if (eventType === "session.idle" && sessionStarted) {
-            stream.destroy();
-            res.write("data: [DONE]\n\n");
-            res.end();
+            finish(false);
             return;
           }
         } catch {}
       }
     });
 
-    stream.on("error", () => {
-      stream.destroy();
-      res.write("data: [DONE]\n\n");
-      res.end();
-    });
+    stream.on("error", () => finish());
+    stream.on("close", () => finish());
 
-    stream.on("close", () => {
-      res.write("data: [DONE]\n\n");
-      res.end();
+    // Client disconnect → abort remote process
+    req.on("close", () => {
+      if (!finished) {
+        finish();
+        adapter.abortSession(machineId, activeSessionId).catch(() => {});
+      }
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
