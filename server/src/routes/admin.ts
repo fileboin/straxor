@@ -12,6 +12,10 @@ import {
   userApiKeys,
   users,
   logs,
+  auditLogs,
+  plugins,
+  systemSettings,
+  notificationConfigs,
 } from "../db/schema.js";
 import { eq, and, or, like, desc, count, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
@@ -393,8 +397,6 @@ router.get("/logs", requireAdmin, async (req: Request, res: Response) => {
       .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     res.json({ logs: logEntries, total, limit: numLimit, offset: numOffset });
-
-    res.json({ logs, total, limit: numLimit, offset: numOffset });
   } catch (error) {
     console.error("Admin logs error:", error);
     res.status(500).json({ error: "Failed to list logs" });
@@ -431,7 +433,7 @@ router.get("/dashboard", requireAdmin, async (_req: Request, res: Response) => {
 
 router.get("/users", requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const userList = await db.select({ id: users.id, email: users.email, role: users.role, createdAt: users.createdAt }).from(users).orderBy(desc(users.createdAt));
+    const userList = await db.select({ id: users.id, email: users.email, role: users.role, plan: users.plan, isBlocked: users.isBlocked, createdAt: users.createdAt }).from(users).orderBy(desc(users.createdAt));
     res.json(userList);
   } catch (error) {
     console.error("Admin users error:", error);
@@ -453,6 +455,253 @@ router.put("/users/:id/role", requireAdmin, async (req: Request, res: Response) 
   } catch (error) {
     console.error("User role update error:", error);
     res.status(500).json({ error: "Failed to update user role" });
+  }
+});
+
+// ── 10. USER MANAGEMENT (block/plan) ──
+
+router.put("/users/:id/block", requireAdmin, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { isBlocked } = req.body;
+  if (typeof isBlocked !== "boolean") { res.status(400).json({ error: "isBlocked (boolean) required" }); return; }
+  try {
+    const [updated] = await db.update(users).set({ isBlocked, updatedAt: new Date() }).where(eq(users.id, id)).returning({ id: users.id, email: users.email, isBlocked: users.isBlocked });
+    if (!updated) { res.status(404).json({ error: "User not found" }); return; }
+    res.json(updated);
+  } catch (error) {
+    console.error("User block error:", error);
+    res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+router.put("/users/:id/plan", requireAdmin, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { plan } = req.body;
+  if (!plan) { res.status(400).json({ error: "plan required" }); return; }
+  try {
+    const [updated] = await db.update(users).set({ plan, updatedAt: new Date() }).where(eq(users.id, id)).returning({ id: users.id, email: users.email, plan: users.plan });
+    if (!updated) { res.status(404).json({ error: "User not found" }); return; }
+    res.json(updated);
+  } catch (error) {
+    console.error("User plan error:", error);
+    res.status(500).json({ error: "Failed to update user plan" });
+  }
+});
+
+// ── 11. PLUGINS ──
+
+router.get("/plugins", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const list = await db.select().from(plugins).orderBy(plugins.name);
+    res.json(list);
+  } catch (error) {
+    console.error("Plugins error:", error);
+    res.status(500).json({ error: "Failed to list plugins" });
+  }
+});
+
+router.post("/plugins", requireAdmin, async (req: Request, res: Response) => {
+  const { name, type, version, description, author, icon, configSchema, permissions, entryPoint, settings, isInstalled, isBuiltin, isEnabled } = req.body;
+  if (!name) { res.status(400).json({ error: "name required" }); return; }
+  try {
+    const [plugin] = await db.insert(plugins).values({
+      name, type, version, description, author, icon,
+      configSchema: configSchema ? JSON.stringify(configSchema) : "{}",
+      permissions: permissions ? JSON.stringify(permissions) : "[]",
+      entryPoint, settings: settings ? JSON.stringify(settings) : "{}",
+      isInstalled, isBuiltin, isEnabled,
+    }).returning();
+    res.json(plugin);
+  } catch (error: any) {
+    if (error?.code === "23505") { res.status(409).json({ error: "Plugin with this name exists" }); return; }
+    console.error("Plugin create error:", error);
+    res.status(500).json({ error: "Failed to create plugin" });
+  }
+});
+
+router.put("/plugins/:id", requireAdmin, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const fields = ["name","type","version","description","author","icon","entryPoint","isInstalled","isBuiltin","isEnabled"];
+  try {
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    for (const f of fields) {
+      if (req.body[f] !== undefined) updateData[f] = req.body[f];
+    }
+    if (req.body.configSchema !== undefined) updateData.configSchema = JSON.stringify(req.body.configSchema);
+    if (req.body.permissions !== undefined) updateData.permissions = JSON.stringify(req.body.permissions);
+    if (req.body.settings !== undefined) updateData.settings = JSON.stringify(req.body.settings);
+    const [updated] = await db.update(plugins).set(updateData).where(eq(plugins.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: "Plugin not found" }); return; }
+    res.json(updated);
+  } catch (error) {
+    console.error("Plugin update error:", error);
+    res.status(500).json({ error: "Failed to update plugin" });
+  }
+});
+
+router.delete("/plugins/:id", requireAdmin, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    await db.delete(plugins).where(eq(plugins.id, id));
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Plugin delete error:", error);
+    res.status(500).json({ error: "Failed to delete plugin" });
+  }
+});
+
+// ── 12. API KEYS (admin view) ──
+
+router.get("/api-keys", requireAdmin, async (req: Request, res: Response) => {
+  const { providerId } = req.query as Record<string, string>;
+  try {
+    const conditions = providerId ? [eq(userApiKeys.providerId, providerId)] : [];
+    const keys = await db.select({
+      id: userApiKeys.id, userId: userApiKeys.userId, providerId: userApiKeys.providerId,
+      label: userApiKeys.label, isEnabled: userApiKeys.isEnabled, createdAt: userApiKeys.createdAt,
+    }).from(userApiKeys).where(conditions.length > 0 ? and(...conditions) : undefined).orderBy(desc(userApiKeys.createdAt));
+    res.json(keys);
+  } catch (error) {
+    console.error("Admin API keys error:", error);
+    res.status(500).json({ error: "Failed to list API keys" });
+  }
+});
+
+router.delete("/api-keys/:id", requireAdmin, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    await db.delete(userApiKeys).where(eq(userApiKeys.id, id));
+    res.json({ success: true });
+  } catch (error) {
+    console.error("API key delete error:", error);
+    res.status(500).json({ error: "Failed to delete API key" });
+  }
+});
+
+// ── 13. AUDIT LOGS ──
+
+router.get("/audit-logs", requireAdmin, async (req: Request, res: Response) => {
+  const { limit, offset, severity, action } = req.query as Record<string, string>;
+  try {
+    const numLimit = Math.min(parseInt(limit || "50"), 200);
+    const numOffset = parseInt(offset || "0");
+    const conditions: any[] = [];
+    if (severity) conditions.push(eq(auditLogs.severity, severity));
+    if (action) conditions.push(eq(auditLogs.action, action));
+    const entries = await db.select()
+      .from(auditLogs)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(numLimit)
+      .offset(numOffset);
+    const [{ total }] = await db.select({ total: count() })
+      .from(auditLogs)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    res.json({ logs: entries, total, limit: numLimit, offset: numOffset });
+  } catch (error) {
+    console.error("Audit logs error:", error);
+    res.status(500).json({ error: "Failed to list audit logs" });
+  }
+});
+
+// ── 14. SYSTEM SETTINGS ──
+
+const DEFAULT_SETTINGS = [
+  { key: "session-timeout", value: "3600", type: "number", description: "Session timeout in seconds", category: "security" },
+  { key: "rate-limit-global", value: "100", type: "number", description: "Global rate limit (requests/min)", category: "security" },
+  { key: "rate-limit-auth", value: "10", type: "number", description: "Auth rate limit (requests/min)", category: "security" },
+  { key: "max-projects-per-user", value: "50", type: "number", description: "Max projects per user", category: "limits" },
+  { key: "max-file-size", value: "10", type: "number", description: "Max file upload size (MB)", category: "limits" },
+  { key: "default-theme", value: "dark", type: "string", description: "Default UI theme", category: "ui" },
+  { key: "allow-registration", value: "true", type: "boolean", description: "Allow new user registration", category: "security" },
+  { key: "maintenance-mode", value: "false", type: "boolean", description: "Enable maintenance mode", category: "system" },
+  { key: "require-email-verification", value: "false", type: "boolean", description: "Require email verification", category: "security" },
+  { key: "admin-2fa-required", value: "false", type: "boolean", description: "Force 2FA for admin accounts", category: "security" },
+  { key: "default-ai-provider", value: "openai", type: "string", description: "Default AI provider for new users", category: "ai" },
+  { key: "enable-telemetry", value: "true", type: "boolean", description: "Collect anonymous usage data", category: "system" },
+];
+
+router.get("/settings", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    let settings = await db.select().from(systemSettings).orderBy(systemSettings.category);
+    if (settings.length === 0) {
+      await db.insert(systemSettings).values(DEFAULT_SETTINGS);
+      settings = await db.select().from(systemSettings).orderBy(systemSettings.category);
+    }
+    res.json(settings);
+  } catch (error) {
+    console.error("Settings error:", error);
+    res.status(500).json({ error: "Failed to list settings" });
+  }
+});
+
+router.put("/settings/:id", requireAdmin, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { value } = req.body;
+  if (value === undefined) { res.status(400).json({ error: "value required" }); return; }
+  try {
+    const [updated] = await db.update(systemSettings).set({ value: String(value), updatedAt: new Date() }).where(eq(systemSettings.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: "Setting not found" }); return; }
+    res.json(updated);
+  } catch (error) {
+    console.error("Settings update error:", error);
+    res.status(500).json({ error: "Failed to update setting" });
+  }
+});
+
+// ── 15. NOTIFICATION SETTINGS (system-wide) ──
+
+router.get("/notifications", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const configs = await db.select().from(notificationConfigs).orderBy(notificationConfigs.channel);
+    res.json(configs);
+  } catch (error) {
+    console.error("Notification configs error:", error);
+    res.status(500).json({ error: "Failed to list notification configs" });
+  }
+});
+
+router.post("/notifications", requireAdmin, async (req: Request, res: Response) => {
+  const { channel, enabled, events, config } = req.body;
+  if (!channel) { res.status(400).json({ error: "channel required" }); return; }
+  try {
+    const [created] = await db.insert(notificationConfigs).values({
+      channel, enabled: enabled ?? true, userId: "00000000-0000-0000-0000-000000000000",
+      events: events ? JSON.stringify(events) : "[]",
+      config: config ? JSON.stringify(config) : "{}",
+    }).returning();
+    res.json(created);
+  } catch (error) {
+    console.error("Notification config create error:", error);
+    res.status(500).json({ error: "Failed to create notification config" });
+  }
+});
+
+router.put("/notifications/:id", requireAdmin, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { enabled, events, config } = req.body;
+  try {
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    if (enabled !== undefined) updateData.enabled = enabled;
+    if (events !== undefined) updateData.events = JSON.stringify(events);
+    if (config !== undefined) updateData.config = JSON.stringify(config);
+    const [updated] = await db.update(notificationConfigs).set(updateData).where(eq(notificationConfigs.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: "Notification config not found" }); return; }
+    res.json(updated);
+  } catch (error) {
+    console.error("Notification config update error:", error);
+    res.status(500).json({ error: "Failed to update notification config" });
+  }
+});
+
+router.delete("/notifications/:id", requireAdmin, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    await db.delete(notificationConfigs).where(eq(notificationConfigs.id, id));
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Notification config delete error:", error);
+    res.status(500).json({ error: "Failed to delete notification config" });
   }
 });
 

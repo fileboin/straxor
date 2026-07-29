@@ -1,39 +1,28 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth, isAdmin } from "../lib/auth.js";
+import { useAuth } from "../lib/auth.js";
 import { useTheme } from "../lib/theme.js";
+import { api } from "../lib/api.js";
 import {
-  getFeatureFlags,
-  toggleFeatureFlag,
-  getTariffs,
-  createTariff,
-  updateTariff,
-  deleteTariff,
-  getRegistry,
-  createRegistryEntry,
-  updateRegistryEntry,
-  deleteRegistryEntry,
-  getWallets,
-  creditWallet,
-  getWalletTransactions,
-  getSubscriptions,
-  updateSubscription,
-  getPromoCodes,
-  createPromoCode,
-  deletePromoCode,
-  getAdminLogs,
-  getAdminDashboard,
-  type FeatureFlag,
-  type Tariff,
-  type AdminRegistryEntry,
-  type WalletAccount,
-  type WalletTransaction,
-  type Subscription,
-  type PromoCode,
-  type AdminDashboardStats,
+  getFeatureFlags, toggleFeatureFlag,
+  getTariffs, createTariff, updateTariff, deleteTariff,
+  getRegistry, createRegistryEntry, updateRegistryEntry, deleteRegistryEntry,
+  getWallets, creditWallet, getWalletTransactions,
+  getSubscriptions, updateSubscription,
+  getPromoCodes, createPromoCode, deletePromoCode,
+  getAdminLogs, getAdminDashboard,
+  getPlugins, createPlugin, updatePlugin, deletePlugin,
+  getAdminApiKeys, deleteAdminApiKey,
+  getAuditLogs,
+  getSystemSettings, updateSystemSetting,
+  getAdminNotifications, createAdminNotification, updateAdminNotification, deleteAdminNotification,
+  blockUser, setUserPlan,
+  type FeatureFlag, type Tariff, type AdminRegistryEntry,
+  type WalletAccount, type WalletTransaction,
+  type Subscription, type PromoCode, type AdminDashboardStats,
 } from "../lib/admin.js";
 
-type Tab = "dashboard" | "users" | "flags" | "tariffs" | "registry" | "wallet" | "subscriptions" | "promos" | "logs" | "providers" | "runtimes";
+type Tab = "dashboard" | "users" | "flags" | "tariffs" | "registry" | "wallet" | "subscriptions" | "promos" | "logs" | "providers" | "runtimes" | "api-keys" | "plugins" | "notifications" | "security" | "settings";
 
 const SIDEBAR: { id: Tab; label: string; icon: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: "📊" },
@@ -44,9 +33,14 @@ const SIDEBAR: { id: Tab; label: string; icon: string }[] = [
   { id: "wallet", label: "Wallet & Billing", icon: "💳" },
   { id: "subscriptions", label: "Subscriptions", icon: "📋" },
   { id: "promos", label: "Promo Codes", icon: "🏷" },
-  { id: "logs", label: "System Logs", icon: "📜" },
   { id: "providers", label: "AI Providers", icon: "🔗" },
-  { id: "runtimes", label: "Runtime Manager", icon: "⚙" },
+  { id: "runtimes", label: "Runtimes", icon: "⚙" },
+  { id: "api-keys", label: "API Integrations", icon: "🔑" },
+  { id: "plugins", label: "Plugins", icon: "🧩" },
+  { id: "notifications", label: "Notifications", icon: "🔔" },
+  { id: "security", label: "Security Center", icon: "🛡" },
+  { id: "settings", label: "Settings", icon: "⚙" },
+  { id: "logs", label: "System Logs", icon: "📜" },
 ];
 
 export default function Admin() {
@@ -59,12 +53,9 @@ export default function Admin() {
   const [actionMsg, setActionMsg] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const flash = (msg: string) => {
-    setActionMsg(msg);
-    setTimeout(() => setActionMsg(""), 2500);
-  };
+  const flash = (msg: string) => { setActionMsg(msg); setTimeout(() => setActionMsg(""), 2500); };
 
-  // Dashboard stats
+  // Dashboard
   const [dashStats, setDashStats] = useState<AdminDashboardStats | null>(null);
 
   // Users
@@ -105,6 +96,32 @@ export default function Admin() {
   const [logFilter, setLogFilter] = useState("");
   const [logPage, setLogPage] = useState(0);
 
+  // API Keys (admin)
+  const [adminKeys, setAdminKeys] = useState<any[]>([]);
+  const [adminKeyProviderFilter, setAdminKeyProviderFilter] = useState("");
+
+  // Plugins
+  const [pluginList, setPluginList] = useState<any[]>([]);
+  const [showPluginForm, setShowPluginForm] = useState(false);
+  const [editingPlugin, setEditingPlugin] = useState<any | null>(null);
+  const [pluginForm, setPluginForm] = useState({ name: "", type: "custom", version: "1.0.0", description: "", author: "", icon: "🧩", isEnabled: true, isInstalled: false });
+
+  // Audit / Security
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditSeverity, setAuditSeverity] = useState("");
+  const [auditPage, setAuditPage] = useState(0);
+
+  // System Settings
+  const [settings, setSettings] = useState<any[]>([]);
+  const [editingSetting, setEditingSetting] = useState<string | null>(null);
+  const [editingSettingValue, setEditingSettingValue] = useState("");
+
+  // Notifications
+  const [notifConfigs, setNotifConfigs] = useState<any[]>([]);
+  const [showNotifForm, setShowNotifForm] = useState(false);
+  const [notifForm, setNotifForm] = useState({ channel: "", enabled: true, events: "[]", config: "{}" });
+
   // ── Loaders ──
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -121,17 +138,21 @@ export default function Admin() {
     try { const res = await getAdminLogs(logFilter || undefined, 50, logPage * 50); setLogs(res.logs); setLogTotal(res.total); }
     catch { flash("Greška"); }
   }, [logFilter, logPage]);
-
-  // Load users list
   const loadUsers = useCallback(async () => {
     setLoading(true);
-    try {
-      const { api } = await import("../lib/api.js");
-      const res = await api<any[]>("/admin/users");
-      setUserList(res);
-    } catch { flash("Greška pri učitavanju korisnika"); }
+    try { const res = await api<any[]>("/admin/users"); setUserList(res); } catch { flash("Greška pri učitavanju korisnika"); }
     setLoading(false);
   }, []);
+  const loadAdminKeys = useCallback(async () => {
+    try { setAdminKeys(await getAdminApiKeys(adminKeyProviderFilter || undefined)); } catch { flash("Greška"); }
+  }, [adminKeyProviderFilter]);
+  const loadPlugins = useCallback(async () => { try { setPluginList(await getPlugins()); } catch { flash("Greška"); } }, []);
+  const loadAuditLogs = useCallback(async () => {
+    try { const res = await getAuditLogs(auditSeverity || undefined, undefined, 50, auditPage * 50); setAuditLogs(res.logs); setAuditTotal(res.total); }
+    catch { flash("Greška"); }
+  }, [auditSeverity, auditPage]);
+  const loadSettings = useCallback(async () => { try { setSettings(await getSystemSettings()); } catch { flash("Greška"); } }, []);
+  const loadNotifs = useCallback(async () => { try { setNotifConfigs(await getAdminNotifications()); } catch { flash("Greška"); } }, []);
 
   useEffect(() => {
     if (tab === "dashboard") loadDashboard();
@@ -143,7 +164,12 @@ export default function Admin() {
     else if (tab === "subscriptions") loadSubscriptions();
     else if (tab === "promos") loadPromoCodes();
     else if (tab === "logs") loadLogs();
-  }, [tab, loadDashboard, loadFlags, loadTariffs, loadRegistry, loadWallets, loadSubscriptions, loadPromoCodes, loadLogs, loadUsers]);
+    else if (tab === "api-keys") loadAdminKeys();
+    else if (tab === "plugins") loadPlugins();
+    else if (tab === "security") loadAuditLogs();
+    else if (tab === "settings") loadSettings();
+    else if (tab === "notifications") loadNotifs();
+  }, [tab]);
 
   // ── Actions ──
   const handleToggleFlag = async (flag: FeatureFlag) => {
@@ -155,13 +181,17 @@ export default function Admin() {
     try { if (editingTariff) { await updateTariff(editingTariff.id, tariffForm); flash("Tarifa ažurirana"); } else { await createTariff(tariffForm); flash("Tarifa kreirana"); } setShowTariffForm(false); setEditingTariff(null); loadTariffs(); }
     catch { flash("Greška"); }
   };
-
   const handleDeleteTariff = async (id: string) => { try { await deleteTariff(id); flash("Obrisano"); loadTariffs(); } catch { flash("Greška"); } };
+
   const handleSaveRegistry = async () => {
     try { if (editingRegistry) { await updateRegistryEntry(editingRegistry.id, registryForm); flash("Registry ažuriran"); } else { await createRegistryEntry(registryForm); flash("Registry kreiran"); } setShowRegistryForm(false); setEditingRegistry(null); loadRegistry(); }
     catch { flash("Greška"); }
   };
   const handleDeleteRegistry = async (id: string) => { try { await deleteRegistryEntry(id); flash("Obrisano"); loadRegistry(); } catch { flash("Greška"); } };
+  const handleToggleRegistry = async (entry: AdminRegistryEntry) => {
+    try { await updateRegistryEntry(entry.id, { isEnabled: !entry.isEnabled }); loadRegistry(); flash(`${entry.name} ${entry.isEnabled ? "disabled" : "enabled"}`); }
+    catch { flash("Greška"); }
+  };
 
   const handleCreditWallet = async () => {
     if (!creditForm.userId || !creditForm.amount) { flash("Unesi userId i iznos"); return; }
@@ -170,11 +200,42 @@ export default function Admin() {
   };
   const handleViewWalletTx = async (walletId: string) => { try { setWalletTxs(await getWalletTransactions(walletId)); } catch { flash("Greška"); } };
   const handleUpdateSubscription = async (id: string, data: Partial<Subscription>) => { try { await updateSubscription(id, data); flash("Ažurirano"); loadSubscriptions(); } catch { flash("Greška"); } };
+
   const handleCreatePromo = async () => {
     if (!promoForm.code || !promoForm.discountValue) { flash("Unesi kod i vrednost"); return; }
     try { await createPromoCode(promoForm); flash("Promo kod kreiran"); setShowPromoForm(false); loadPromoCodes(); } catch { flash("Greška"); }
   };
   const handleDeletePromo = async (id: string) => { try { await deletePromoCode(id); flash("Obrisano"); loadPromoCodes(); } catch { flash("Greška"); } };
+
+  // Users
+  const handleBlockUser = async (id: string, isBlocked: boolean) => { try { await blockUser(id, isBlocked); flash(isBlocked ? "Blokiran" : "Odblokiran"); loadUsers(); } catch { flash("Greška"); } };
+  const handleSetUserPlan = async (id: string, plan: string) => { try { await setUserPlan(id, plan); flash("Plan ažuriran"); loadUsers(); } catch { flash("Greška"); } };
+  const handleSetUserRole = async (id: string, role: string) => { try { await api(`/admin/users/${id}/role`, { method: "PUT", body: { role } }); flash("Uloga ažurirana"); loadUsers(); } catch { flash("Greška"); } };
+
+  // API Keys
+  const handleDeleteAdminKey = async (id: string) => { try { await deleteAdminApiKey(id); flash("Ključ obrisan"); loadAdminKeys(); } catch { flash("Greška"); } };
+
+  // Plugins
+  const handleSavePlugin = async () => {
+    try { if (editingPlugin) { await updatePlugin(editingPlugin.id, pluginForm); flash("Plugin ažuriran"); } else { await createPlugin(pluginForm); flash("Plugin kreiran"); } setShowPluginForm(false); setEditingPlugin(null); loadPlugins(); }
+    catch { flash("Greška"); }
+  };
+  const handleDeletePlugin = async (id: string) => { try { await deletePlugin(id); flash("Plugin obrisan"); loadPlugins(); } catch { flash("Greška"); } };
+  const handleTogglePlugin = async (p: any) => { try { await updatePlugin(p.id, { isEnabled: !p.isEnabled }); loadPlugins(); flash(`${p.name} ${p.isEnabled ? "disabled" : "enabled"}`); } catch { flash("Greška"); } };
+
+  // Settings
+  const handleSaveSetting = async (id: string) => {
+    try { await updateSystemSetting(id, editingSettingValue); flash("Sačuvano"); setEditingSetting(null); loadSettings(); }
+    catch { flash("Greška"); }
+  };
+
+  // Notifications
+  const handleSaveNotif = async () => {
+    try { await createAdminNotification(notifForm); flash("Notifikacija kreirana"); setShowNotifForm(false); loadNotifs(); }
+    catch { flash("Greška"); }
+  };
+  const handleToggleNotif = async (n: any) => { try { await updateAdminNotification(n.id, { enabled: !n.enabled }); loadNotifs(); } catch { flash("Greška"); } };
+  const handleDeleteNotif = async (id: string) => { try { await deleteAdminNotification(id); flash("Obrisano"); loadNotifs(); } catch { flash("Greška"); } };
 
   // ── Render ──
   return (
@@ -213,6 +274,7 @@ export default function Admin() {
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           {loading && <div className="flex items-center justify-center h-32"><div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>}
 
+          {/* ── Dashboard ── */}
           {!loading && tab === "dashboard" && dashStats && (
             <div className="space-y-6">
               <div className="flex items-center justify-between"><h2 className="text-[16px] font-bold text-text">System Overview</h2></div>
@@ -227,15 +289,33 @@ export default function Admin() {
             </div>
           )}
 
+          {/* ── Users ── */}
           {!loading && tab === "users" && (
             <div className="space-y-3">
               <h2 className="text-[16px] font-bold text-text mb-4">User Management</h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-[12px]">
-                  <thead><tr className="text-text-muted border-b border-border"><th className="text-left py-2 px-3">Email</th><th className="text-left py-2 px-3">Role</th><th className="text-left py-2 px-3">Created</th><th className="text-left py-2 px-3">Actions</th></tr></thead>
+                  <thead><tr className="text-text-muted border-b border-border"><th className="text-left py-2 px-3">Email</th><th className="text-left py-2 px-3">Role</th><th className="text-left py-2 px-3">Plan</th><th className="text-left py-2 px-3">Status</th><th className="text-left py-2 px-3">Created</th><th className="text-left py-2 px-3">Actions</th></tr></thead>
                   <tbody>
                     {userList.map((u: any) => (
-                      <tr key={u.id} className="border-b border-border/50 hover:bg-surface-2/50"><td className="py-2 px-3 text-text">{u.email}</td><td className="py-2 px-3"><span className={`text-[10px] px-2 py-0.5 rounded-full ${u.role === "admin" || u.role === "super_admin" ? "bg-accent/20 text-accent" : "bg-surface-3 text-text-secondary"}`}>{u.role || "user"}</span></td><td className="py-2 px-3 text-text-muted">{new Date(u.createdAt).toLocaleDateString()}</td><td className="py-2 px-3">{/* Future: edit role, block */}</td></tr>
+                      <tr key={u.id} className="border-b border-border/50 hover:bg-surface-2/50">
+                        <td className="py-2 px-3 text-text">{u.email}</td>
+                        <td className="py-2 px-3">
+                          <select value={u.role || "user"} onChange={(e) => handleSetUserRole(u.id, e.target.value)} className="bg-surface-3 border border-border rounded px-1.5 py-0.5 text-[10px] text-text outline-none">
+                            <option value="user">user</option><option value="admin">admin</option><option value="super_admin">super_admin</option>
+                          </select>
+                        </td>
+                        <td className="py-2 px-3">
+                          <select value={u.plan || "free"} onChange={(e) => handleSetUserPlan(u.id, e.target.value)} className="bg-surface-3 border border-border rounded px-1.5 py-0.5 text-[10px] text-text outline-none">
+                            <option value="free">Free</option><option value="hobby">Hobby</option><option value="pro">Pro</option><option value="team">Team</option><option value="enterprise">Enterprise</option><option value="lifetime">Lifetime</option>
+                          </select>
+                        </td>
+                        <td className="py-2 px-3"><span className={`text-[10px] px-2 py-0.5 rounded-full ${u.isBlocked ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>{u.isBlocked ? "Blocked" : "Active"}</span></td>
+                        <td className="py-2 px-3 text-text-muted">{new Date(u.createdAt).toLocaleDateString()}</td>
+                        <td className="py-2 px-3">
+                          <button onClick={() => handleBlockUser(u.id, !u.isBlocked)} className={`text-[10px] px-2 py-0.5 rounded ${u.isBlocked ? "bg-green-500/10 text-green-400 hover:bg-green-500/20" : "bg-red-500/10 text-red-400 hover:bg-red-500/20"}`}>{u.isBlocked ? "Unblock" : "Block"}</button>
+                        </td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
@@ -243,6 +323,7 @@ export default function Admin() {
             </div>
           )}
 
+          {/* ── Feature Flags ── */}
           {!loading && tab === "flags" && (
             <div className="space-y-3">
               <h2 className="text-[16px] font-bold text-text mb-4">Feature Flags</h2>
@@ -262,6 +343,7 @@ export default function Admin() {
             </div>
           )}
 
+          {/* ── Tariffs ── */}
           {!loading && tab === "tariffs" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-4"><h2 className="text-[16px] font-bold text-text">Tariffs</h2><button onClick={() => { setEditingTariff(null); setTariffForm({ name: "", price: 0, maxProjects: 1, maxAgents: 1, maxRuntimes: 1, maxMembers: 1, storageLimit: 100, bandwidthLimit: 1000, sortOrder: 0 }); setShowTariffForm(true); }} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light transition-colors">+ New Tariff</button></div>
@@ -287,6 +369,7 @@ export default function Admin() {
             </div>
           )}
 
+          {/* ── Registry ── */}
           {!loading && tab === "registry" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-4"><h2 className="text-[16px] font-bold text-text">Registry System</h2><div className="flex items-center gap-2"><select value={registryFilter} onChange={(e) => setRegistryFilter(e.target.value)} className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-[11px] text-text outline-none"><option value="">All</option><option value="runtime">Runtime</option><option value="ai-provider">AI Provider</option><option value="integration">Integration</option><option value="template">Template</option></select><button onClick={() => { setEditingRegistry(null); setRegistryForm({ type: "runtime", key: "", name: "", description: "", icon: "📦", isEnabled: true, sortOrder: 0 }); setShowRegistryForm(true); }} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light">+ New</button></div></div>
@@ -294,7 +377,11 @@ export default function Admin() {
                 {registry.filter((e) => !registryFilter || e.type === registryFilter).map((e) => (
                   <div key={e.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-2 border border-border">
                     <div className="flex items-center gap-2.5"><span className="text-lg">{e.icon || "📦"}</span><div><div className="text-[12px] font-medium text-text">{e.name}</div><div className="text-[10px] text-text-muted">{e.type} · {e.key}</div></div></div>
-                    <div className="flex items-center gap-1.5"><button onClick={() => { setEditingRegistry(e); setRegistryForm({ type: e.type, key: e.key, name: e.name, description: e.description || "", icon: e.icon || "📦", isEnabled: e.isEnabled ?? true, sortOrder: e.sortOrder ?? 0 }); setShowRegistryForm(true); }} className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-text-secondary hover:text-text">✎</button>{!e.isBuiltin && <button onClick={() => handleDeleteRegistry(e.id)} className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20">✕</button>}</div>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => handleToggleRegistry(e)} className={`text-[10px] px-1.5 py-0.5 rounded ${e.isEnabled ? "bg-green-500/10 text-green-400" : "bg-surface-3 text-text-muted"}`}>{e.isEnabled ? "ON" : "OFF"}</button>
+                      <button onClick={() => { setEditingRegistry(e); setRegistryForm({ type: e.type, key: e.key, name: e.name, description: e.description || "", icon: e.icon || "📦", isEnabled: e.isEnabled ?? true, sortOrder: e.sortOrder ?? 0 }); setShowRegistryForm(true); }} className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-text-secondary hover:text-text">✎</button>
+                      {!e.isBuiltin && <button onClick={() => handleDeleteRegistry(e.id)} className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20">✕</button>}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -312,6 +399,7 @@ export default function Admin() {
             </div>
           )}
 
+          {/* ── Wallet ── */}
           {!loading && tab === "wallet" && (
             <div className="space-y-4">
               <h2 className="text-[16px] font-bold text-text">Wallet & Billing</h2>
@@ -341,10 +429,12 @@ export default function Admin() {
             </div>
           )}
 
+          {/* ── Subscriptions ── */}
           {!loading && tab === "subscriptions" && (
             <div className="space-y-3"><h2 className="text-[16px] font-bold text-text mb-4">Subscriptions</h2><div className="space-y-1.5">{subscriptionList.map((s) => (<div key={s.id} className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-surface-2 border border-border"><div><div className="text-[12px] text-text">User: <span className="font-mono text-[11px]">{s.userId.slice(0, 12)}...</span></div><div className="text-[11px] text-text-muted">Status: {s.status} · Tariff: {s.tariffId?.slice(0, 8) || "N/A"} · Auto: {s.autoRenew ? "✓" : "✕"}</div></div><select value={s.status || "active"} onChange={(e) => handleUpdateSubscription(s.id, { status: e.target.value })} className="bg-surface-3 border border-border rounded-lg px-2 py-1 text-[10px] text-text outline-none"><option value="active">Active</option><option value="paused">Paused</option><option value="cancelled">Cancelled</option><option value="expired">Expired</option></select></div>))}</div></div>
           )}
 
+          {/* ── Promo Codes ── */}
           {!loading && tab === "promos" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-4"><h2 className="text-[16px] font-bold text-text">Promo Codes</h2><button onClick={() => { setPromoForm({ code: "", discountType: "percent", discountValue: 10, maxUses: 100 }); setShowPromoForm(true); }} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light">+ New Code</button></div>
@@ -363,6 +453,7 @@ export default function Admin() {
             </div>
           )}
 
+          {/* ── System Logs ── */}
           {!loading && tab === "logs" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-4"><h2 className="text-[16px] font-bold text-text">System Logs</h2><div className="flex items-center gap-2"><select value={logFilter} onChange={(e) => { setLogFilter(e.target.value); setLogPage(0); }} className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-[11px] text-text outline-none"><option value="">All</option><option value="system">System</option><option value="auth">Auth</option><option value="deploy">Deploy</option><option value="agent">Agent</option><option value="error">Error</option></select><span className="text-[11px] text-text-muted">{logTotal} total</span></div></div>
@@ -371,25 +462,185 @@ export default function Admin() {
             </div>
           )}
 
+          {/* ── AI Providers (powered by Registry) ── */}
           {!loading && tab === "providers" && (
             <div className="space-y-3">
-              <h2 className="text-[16px] font-bold text-text mb-4">AI Provider Manager</h2>
-              <p className="text-[12px] text-text-muted">Manage AI provider configurations — keys, models, rate limits.</p>
+              <div className="flex items-center justify-between mb-4"><h2 className="text-[16px] font-bold text-text">AI Provider Manager</h2><button onClick={() => { setEditingRegistry(null); setRegistryForm({ type: "ai-provider", key: "", name: "", description: "", icon: "🔗", isEnabled: true, sortOrder: 0 }); setShowRegistryForm(true); }} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light">+ Add Provider</button></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {["OpenAI", "Anthropic", "Google", "OpenRouter", "Ollama", "DeepSeek"].map((name) => (
-                  <div key={name} className="p-4 rounded-xl bg-surface-2 border border-border"><div className="text-[13px] font-medium text-text">{name}</div><div className="text-[11px] text-text-muted mt-1">Status: <span className="text-green-400">Active</span></div></div>
+                {registry.filter((e) => e.type === "ai-provider").map((p) => (
+                  <div key={p.id} className="p-4 rounded-xl bg-surface-2 border border-border space-y-2">
+                    <div className="flex items-center justify-between"><div className="flex items-center gap-2"><span className="text-lg">{p.icon || "🔗"}</span><span className="text-[13px] font-medium text-text">{p.name}</span></div><span className={`text-[10px] px-2 py-0.5 rounded-full ${p.isEnabled ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>{p.isEnabled ? "Active" : "Disabled"}</span></div>
+                    <div className="text-[10px] text-text-muted font-mono">{p.key}</div>
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button onClick={() => handleToggleRegistry(p)} className={`text-[10px] px-2 py-1 rounded ${p.isEnabled ? "bg-red-500/10 text-red-400 hover:bg-red-500/20" : "bg-green-500/10 text-green-400 hover:bg-green-500/20"}`}>{p.isEnabled ? "Disable" : "Enable"}</button>
+                      <button onClick={() => { setEditingRegistry(p); setRegistryForm({ type: p.type, key: p.key, name: p.name, description: p.description || "", icon: p.icon || "🔗", isEnabled: p.isEnabled ?? true, sortOrder: p.sortOrder ?? 0 }); setShowRegistryForm(true); }} className="text-[10px] px-2 py-1 rounded bg-surface-3 text-text-secondary hover:text-text">Edit</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {showRegistryForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                  <div className="w-full max-w-md mx-4 bg-surface border border-border rounded-2xl shadow-2xl p-5 space-y-4">
+                    <h4 className="text-[13px] font-bold">{editingRegistry ? "Edit AI Provider" : "New AI Provider"}</h4>
+                    <div className="grid grid-cols-2 gap-3"><div><label className="text-[11px] text-text-muted block mb-1">Key</label><input type="text" value={registryForm.key} onChange={(e) => setRegistryForm((p) => ({ ...p, key: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div><div><label className="text-[11px] text-text-muted block mb-1">Name</label><input type="text" value={registryForm.name} onChange={(e) => setRegistryForm((p) => ({ ...p, name: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div></div>
+                    <div><label className="text-[11px] text-text-muted block mb-1">Description</label><input type="text" value={registryForm.description} onChange={(e) => setRegistryForm((p) => ({ ...p, description: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div>
+                    <div className="flex items-center justify-end gap-2 pt-2"><button onClick={() => { setShowRegistryForm(false); setEditingRegistry(null); }} className="text-[11px] px-3 py-1.5 text-text-muted hover:text-text">Cancel</button><button onClick={handleSaveRegistry} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light">Save</button></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Runtime Manager (powered by Registry) ── */}
+          {!loading && tab === "runtimes" && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between mb-4"><h2 className="text-[16px] font-bold text-text">Runtime Manager</h2><button onClick={() => { setEditingRegistry(null); setRegistryForm({ type: "runtime", key: "", name: "", description: "", icon: "⚙", isEnabled: true, sortOrder: 0 }); setShowRegistryForm(true); }} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light">+ Add Runtime</button></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {registry.filter((e) => e.type === "runtime").map((r) => (
+                  <div key={r.id} className="p-4 rounded-xl bg-surface-2 border border-border space-y-2">
+                    <div className="flex items-center justify-between"><div className="flex items-center gap-2"><span className="text-lg">{r.icon || "⚙"}</span><span className="text-[13px] font-medium text-text">{r.name}</span></div><span className={`text-[10px] px-2 py-0.5 rounded-full ${r.isEnabled ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>{r.isEnabled ? "Active" : "Disabled"}</span></div>
+                    <div className="text-[10px] text-text-muted font-mono">{r.key}</div>
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button onClick={() => handleToggleRegistry(r)} className={`text-[10px] px-2 py-1 rounded ${r.isEnabled ? "bg-red-500/10 text-red-400 hover:bg-red-500/20" : "bg-green-500/10 text-green-400 hover:bg-green-500/20"}`}>{r.isEnabled ? "Disable" : "Enable"}</button>
+                      <button onClick={() => { setEditingRegistry(r); setRegistryForm({ type: r.type, key: r.key, name: r.name, description: r.description || "", icon: r.icon || "⚙", isEnabled: r.isEnabled ?? true, sortOrder: r.sortOrder ?? 0 }); setShowRegistryForm(true); }} className="text-[10px] px-2 py-1 rounded bg-surface-3 text-text-secondary hover:text-text">Edit</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {showRegistryForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                  <div className="w-full max-w-md mx-4 bg-surface border border-border rounded-2xl shadow-2xl p-5 space-y-4">
+                    <h4 className="text-[13px] font-bold">{editingRegistry ? "Edit Runtime" : "New Runtime"}</h4>
+                    <div className="grid grid-cols-2 gap-3"><div><label className="text-[11px] text-text-muted block mb-1">Key</label><input type="text" value={registryForm.key} onChange={(e) => setRegistryForm((p) => ({ ...p, key: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div><div><label className="text-[11px] text-text-muted block mb-1">Name</label><input type="text" value={registryForm.name} onChange={(e) => setRegistryForm((p) => ({ ...p, name: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div></div>
+                    <div><label className="text-[11px] text-text-muted block mb-1">Description</label><input type="text" value={registryForm.description} onChange={(e) => setRegistryForm((p) => ({ ...p, description: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div>
+                    <div className="flex items-center justify-end gap-2 pt-2"><button onClick={() => { setShowRegistryForm(false); setEditingRegistry(null); }} className="text-[11px] px-3 py-1.5 text-text-muted hover:text-text">Cancel</button><button onClick={handleSaveRegistry} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light">Save</button></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── API & Integrations Manager ── */}
+          {!loading && tab === "api-keys" && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between mb-4"><h2 className="text-[16px] font-bold text-text">API & Integrations Manager</h2><div className="flex items-center gap-2"><select value={adminKeyProviderFilter} onChange={(e) => setAdminKeyProviderFilter(e.target.value)} className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-[11px] text-text outline-none"><option value="">All Providers</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="openrouter">OpenRouter</option><option value="google">Google</option><option value="ollama">Ollama</option><option value="deepseek">DeepSeek</option><option value="github">GitHub</option><option value="gitlab">GitLab</option><option value="telegram">Telegram</option><option value="discord">Discord</option><option value="slack">Slack</option><option value="cloudflare">Cloudflare</option><option value="vercel">Vercel</option><option value="netlify">Netlify</option></select><span className="text-[11px] text-text-muted">{adminKeys.length} keys</span></div></div>
+              <div className="space-y-1.5">
+                {adminKeys.length === 0 && <div className="text-[12px] text-text-muted px-4 py-8 text-center">No API keys found.</div>}
+                {adminKeys.map((k: any) => (
+                  <div key={k.id} className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-surface-2 border border-border">
+                    <div className="flex items-center gap-3">
+                      <span className={`w-2 h-2 rounded-full ${k.isEnabled ? "bg-green-400" : "bg-red-400"}`} />
+                      <div><div className="text-[12px] text-text font-medium">{k.providerId} {k.label ? `· ${k.label}` : ""}</div><div className="text-[10px] text-text-muted font-mono">User: {k.userId?.slice(0, 12)}... · {new Date(k.createdAt).toLocaleDateString()}</div></div>
+                    </div>
+                    <button onClick={() => handleDeleteAdminKey(k.id)} className="text-[10px] px-2 py-1 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20">Delete</button>
+                  </div>
                 ))}
               </div>
             </div>
           )}
 
-          {!loading && tab === "runtimes" && (
+          {/* ── Plugin Marketplace ── */}
+          {!loading && tab === "plugins" && (
             <div className="space-y-3">
-              <h2 className="text-[16px] font-bold text-text mb-4">Runtime Manager</h2>
-              <p className="text-[12px] text-text-muted">Available runtimes for agent execution.</p>
+              <div className="flex items-center justify-between mb-4"><h2 className="text-[16px] font-bold text-text">Plugin Marketplace</h2><button onClick={() => { setEditingPlugin(null); setPluginForm({ name: "", type: "custom", version: "1.0.0", description: "", author: "", icon: "🧩", isEnabled: true, isInstalled: false }); setShowPluginForm(true); }} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light">+ Add Plugin</button></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {["OpenCode", "Free Claude Code", "Cline", "Codex", "Continue", "Custom Runtime"].map((name) => (
-                  <div key={name} className="p-4 rounded-xl bg-surface-2 border border-border"><div className="text-[13px] font-medium text-text">{name}</div><div className="text-[11px] text-text-muted mt-1">Enabled: <span className="text-green-400">Yes</span></div></div>
+                {pluginList.map((p) => (
+                  <div key={p.id} className="p-4 rounded-xl bg-surface-2 border border-border space-y-2">
+                    <div className="flex items-center justify-between"><div className="flex items-center gap-2"><span className="text-lg">{p.icon || "🧩"}</span><div><div className="text-[13px] font-medium text-text">{p.name}</div><div className="text-[10px] text-text-muted">v{p.version} · {p.type}</div></div></div></div>
+                    {p.description && <div className="text-[11px] text-text-muted">{p.description}</div>}
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button onClick={() => handleTogglePlugin(p)} className={`text-[10px] px-2 py-1 rounded ${p.isEnabled ? "bg-red-500/10 text-red-400 hover:bg-red-500/20" : "bg-green-500/10 text-green-400 hover:bg-green-500/20"}`}>{p.isEnabled ? "Disable" : "Enable"}</button>
+                      <button onClick={() => { setEditingPlugin(p); setPluginForm({ name: p.name, type: p.type, version: p.version, description: p.description || "", author: p.author || "", icon: p.icon || "🧩", isEnabled: p.isEnabled, isInstalled: p.isInstalled }); setShowPluginForm(true); }} className="text-[10px] px-2 py-1 rounded bg-surface-3 text-text-secondary hover:text-text">Edit</button>
+                      <button onClick={() => handleDeletePlugin(p.id)} className="text-[10px] px-2 py-1 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20">Remove</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {showPluginForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                  <div className="w-full max-w-md mx-4 bg-surface border border-border rounded-2xl shadow-2xl p-5 space-y-4">
+                    <h4 className="text-[13px] font-bold">{editingPlugin ? "Edit Plugin" : "New Plugin"}</h4>
+                    <div className="grid grid-cols-2 gap-3"><div><label className="text-[11px] text-text-muted block mb-1">Name</label><input type="text" value={pluginForm.name} onChange={(e) => setPluginForm((p) => ({ ...p, name: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div><div><label className="text-[11px] text-text-muted block mb-1">Type</label><select value={pluginForm.type} onChange={(e) => setPluginForm((p) => ({ ...p, type: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none"><option value="custom">Custom</option><option value="sdk">SDK</option><option value="tool">Tool</option><option value="theme">Theme</option></select></div></div>
+                    <div><label className="text-[11px] text-text-muted block mb-1">Description</label><input type="text" value={pluginForm.description} onChange={(e) => setPluginForm((p) => ({ ...p, description: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div>
+                    <div className="grid grid-cols-3 gap-3"><div><label className="text-[11px] text-text-muted block mb-1">Version</label><input type="text" value={pluginForm.version} onChange={(e) => setPluginForm((p) => ({ ...p, version: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div><div><label className="text-[11px] text-text-muted block mb-1">Author</label><input type="text" value={pluginForm.author} onChange={(e) => setPluginForm((p) => ({ ...p, author: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div><div><label className="text-[11px] text-text-muted block mb-1">Icon</label><input type="text" value={pluginForm.icon} onChange={(e) => setPluginForm((p) => ({ ...p, icon: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent" /></div></div>
+                    <div className="flex items-center justify-end gap-2 pt-2"><button onClick={() => { setShowPluginForm(false); setEditingPlugin(null); }} className="text-[11px] px-3 py-1.5 text-text-muted hover:text-text">Cancel</button><button onClick={handleSavePlugin} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light">Save</button></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Notifications ── */}
+          {!loading && tab === "notifications" && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between mb-4"><h2 className="text-[16px] font-bold text-text">Notification Channels</h2><button onClick={() => { setNotifForm({ channel: "", enabled: true, events: "[]", config: "{}" }); setShowNotifForm(true); }} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light">+ Add Channel</button></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {notifConfigs.map((n) => (
+                  <div key={n.id} className="p-4 rounded-xl bg-surface-2 border border-border space-y-2">
+                    <div className="flex items-center justify-between"><span className="text-[13px] font-medium text-text">{n.channel}</span><span className={`text-[10px] px-2 py-0.5 rounded-full ${n.enabled ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>{n.enabled ? "Active" : "Disabled"}</span></div>
+                    <div className="text-[10px] text-text-muted">Events: {(() => { try { return JSON.parse(n.events || "[]").length || "all"; } catch { return "all"; } })()}</div>
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button onClick={() => handleToggleNotif(n)} className={`text-[10px] px-2 py-1 rounded ${n.enabled ? "bg-red-500/10 text-red-400 hover:bg-red-500/20" : "bg-green-500/10 text-green-400 hover:bg-green-500/20"}`}>{n.enabled ? "Disable" : "Enable"}</button>
+                      <button onClick={() => handleDeleteNotif(n.id)} className="text-[10px] px-2 py-1 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20">Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {showNotifForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                  <div className="w-full max-w-sm mx-4 bg-surface border border-border rounded-2xl shadow-2xl p-5 space-y-4">
+                    <h4 className="text-[13px] font-bold">New Notification Channel</h4>
+                    <div><label className="text-[11px] text-text-muted block mb-1">Channel</label><select value={notifForm.channel} onChange={(e) => setNotifForm((p) => ({ ...p, channel: e.target.value }))} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none"><option value="">Select...</option><option value="email">Email</option><option value="telegram">Telegram</option><option value="discord">Discord</option><option value="push">Push</option><option value="webhook">Webhook</option></select></div>
+                    <div><label className="text-[11px] text-text-muted block mb-1">Config (JSON)</label><textarea value={notifForm.config} onChange={(e) => setNotifForm((p) => ({ ...p, config: e.target.value }))} rows={3} className="w-full px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-[11px] text-text outline-none focus:border-accent font-mono" /></div>
+                    <div className="flex items-center justify-end gap-2 pt-2"><button onClick={() => setShowNotifForm(false)} className="text-[11px] px-3 py-1.5 text-text-muted hover:text-text">Cancel</button><button onClick={handleSaveNotif} className="text-[11px] px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-light">Save</button></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Security Center ── */}
+          {!loading && tab === "security" && (
+            <div className="space-y-4">
+              <h2 className="text-[16px] font-bold text-text">Security Center</h2>
+              {/* Audit Logs */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between"><h3 className="text-[13px] font-semibold text-text">Audit Trail</h3><div className="flex items-center gap-2"><select value={auditSeverity} onChange={(e) => { setAuditSeverity(e.target.value); setAuditPage(0); }} className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-[10px] text-text outline-none"><option value="">All Severities</option><option value="info">Info</option><option value="warn">Warning</option><option value="error">Error</option><option value="critical">Critical</option></select><span className="text-[11px] text-text-muted">{auditTotal} total</span></div></div>
+                <div className="space-y-1 max-h-80 overflow-y-auto">{auditLogs.map((l: any) => (<div key={l.id} className="flex items-start gap-3 px-4 py-2 rounded-xl bg-surface-2 border border-border"><span className="text-[10px] text-text-muted shrink-0 mt-0.5 font-mono">{new Date(l.createdAt).toLocaleString()}</span><span className="text-[10px] font-mono text-text-muted shrink-0">{l.action}</span><span className="text-[10px] font-mono shrink-0" style={{ color: l.severity === "error" || l.severity === "critical" ? "#f87171" : l.severity === "warn" ? "#fbbf24" : "#94a3b8" }}>{l.severity}</span><span className="text-[11px] text-text">{l.resource || l.action}</span></div>))}</div>
+                {auditTotal > 50 && (<div className="flex items-center justify-center gap-2 pt-2"><button disabled={auditPage === 0} onClick={() => setAuditPage((p) => p - 1)} className="text-[11px] px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-text-secondary hover:text-text disabled:opacity-40">← Previous</button><span className="text-[11px] text-text-muted">Page {auditPage + 1}</span><button disabled={(auditPage + 1) * 50 >= auditTotal} onClick={() => setAuditPage((p) => p + 1)} className="text-[11px] px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-text-secondary hover:text-text disabled:opacity-40">Next →</button></div>)}
+              </div>
+              {/* Summary */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-4 rounded-xl bg-surface-2 border border-border"><div className="text-[11px] text-text-muted">2FA</div><div className="text-[12px] text-text mt-1">Available per user (totp_secret)</div></div>
+                <div className="p-4 rounded-xl bg-surface-2 border border-border"><div className="text-[11px] text-text-muted">Session Timeout</div><div className="text-[12px] text-text mt-1">Configurable in Settings tab</div></div>
+                <div className="p-4 rounded-xl bg-surface-2 border border-border"><div className="text-[11px] text-text-muted">API Key Encryption</div><div className="text-[12px] text-text mt-1">AES-256-GCM encrypted storage</div></div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Settings ── */}
+          {!loading && tab === "settings" && (
+            <div className="space-y-3">
+              <h2 className="text-[16px] font-bold text-text mb-4">System Settings</h2>
+              <div className="space-y-1.5">
+                {settings.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-surface-2 border border-border">
+                    <div className="flex-1"><div className="text-[12px] font-medium text-text">{s.key}</div><div className="text-[10px] text-text-muted">{s.description} {s.category && <span>· {s.category}</span>}</div></div>
+                    <div className="flex items-center gap-2">
+                      {editingSetting === s.id ? (
+                        <>
+                          <input type="text" value={editingSettingValue} onChange={(e) => setEditingSettingValue(e.target.value)} className="w-32 px-2 py-1 bg-surface-3 border border-border rounded text-[11px] text-text outline-none focus:border-accent" autoFocus />
+                          <button onClick={() => handleSaveSetting(s.id)} className="text-[10px] px-2 py-1 rounded bg-accent text-white">Save</button>
+                          <button onClick={() => setEditingSetting(null)} className="text-[10px] px-2 py-1 text-text-muted hover:text-text">✕</button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-[12px] font-mono text-text max-w-32 truncate">{s.value}</span>
+                          <button onClick={() => { setEditingSetting(s.id); setEditingSettingValue(s.value); }} className="text-[10px] px-2 py-1 rounded bg-surface-3 text-text-secondary hover:text-text">Edit</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

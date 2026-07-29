@@ -14,6 +14,10 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   role: varchar("role", { length: 20 }).notNull().default("user"),
+  plan: varchar("plan", { length: 50 }).default("free"),
+  isBlocked: boolean("is_blocked").notNull().default(false),
+  totpSecret: varchar("totp_secret", { length: 255 }),
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -78,7 +82,9 @@ export const userApiKeys = pgTable("user_api_keys", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   providerId: varchar("provider_id", { length: 50 }).notNull(),
+  label: varchar("label", { length: 255 }),
   encryptedKey: text("encrypted_key").notNull(),
+  isEnabled: boolean("is_enabled").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1050,3 +1056,16 @@ export const adminRegistry = pgTable("admin_registry", {
 });
 
 export const adminRegistryRelations = relations(adminRegistry, () => ({}));
+
+export const systemSettings = pgTable("system_settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  key: varchar("key", { length: 255 }).notNull().unique(),
+  value: text("value").notNull().default(""),
+  type: varchar("type", { length: 20 }).notNull().default("string"),
+  description: text("description"),
+  category: varchar("category", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const systemSettingsRelations = relations(systemSettings, () => ({}));

@@ -210,3 +210,81 @@ export async function getAdminLogs(type?: string, limit = 50, offset = 0): Promi
 export async function getAdminDashboard(): Promise<AdminDashboardStats> {
   return api("/admin/dashboard");
 }
+
+// ── Plugins ──
+
+export async function getPlugins(): Promise<any[]> {
+  return api("/admin/plugins");
+}
+
+export async function createPlugin(data: any): Promise<any> {
+  return api("/admin/plugins", { method: "POST", body: data });
+}
+
+export async function updatePlugin(id: string, data: any): Promise<any> {
+  return api(`/admin/plugins/${id}`, { method: "PUT", body: data });
+}
+
+export async function deletePlugin(id: string): Promise<{ success: boolean }> {
+  return api(`/admin/plugins/${id}`, { method: "DELETE" });
+}
+
+// ── API Keys (admin) ──
+
+export async function getAdminApiKeys(providerId?: string): Promise<any[]> {
+  const params = providerId ? `?providerId=${encodeURIComponent(providerId)}` : "";
+  return api(`/admin/api-keys${params}`);
+}
+
+export async function deleteAdminApiKey(id: string): Promise<{ success: boolean }> {
+  return api(`/admin/api-keys/${id}`, { method: "DELETE" });
+}
+
+// ── Audit Logs ──
+
+export async function getAuditLogs(severity?: string, action?: string, limit = 50, offset = 0): Promise<{ logs: any[]; total: number; limit: number; offset: number }> {
+  const params = new URLSearchParams();
+  if (severity) params.set("severity", severity);
+  if (action) params.set("action", action);
+  params.set("limit", String(limit));
+  params.set("offset", String(offset));
+  return api(`/admin/audit-logs?${params.toString()}`);
+}
+
+// ── System Settings ──
+
+export async function getSystemSettings(): Promise<any[]> {
+  return api("/admin/settings");
+}
+
+export async function updateSystemSetting(id: string, value: string): Promise<any> {
+  return api(`/admin/settings/${id}`, { method: "PUT", body: { value } });
+}
+
+// ── Notifications ──
+
+export async function getAdminNotifications(): Promise<any[]> {
+  return api("/admin/notifications");
+}
+
+export async function createAdminNotification(data: any): Promise<any> {
+  return api("/admin/notifications", { method: "POST", body: data });
+}
+
+export async function updateAdminNotification(id: string, data: any): Promise<any> {
+  return api(`/admin/notifications/${id}`, { method: "PUT", body: data });
+}
+
+export async function deleteAdminNotification(id: string): Promise<{ success: boolean }> {
+  return api(`/admin/notifications/${id}`, { method: "DELETE" });
+}
+
+// ── Users (admin) ──
+
+export async function blockUser(id: string, isBlocked: boolean): Promise<any> {
+  return api(`/admin/users/${id}/block`, { method: "PUT", body: { isBlocked } });
+}
+
+export async function setUserPlan(id: string, plan: string): Promise<any> {
+  return api(`/admin/users/${id}/plan`, { method: "PUT", body: { plan } });
+}
