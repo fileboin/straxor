@@ -362,6 +362,15 @@ export const HOME_TILES: HomeTile[] = [
     category: "system",
     action: "resilience",
   },
+  {
+    id: "admin",
+    name: "Admin Center",
+    description: "Feature flags, tariffi, wallet, pretplate, promo kodovi, registry sistem",
+    icon: "🛡",
+    color: "red",
+    category: "system",
+    action: "admin",
+  },
 ];
 
 // ── API ──

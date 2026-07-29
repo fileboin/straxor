@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar.js";
 import { useTheme } from "../lib/theme.js";
 import ChatPanel from "../components/workspace/ChatPanel.js";
@@ -52,6 +53,7 @@ import GlobalScalePanel from "../components/workspace/GlobalScalePanel.js";
 import EnterpriseResilience from "../components/workspace/EnterpriseResilience.js";
 import CollaboratorsPanel from "../components/workspace/CollaboratorsPanel.js";
 import OrganizationDashboard from "../components/workspace/OrganizationDashboard.js";
+import AdminCenter from "../components/workspace/AdminCenter.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -79,6 +81,7 @@ const INITIAL_ASK_MESSAGES: ChatMessage[] = [
 ];
 
 export default function Workspace() {
+  const navigate = useNavigate();
   const { toggleTheme } = useTheme();
   const [orchestrator, setOrchestrator] = useState(false);
 
@@ -136,6 +139,7 @@ export default function Workspace() {
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [showScale, setShowScale] = useState(false);
   const [showResilience, setShowResilience] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -1130,6 +1134,15 @@ export default function Workspace() {
       action: () => setShowResilience(true),
     },
     {
+      id: "admin",
+      label: "Admin Control Center",
+      description: "Feature flags, tariffi, wallet, pretplate, promo kodovi, registry",
+      icon: "🛡",
+      category: "action",
+      keywords: ["admin", "control", "flags", "tariffs", "billing", "wallet", "registry"],
+      action: () => navigate("/admin"),
+    },
+    {
       id: "action-new-session",
       label: "Nova sesija",
       description: "Resetuj agent sesiju i započni novu",
@@ -1243,10 +1256,11 @@ export default function Workspace() {
       action: () => window.location.href = "/dashboard",
     },
   ], [
+    navigate,
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization, setShowEnterprise, setShowPlugins, setShowMarketplace, setShowScale, setShowResilience,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization, setShowEnterprise, setShowPlugins, setShowMarketplace, setShowScale, setShowResilience, setShowAdmin,
   ]);
 
   return (
@@ -1672,6 +1686,7 @@ export default function Workspace() {
               marketplace: () => setShowMarketplace(true),
               scale: () => setShowScale(true),
               resilience: () => setShowResilience(true),
+              admin: () => navigate("/admin"),
             };
             const handler = panelMap[action];
             if (handler) handler();
@@ -1748,6 +1763,10 @@ export default function Workspace() {
 
       {showResilience && (
         <EnterpriseResilience onClose={() => setShowResilience(false)} />
+      )}
+
+      {showAdmin && (
+        <AdminCenter onClose={() => setShowAdmin(false)} />
       )}
 
       {showKanban && (

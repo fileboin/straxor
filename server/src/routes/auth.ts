@@ -25,9 +25,9 @@ router.post("/register", async (req, res) => {
     const [user] = await db
       .insert(users)
       .values({ email, passwordHash })
-      .returning({ id: users.id, email: users.email });
+      .returning({ id: users.id, email: users.email, role: users.role });
 
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
+    const token = jwt.sign({ userId: user.id, email: user.email, role: user.role }, JWT_SECRET, {
       expiresIn: "7d",
     });
 
@@ -56,11 +56,11 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Neispravni podaci" });
     }
 
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
+    const token = jwt.sign({ userId: user.id, email: user.email, role: user.role }, JWT_SECRET, {
       expiresIn: "7d",
     });
 
-    res.json({ user: { id: user.id, email: user.email }, token });
+    res.json({ user: { id: user.id, email: user.email, role: user.role }, token });
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: "Greška pri prijavi" });
@@ -78,7 +78,7 @@ router.get("/me", async (req, res) => {
     const payload = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
 
     const [user] = await db
-      .select({ id: users.id, email: users.email })
+      .select({ id: users.id, email: users.email, role: users.role })
       .from(users)
       .where(eq(users.id, payload.userId));
 

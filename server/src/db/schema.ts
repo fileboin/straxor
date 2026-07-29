@@ -13,6 +13,7 @@ export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  role: varchar("role", { length: 20 }).notNull().default("user"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -927,3 +928,125 @@ export const offlineConfig = pgTable("offline_config", {
 });
 
 export const offlineConfigRelations = relations(offlineConfig, () => ({}));
+
+// ── Admin Control Center ──
+
+export const featureFlags = pgTable("feature_flags", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  key: varchar("key", { length: 255 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 100 }),
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const featureFlagsRelations = relations(featureFlags, () => ({}));
+
+export const tariffs = pgTable("tariffs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  price: integer("price").notNull().default(0),
+  currency: varchar("currency", { length: 10 }).default("USD"),
+  billingCycle: varchar("billing_cycle", { length: 50 }).default("monthly"),
+  maxProjects: integer("max_projects").default(1),
+  maxAgents: integer("max_agents").default(1),
+  maxRuntimes: integer("max_runtimes").default(1),
+  maxMembers: integer("max_members").default(1),
+  storageLimit: integer("storage_limit").default(100),
+  bandwidthLimit: integer("bandwidth_limit").default(1000),
+  aiLimits: text("ai_limits").default("{}"),
+  allowedIntegrations: text("allowed_integrations").default("[]"),
+  features: text("features").default("[]"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const tariffsRelations = relations(tariffs, () => ({}));
+
+export const walletAccounts = pgTable("wallet_accounts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  balance: integer("balance").notNull().default(0),
+  currency: varchar("currency", { length: 10 }).default("USD"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const walletAccountsRelations = relations(walletAccounts, ({ one }) => ({
+  user: one(users, { fields: [walletAccounts.userId], references: [users.id] }),
+}));
+
+export const walletTransactions = pgTable("wallet_transactions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  walletId: uuid("wallet_id").notNull().references(() => walletAccounts.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 50 }).notNull(),
+  amount: integer("amount").notNull(),
+  balanceBefore: integer("balance_before").notNull(),
+  balanceAfter: integer("balance_after").notNull(),
+  currency: varchar("currency", { length: 10 }).default("USD"),
+  description: text("description"),
+  reference: varchar("reference", { length: 255 }),
+  metadata: text("metadata").default("{}"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const walletTransactionsRelations = relations(walletTransactions, ({ one }) => ({
+  wallet: one(walletAccounts, { fields: [walletTransactions.walletId], references: [walletAccounts.id] }),
+}));
+
+export const subscriptions = pgTable("subscriptions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tariffId: uuid("tariff_id").references(() => tariffs.id, { onDelete: "set null" }),
+  status: varchar("status", { length: 50 }).notNull().default("active"),
+  startDate: timestamp("start_date").defaultNow().notNull(),
+  endDate: timestamp("end_date"),
+  autoRenew: boolean("auto_renew").notNull().default(true),
+  metadata: text("metadata").default("{}"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  user: one(users, { fields: [subscriptions.userId], references: [users.id] }),
+  tariff: one(tariffs, { fields: [subscriptions.tariffId], references: [tariffs.id] }),
+}));
+
+export const promoCodes = pgTable("promo_codes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: varchar("code", { length: 100 }).notNull().unique(),
+  discountType: varchar("discount_type", { length: 50 }).notNull().default("percent"),
+  discountValue: integer("discount_value").notNull().default(0),
+  maxUses: integer("max_uses").default(0),
+  currentUses: integer("current_uses").notNull().default(0),
+  minAmount: integer("min_amount").default(0),
+  appliesToTariffs: text("applies_to_tariffs").default("[]"),
+  expiresAt: timestamp("expires_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const promoCodesRelations = relations(promoCodes, () => ({}));
+
+export const adminRegistry = pgTable("admin_registry", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  type: varchar("type", { length: 100 }).notNull(),
+  key: varchar("key", { length: 255 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  icon: varchar("icon", { length: 50 }).default("📦"),
+  config: text("config").default("{}"),
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  isBuiltin: boolean("is_builtin").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const adminRegistryRelations = relations(adminRegistry, () => ({}));

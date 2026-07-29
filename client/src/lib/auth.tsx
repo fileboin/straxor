@@ -1,9 +1,14 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { api } from "./api.js";
 
-interface User {
+export interface User {
   id: string;
   email: string;
+  role: string;
+}
+
+export function isAdmin(user: User | null): boolean {
+  return user?.role === "admin" || user?.role === "super_admin";
 }
 
 interface AuthContextType {

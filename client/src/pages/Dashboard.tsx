@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from "react";
-import { useAuth } from "../lib/auth.js";
+import { useAuth, isAdmin } from "../lib/auth.js";
 import { useTheme } from "../lib/theme.js";
 import {
   fetchProjects,
@@ -90,6 +90,11 @@ export default function Dashboard() {
           >
             {theme === "dark" ? "☀" : "☾"}
           </button>
+          {isAdmin(user) && (
+            <button onClick={() => navigate("/admin")} className="text-sm px-3 py-1.5 rounded-lg bg-surface-2 border border-accent/30 text-accent hover:bg-accent/10 transition-colors">
+              Admin
+            </button>
+          )}
           <span className="text-sm text-text-secondary hidden sm:inline">{user?.email}</span>
           <button onClick={logout} className="text-sm text-text-muted hover:text-text transition-colors">
             Odjavi se
