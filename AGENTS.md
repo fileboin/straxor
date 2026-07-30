@@ -1,34 +1,28 @@
 # Session Summary
 
 ## Objective
-Build STRAXOR core verticals: Marketplace Core (70), Universal Connections (71), Image Agent (72), Proof Loop Verification (73).
+Production‑deploy STRAXOR frontend+backend as single Render service, fix white screen.
 
 ## Important Details
-- **DB aktivna**: Neon `DATABASE_URL` u `.env`, migracija primijenjena (`0000_abandoned_randall.sql` + `0001_pretty_havok.sql`).
-- **Storage adapteri završeni**: marketplace-core, connections, verification — svi imaju DB-backed Postgres store-ove (JSONB kolone) uz fallback na in-memory ako `DATABASE_URL` nije setovan.
-- Block 73 arhitektura: Verification Engine → Verification Adapter Interface → Proof Loop Adapter (ne zavisi od jednog protokola).
-- Verification hard rule (kod, ne prompt): `verifierSessionId !== builderSessionId`.
-- Image Agent (72) sedi na Image Core (69) — ne zamenjuje ga, dodaje prompt inženjering (5-komponentna formula, domain modes, brand presets).
-- Marketplace Core (70) — standalone, nema zavisnosti od DB, AI providera ili external servisa.
-- Universal Connections (71) — 34 adaptera u 6 kategorija, provider-agnostic.
+- **Render deploy**: Single Web Service serves both API and client. `server/package.json` builds `client/` then compiles server. Express serves `client/dist/` static files with SPA fallback.
+- **No CORS needed** between frontend and backend — same origin.
+- **White screen root cause**: 15 client lib files had `const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001"`. Since `VITE_API_URL=""` (empty) is falsy, `||` fell through to `localhost`, breaking all API calls in production. Fixed by changing fallback to `""` (same‑origin).
+- **`client/.env`**: `VITE_API_URL=` empty → same‑origin `/api/*` calls. File is now tracked in git.
+- **Pre‑existing TS errors**: All ~70 fixed (`schema.ts` circular ref, `registry.ts` 7 missing ids, `FileStore.ts` missing `destroy`, 9+ route param casts, type casts). `tsc --noEmit` passes with 0 errors.
 
 ## Work State
 ### Completed
-- **Block 70** (Marketplace Core): PackageRegistry, VerificationEngine, SearchEngine (TF-IDF), RecommendationEngine, VersionManager, DependencyManager, RatingsManager, CreatorPortal, LicensingEngine (8 licenci), MarketplaceEngine, 3 payment stubs, 2 storage adaptera, PluginManager, REST API (~30 endpoints), client lib, Marketplace page, routing, navigation, CSS. **+PostgresStore** (JSONB persistence).
-- **Block 71** (Universal Connections): ConnectionManager, 34 adaptera (7 automation, 7 hardware, 6 network, 7 cloud, 5 AI, 3 custom), REST API (~15 endpoints), client lib, Connections page, routing, navigation, CSS. **+PostgresConnectionStore** (JSONB persistence).
-- **Block 72** (Image Agent): 8 server fajlova (types, prompt-engine, domain-modes (21), brand-presets (10), session-manager, image-agent, api/routes, index), client lib, ImageAgent page (chat UI + session management + decompose + batch gen), routing (`/project/:id/image-agent`), 🤖 dugme u WorkspaceTopbar.
-- **Block 73** (Proof Loop Verification): VerificationEngine + VerificationAdapter interfejs + ProofLoopAdapter (5 faza: spec_freeze → evidence → verify sa HARD CHECK → fix loop → passed/failed), REST API (7 endpointa), client lib, VerificationPanel modal u Workspace, ✓ dugme u WorkspaceTopbar. **+PostgresVerificationStore** (JSONB persistence).
-- Blocks 64–67 (support, publish, deploy, admin): committed and pushed.
-- **DB Migration**: 9 novih tabela u `0001_pretty_havok.sql` (marketplace_core_packages/reviews/creators/payments/events, connection_instances/events, verification_tasks).
+- All pre‑existing TS errors fixed (0 errors `tsc --noEmit`).
+- Render‑ready single‑service deploy: Express serves client dist + SPA fallback + `/api/health` endpoint with DB ping.
+- `client/.env` created and tracked; `VITE_API_BASE` removed; Vite base changed from `/straxor/` to `/`.
+- **Root cause fixed**: 15 lib files + FileExplorer.tsx (x2) changed `|| "http://localhost:3001"` → `|| ""`. Build is clean — no `localhost:3001` in bundle.
+- **DB Migration**: 9 tables in `0001_pretty_havok.sql`.
 
 ### Active
-- None
+- Awaiting Render deploy to confirm white screen is gone.
 
 ### Blocked
 - None
 
-## Tech Debt / Paused
-- Pre-existing TS errors u `client/src/components/workspace/` (~20 errors) + `server/src/routes/` (~50 errors) — unrelated to Block work.
-
 ## Next Move
-Nakon potvrde — nastavak na sledeći blok po prioritetu.
+After confirming production works — continue with next Block by priority.

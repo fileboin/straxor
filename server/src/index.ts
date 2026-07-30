@@ -70,19 +70,9 @@ import { verificationRoutes } from "./verification/api/routes.js";
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ── Security: CORS hardening ──
-// Production: set CLIENT_URL to exact origin (e.g. https://straxor.app)
-// Dev fallback: localhost:5173 (Vite default)
-const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173").split(",").map(s => s.trim());
+// ── CORS: same-origin since Express serves both API and client ──
 app.use(cors({
-  origin: (origin, cb) => {
-    // Allow requests with no origin (server-to-server, curl, etc.)
-    if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
-      cb(null, true);
-    } else {
-      cb(new Error(`Origin ${origin} not allowed by CORS`));
-    }
-  },
+  origin: (origin, cb) => cb(null, origin || true),
   credentials: true,
 }));
 
