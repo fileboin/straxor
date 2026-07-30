@@ -2,6 +2,9 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 import { db } from "./db/index.js";
 import { sql } from "drizzle-orm";
 import authRoutes from "./routes/auth.js";
@@ -203,6 +206,20 @@ app.use("/api/connections", connectionsRouter);
 
 app.use("/api/image-agent", imageAgentRoutes);
 app.use("/api/verification", verificationRoutes);
+
+// ── Serve client build in production ──
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const clientDist = path.join(__dirname, "../../client/dist");
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  // SPA fallback: serve index.html for all non-API routes
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(clientDist, "index.html"));
+  });
+  console.log("Serving client from", clientDist);
+} else {
+  console.log("Client dist not found at", clientDist, "- API only mode");
+}
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
