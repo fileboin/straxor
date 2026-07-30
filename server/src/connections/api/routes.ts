@@ -9,8 +9,11 @@ import { registerAll as registerCloud } from "../cloud/index.js";
 import { registerAll as registerAI } from "../ai/index.js";
 import { registerAll as registerCustom } from "../custom/index.js";
 
+import { PostgresConnectionStore } from "../storage/PostgresConnectionStore.js";
+
 export function createConnectionsRouter(): Router {
-  const manager = new ConnectionManager();
+  const store = process.env.DATABASE_URL ? new PostgresConnectionStore() : undefined;
+  const manager = new ConnectionManager(store);
   registerAutomation(a => manager.registerAdapter(a));
   registerHardware(a => manager.registerAdapter(a));
   registerNetwork(a => manager.registerAdapter(a));

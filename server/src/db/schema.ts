@@ -6,6 +6,7 @@ import {
   integer,
   boolean,
   timestamp,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -1224,3 +1225,82 @@ export const deployProviderSettings = pgTable("deploy_provider_settings", {
 });
 
 export const deployProviderSettingsRelations = relations(deployProviderSettings, () => ({}));
+
+// ── Marketplace Core (Block 70) ──
+
+export const marketplaceCorePackages = pgTable("marketplace_core_packages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  listing: jsonb("listing").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const marketplaceCorePackagesRelations = relations(marketplaceCorePackages, () => ({}));
+
+export const marketplaceCoreReviews = pgTable("marketplace_core_reviews", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  packageId: uuid("package_id").notNull().references(() => marketplaceCorePackages.id, { onDelete: "cascade" }),
+  review: jsonb("review").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const marketplaceCoreReviewsRelations = relations(marketplaceCoreReviews, ({ one }) => ({
+  package: one(marketplaceCorePackages, { fields: [marketplaceCoreReviews.packageId], references: [marketplaceCorePackages.id] }),
+}));
+
+export const marketplaceCoreCreators = pgTable("marketplace_core_creators", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: varchar("user_id", { length: 255 }).notNull().unique(),
+  profile: jsonb("profile").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const marketplaceCoreCreatorsRelations = relations(marketplaceCoreCreators, () => ({}));
+
+export const marketplaceCorePayments = pgTable("marketplace_core_payments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  payment: jsonb("payment").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const marketplaceCorePaymentsRelations = relations(marketplaceCorePayments, () => ({}));
+
+export const marketplaceCoreEvents = pgTable("marketplace_core_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  event: jsonb("event").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const marketplaceCoreEventsRelations = relations(marketplaceCoreEvents, () => ({}));
+
+// ── Universal Connections (Block 71) ──
+
+export const connectionInstances = pgTable("connection_instances", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  instance: jsonb("instance").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const connectionInstancesRelations = relations(connectionInstances, () => ({}));
+
+export const connectionEvents = pgTable("connection_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  event: jsonb("event").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const connectionEventsRelations = relations(connectionEvents, () => ({}));
+
+// ── Verification (Block 73) ──
+
+export const verificationTasks = pgTable("verification_tasks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  sessionId: varchar("session_id", { length: 255 }).notNull().unique(),
+  proof: jsonb("proof").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const verificationTasksRelations = relations(verificationTasks, () => ({}));

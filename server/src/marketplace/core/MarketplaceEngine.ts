@@ -7,6 +7,7 @@ import { DependencyManager } from "./DependencyManager.js";
 import { RatingsManager } from "./RatingsManager.js";
 import { CreatorPortal } from "./CreatorPortal.js";
 import { LicensingEngine } from "./LicensingEngine.js";
+import type { MarketplaceStore } from "../storage/interfaces.js";
 import type {
   PackageListing, PackageManifest, PackageVersion, PackageCategory,
   SearchQuery, SearchResult, Review, RecommendationContext,
@@ -33,11 +34,12 @@ export class MarketplaceEngine {
   readonly creators: CreatorPortal;
   readonly licensing: LicensingEngine;
 
+  private store?: MarketplaceStore;
   private plugins: MarketplacePlugin[] = [];
   private events: MarketplaceEvent[] = [];
   private config: Required<MarketplaceConfig>;
 
-  constructor(config?: MarketplaceConfig) {
+  constructor(config?: MarketplaceConfig & { store?: MarketplaceStore }) {
     this.packages = new PackageRegistry();
     this.verification = new VerificationEngine();
     this.search = new SearchEngine(this.packages);
@@ -47,6 +49,7 @@ export class MarketplaceEngine {
     this.ratings = new RatingsManager();
     this.creators = new CreatorPortal();
     this.licensing = new LicensingEngine();
+    this.store = config?.store;
 
     this.config = {
       name: config?.name ?? "STRAXOR Marketplace",
@@ -55,6 +58,27 @@ export class MarketplaceEngine {
       maxPackageSize: config?.maxPackageSize ?? 100 * 1024 * 1024,
       requireVerification: config?.requireVerification ?? true,
     };
+
+    this.initStore();
+  }
+
+  private async initStore(): Promise<void> {
+    if (!this.store) return;
+    try {
+      const data = await this.store.loadAll();
+      for (const pkg of data.packages) {
+        this.packages.register(pkg.manifest, pkg.versions[pkg.versions.length - 1]);
+      }
+      for (const review of data.reviews) {
+        this.ratings.addReviewRaw(review);
+      }
+      for (const creator of data.creators) {
+        this.creators.registerCreator(creator);
+      }
+      this.events = data.events;
+    } catch (err) {
+      console.warn("MarketplaceEngine: failed to load store, starting fresh:", (err as Error).message);
+    }
   }
 
   // --- Publish ---
@@ -74,6 +98,7 @@ export class MarketplaceEngine {
     }
 
     this.emitEvent({ type: "package:published", packageId: listing.id, data: { name: manifest.name, version: version.version } });
+    this.store?.savePackage(listing).catch(() => {});
     return { listing };
   }
 
@@ -82,6 +107,7 @@ export class MarketplaceEngine {
     if (listing) {
       listing.manifest = manifest;
       this.emitEvent({ type: "package:updated", packageId: listing.id, data: { name, version: version.version } });
+      this.store?.savePackage(listing).catch(() => {});
     }
     return listing;
   }
@@ -106,6 +132,7 @@ export class MarketplaceEngine {
     if (!listing) return false;
     this.packages.delete(name);
     this.emitEvent({ type: "package:deleted", packageId: listing.id, data: { name } });
+    this.store?.deletePackage(name).catch(() => {});
     return true;
   }
 
@@ -173,19 +200,25 @@ export class MarketplaceEngine {
   addReview(name: string, userId: string, userName: string, rating: number, content: string, title?: string): Review | undefined {
     const listing = this.packages.get(name);
     if (!listing) return undefined;
-    return this.ratings.addReview(listing, userId, userName, rating, content, title);
+    const review = this.ratings.addReview(listing, userId, userName, rating, content, title);
+    if (review) this.store?.saveReview(review).catch(() => {});
+    return review;
   }
 
   updateReview(name: string, reviewId: string, userId: string, rating?: number, content?: string, title?: string): Review | undefined {
     const listing = this.packages.get(name);
     if (!listing) return undefined;
-    return this.ratings.updateReview(listing, reviewId, userId, rating, content, title);
+    const review = this.ratings.updateReview(listing, reviewId, userId, rating, content, title);
+    if (review) this.store?.saveReview(review).catch(() => {});
+    return review;
   }
 
   deleteReview(name: string, reviewId: string, userId: string): boolean {
     const listing = this.packages.get(name);
     if (!listing) return false;
-    return this.ratings.deleteReview(listing, reviewId, userId);
+    const deleted = this.ratings.deleteReview(listing, reviewId, userId);
+    if (deleted) this.store?.deleteReview(listing.id, reviewId).catch(() => {});
+    return deleted;
   }
 
   getReviews(name: string, limit = 20, offset = 0): Review[] {
@@ -201,7 +234,11 @@ export class MarketplaceEngine {
   }
 
   // --- Creator Portal ---
-  registerCreator(profile: CreatorProfile): CreatorProfile { return this.creators.registerCreator(profile); }
+  registerCreator(profile: CreatorProfile): CreatorProfile {
+    const created = this.creators.registerCreator(profile);
+    this.store?.saveCreator(created).catch(() => {});
+    return created;
+  }
   getCreator(userId: string): CreatorProfile | undefined { return this.creators.getCreator(userId); }
   getCreatorAnalytics(userId: string): any {
     const pkgs = this.packages.list();
@@ -233,6 +270,7 @@ export class MarketplaceEngine {
     const full: MarketplaceEvent = { ...event, timestamp: new Date().toISOString() };
     this.events.push(full);
     if (this.events.length > 1000) this.events.shift();
+    this.store?.saveEvent(full).catch(() => {});
     for (const plugin of this.plugins) {
       plugin.onEvent?.(full).catch(() => {});
     }

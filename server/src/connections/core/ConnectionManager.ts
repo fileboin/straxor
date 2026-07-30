@@ -1,10 +1,30 @@
 import type { ConnectionAdapter, ConnectionInstance, ConnectionTestResult, ExecuteResult, ConnectionCategory, ConnectionEvent, ConfigField, ConnectionOperation } from "./types.js";
+import type { ConnectionStore } from "../storage/PostgresConnectionStore.js";
 
 export class ConnectionManager {
   private adapters = new Map<string, ConnectionAdapter>();
   private instances = new Map<string, ConnectionInstance>();
   private events: ConnectionEvent[] = [];
   private listeners: Array<(event: ConnectionEvent) => void> = [];
+  private store?: ConnectionStore;
+
+  constructor(store?: ConnectionStore) {
+    this.store = store;
+    this.initStore();
+  }
+
+  private async initStore(): Promise<void> {
+    if (!this.store) return;
+    try {
+      const data = await this.store.loadAll();
+      for (const instance of data.instances) {
+        this.instances.set(instance.id, instance);
+      }
+      this.events = data.events;
+    } catch (err) {
+      console.warn("ConnectionManager: failed to load store, starting fresh:", (err as Error).message);
+    }
+  }
 
   // ── Adapter management ──
   registerAdapter(adapter: ConnectionAdapter): void {
@@ -50,6 +70,7 @@ export class ConnectionManager {
     };
 
     this.instances.set(instance.id, instance);
+    this.store?.saveInstance(instance).catch(() => {});
     this.emitEvent({ type: "connection:created", connectionId: instance.id, adapterName, timestamp: new Date().toISOString() });
     return instance;
   }
@@ -59,6 +80,7 @@ export class ConnectionManager {
     if (!instance) return undefined;
 
     Object.assign(instance, updates, { updatedAt: new Date().toISOString() });
+    this.store?.saveInstance(instance).catch(() => {});
     this.emitEvent({ type: "connection:updated", connectionId: id, adapterName: instance.adapterName, timestamp: new Date().toISOString() });
     return instance;
   }
@@ -68,6 +90,7 @@ export class ConnectionManager {
     if (!instance) return false;
 
     this.instances.delete(id);
+    this.store?.deleteInstance(id).catch(() => {});
     this.emitEvent({ type: "connection:deleted", connectionId: id, adapterName: instance.adapterName, timestamp: new Date().toISOString() });
     return true;
   }
@@ -150,6 +173,7 @@ export class ConnectionManager {
   private emitEvent(event: ConnectionEvent): void {
     this.events.push(event);
     if (this.events.length > 500) this.events.shift();
+    this.store?.saveEvent(event).catch(() => {});
     for (const listener of this.listeners) listener(event);
   }
 

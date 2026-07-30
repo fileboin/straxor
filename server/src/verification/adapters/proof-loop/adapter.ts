@@ -1,10 +1,5 @@
 import type { VerificationAdapter, TaskProof, SpecDefinition, EvidenceData, VerdictResult } from "../../types.js";
-
-interface ProofStore {
-  [taskId: string]: TaskProof;
-}
-
-const store: ProofStore = {};
+import type { VerificationStore } from "./PostgresVerificationStore.js";
 
 function generateId(): string {
   return `proof-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -15,9 +10,14 @@ const VALID_STATUSES = new Set(["PASS", "FAIL", "UNKNOWN"]);
 export class ProofLoopAdapter implements VerificationAdapter {
   readonly id = "proof-loop";
   readonly name = "Proof Loop";
+  private store: VerificationStore;
+
+  constructor(store?: VerificationStore) {
+    this.store = store ?? createMemoryStore();
+  }
 
   async initTask(taskId: string, spec: SpecDefinition): Promise<TaskProof> {
-    const existing = store[taskId];
+    const existing = await this.store.get(taskId);
     if (existing && existing.status !== "failed") {
       throw new Error(`Task ${taskId} already exists with status ${existing.status}`);
     }
@@ -35,12 +35,12 @@ export class ProofLoopAdapter implements VerificationAdapter {
       updatedAt: Date.now(),
     };
 
-    store[taskId] = proof;
+    await this.store.save(taskId, proof);
     return proof;
   }
 
   async collectEvidence(taskId: string, evidence: EvidenceData): Promise<TaskProof> {
-    const proof = store[taskId];
+    const proof = await this.store.get(taskId);
     if (!proof) throw new Error(`Task ${taskId} not found`);
     if (proof.status !== "spec_frozen" && proof.status !== "fixing") {
       throw new Error(`Cannot collect evidence in status ${proof.status}`);
@@ -49,11 +49,12 @@ export class ProofLoopAdapter implements VerificationAdapter {
     proof.evidence = evidence;
     proof.status = "evidence_collected";
     proof.updatedAt = Date.now();
+    await this.store.save(taskId, proof);
     return proof;
   }
 
   async generateVerdict(taskId: string, verifierSessionId: string): Promise<{ verdict: VerdictResult; problems: string }> {
-    const proof = store[taskId];
+    const proof = await this.store.get(taskId);
     if (!proof) throw new Error(`Task ${taskId} not found`);
     if (proof.status !== "evidence_collected" && proof.status !== "fixing") {
       throw new Error(`Cannot verify in status ${proof.status}`);
@@ -94,24 +95,26 @@ export class ProofLoopAdapter implements VerificationAdapter {
     proof.verdict = verdict;
     proof.problems = problems;
     proof.updatedAt = Date.now();
+    await this.store.save(taskId, proof);
 
     return { verdict, problems };
   }
 
   async getStatus(taskId: string): Promise<TaskProof | null> {
-    return store[taskId] || null;
+    return this.store.get(taskId);
   }
 
   async cancelVerification(taskId: string): Promise<void> {
-    const proof = store[taskId];
+    const proof = await this.store.get(taskId);
     if (!proof) throw new Error(`Task ${taskId} not found`);
     proof.status = "failed";
     proof.problems = `# Problems — ${taskId}\n\nVerification cancelled.\n`;
     proof.updatedAt = Date.now();
+    await this.store.save(taskId, proof);
   }
 
   async applyFix(taskId: string, fixNotes: string): Promise<TaskProof> {
-    const proof = store[taskId];
+    const proof = await this.store.get(taskId);
     if (!proof) throw new Error(`Task ${taskId} not found`);
     if (proof.status !== "failed" && proof.status !== "verifying") {
       throw new Error(`Cannot apply fix in status ${proof.status}`);
@@ -120,11 +123,12 @@ export class ProofLoopAdapter implements VerificationAdapter {
     proof.status = "fixing";
     proof.problems = fixNotes;
     proof.updatedAt = Date.now();
+    await this.store.save(taskId, proof);
     return proof;
   }
 
-  updateVerdict(taskId: string, criteriaId: string, status: "PASS" | "FAIL" | "UNKNOWN", note: string): TaskProof {
-    const proof = store[taskId];
+  async updateVerdict(taskId: string, criteriaId: string, status: "PASS" | "FAIL" | "UNKNOWN", note: string): Promise<TaskProof> {
+    const proof = await this.store.get(taskId);
     if (!proof) throw new Error(`Task ${taskId} not found`);
 
     if (!proof.verdict) {
@@ -134,12 +138,12 @@ export class ProofLoopAdapter implements VerificationAdapter {
     const criterion = proof.verdict.criteria.find((c) => c.id === criteriaId);
     if (!criterion) throw new Error(`Criterion ${criteriaId} not found in verdict`);
 
-    criterion.status = status;
-    criterion.note = note;
-
     if (!VALID_STATUSES.has(status)) {
       throw new Error(`Invalid status ${status}. Must be PASS, FAIL, or UNKNOWN.`);
     }
+
+    criterion.status = status;
+    criterion.note = note;
 
     const allPass = proof.verdict.criteria.every((c) => c.status === "PASS");
     const hasFail = proof.verdict.criteria.some((c) => c.status === "FAIL");
@@ -157,6 +161,17 @@ export class ProofLoopAdapter implements VerificationAdapter {
       proof.problems = "";
     }
 
+    await this.store.save(taskId, proof);
     return proof;
   }
+}
+
+function createMemoryStore(): VerificationStore {
+  const mem: Record<string, TaskProof> = {};
+  return {
+    async save(sessionId: string, proof: TaskProof) { mem[sessionId] = proof; },
+    async get(sessionId: string) { return mem[sessionId] || null; },
+    async delete(sessionId: string) { delete mem[sessionId]; },
+    async listAll() { return Object.entries(mem).map(([sessionId, proof]) => ({ sessionId, proof })); },
+  };
 }

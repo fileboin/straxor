@@ -2,9 +2,11 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { VerificationEngine } from "../VerificationEngine.js";
 import { ProofLoopAdapter } from "../adapters/proof-loop/adapter.js";
+import { PostgresVerificationStore } from "../adapters/proof-loop/PostgresVerificationStore.js";
 
 const engine = new VerificationEngine();
-engine.registerAdapter(new ProofLoopAdapter());
+const store = process.env.DATABASE_URL ? new PostgresVerificationStore() : undefined;
+engine.registerAdapter(new ProofLoopAdapter(store));
 
 const router = Router();
 

@@ -3,12 +3,14 @@ import type { Request, Response } from "express";
 import { MarketplaceEngine } from "../core/MarketplaceEngine.js";
 import type { MarketplaceConfig } from "../core/MarketplaceEngine.js";
 import { MarketplaceFileStore } from "../storage/FileStore.js";
+import { PostgresStore } from "../storage/PostgresStore.js";
 import { PluginManager } from "../plugins/PluginManager.js";
 import { ALL_CATEGORIES, CATEGORY_DISPLAY, LICENSE_INFO } from "../core/types.js";
 import type { PackageManifest, PackageVersion, SearchQuery, CreatorProfile, PackageCategory, LicenseType } from "../core/types.js";
 
 export function createMarketplaceRouter(config?: MarketplaceConfig): Router {
-  const engine = new MarketplaceEngine(config);
+  const store = process.env.DATABASE_URL ? new PostgresStore() : undefined;
+  const engine = new MarketplaceEngine({ ...config, store });
   const router = Router();
 
   // ── Stats ──

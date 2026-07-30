@@ -76,6 +76,12 @@ export class RatingsManager {
     return dist;
   }
 
+  addReviewRaw(review: Review): void {
+    const existing = this.reviews.get(review.packageId) ?? [];
+    existing.push(review);
+    this.reviews.set(review.packageId, existing);
+  }
+
   reportReview(packageId: string, reviewId: string): boolean {
     return true;
   }
