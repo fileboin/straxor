@@ -543,7 +543,7 @@ export const codeComments = pgTable("code_comments", {
   lineStart: integer("line_start").notNull(),
   lineEnd: integer("line_end").notNull(),
   content: text("content").notNull(),
-  parentId: uuid("parent_id").references(() => codeComments.id, { onDelete: "cascade" }),
+  parentId: uuid("parent_id").references((): any => codeComments.id, { onDelete: "cascade" }),
   isResolved: boolean("is_resolved").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

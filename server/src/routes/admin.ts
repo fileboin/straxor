@@ -70,7 +70,7 @@ router.get("/feature-flags", requireAdmin, async (_req: Request, res: Response) 
 });
 
 router.put("/feature-flags/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { isEnabled } = req.body;
   try {
     const [updated] = await db.update(featureFlags).set({ isEnabled, updatedAt: new Date() }).where(eq(featureFlags.id, id)).returning();
@@ -127,7 +127,7 @@ router.post("/tariffs", requireAdmin, async (req: Request, res: Response) => {
 });
 
 router.put("/tariffs/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const fields = ["name","price","currency","billingCycle","maxProjects","maxAgents","maxRuntimes","maxMembers","storageLimit","bandwidthLimit","aiLimits","allowedIntegrations","features","isActive","sortOrder"];
   try {
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
@@ -150,7 +150,7 @@ router.put("/tariffs/:id", requireAdmin, async (req: Request, res: Response) => 
 });
 
 router.delete("/tariffs/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(tariffs).where(eq(tariffs.id, id));
     res.json({ success: true });
@@ -236,7 +236,7 @@ router.post("/registry", requireAdmin, async (req: Request, res: Response) => {
 });
 
 router.put("/registry/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { name, description, icon, config, isEnabled, sortOrder, type, key } = req.body;
   try {
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
@@ -254,7 +254,7 @@ router.put("/registry/:id", requireAdmin, async (req: Request, res: Response) =>
 });
 
 router.delete("/registry/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(adminRegistry).where(eq(adminRegistry.id, id));
     res.json({ success: true });
@@ -325,7 +325,7 @@ router.get("/subscriptions", requireAdmin, async (_req: Request, res: Response) 
 });
 
 router.put("/subscriptions/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { tariffId, status, autoRenew, endDate } = req.body;
   try {
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
@@ -372,7 +372,7 @@ router.post("/promo-codes", requireAdmin, async (req: Request, res: Response) =>
 });
 
 router.delete("/promo-codes/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(promoCodes).where(eq(promoCodes.id, id));
     res.json({ success: true });
@@ -449,7 +449,7 @@ router.get("/users", requireAdmin, async (_req: Request, res: Response) => {
 });
 
 router.put("/users/:id/role", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { role } = req.body;
   if (!role || !["user", "admin", "super_admin"].includes(role)) {
     res.status(400).json({ error: "Invalid role. Must be user, admin, or super_admin" });
@@ -468,7 +468,7 @@ router.put("/users/:id/role", requireAdmin, async (req: Request, res: Response) 
 // ── 10. USER MANAGEMENT (block/plan) ──
 
 router.put("/users/:id/block", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { isBlocked } = req.body;
   if (typeof isBlocked !== "boolean") { res.status(400).json({ error: "isBlocked (boolean) required" }); return; }
   try {
@@ -482,7 +482,7 @@ router.put("/users/:id/block", requireAdmin, async (req: Request, res: Response)
 });
 
 router.put("/users/:id/plan", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { plan } = req.body;
   if (!plan) { res.status(400).json({ error: "plan required" }); return; }
   try {
@@ -527,7 +527,7 @@ router.post("/plugins", requireAdmin, async (req: Request, res: Response) => {
 });
 
 router.put("/plugins/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const fields = ["name","type","version","description","author","icon","entryPoint","isInstalled","isBuiltin","isEnabled"];
   try {
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
@@ -547,7 +547,7 @@ router.put("/plugins/:id", requireAdmin, async (req: Request, res: Response) => 
 });
 
 router.delete("/plugins/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(plugins).where(eq(plugins.id, id));
     res.json({ success: true });
@@ -575,7 +575,7 @@ router.get("/api-keys", requireAdmin, async (req: Request, res: Response) => {
 });
 
 router.delete("/api-keys/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(userApiKeys).where(eq(userApiKeys.id, id));
     res.json({ success: true });
@@ -643,7 +643,7 @@ router.get("/settings", requireAdmin, async (_req: Request, res: Response) => {
 });
 
 router.put("/settings/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { value } = req.body;
   if (value === undefined) { res.status(400).json({ error: "value required" }); return; }
   try {
@@ -685,7 +685,7 @@ router.post("/notifications", requireAdmin, async (req: Request, res: Response) 
 });
 
 router.put("/notifications/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { enabled, events, config } = req.body;
   try {
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
@@ -702,7 +702,7 @@ router.put("/notifications/:id", requireAdmin, async (req: Request, res: Respons
 });
 
 router.delete("/notifications/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(notificationConfigs).where(eq(notificationConfigs.id, id));
     res.json({ success: true });
@@ -734,7 +734,8 @@ router.get("/support/tickets", requireAdmin, async (req: Request, res: Response)
 
 router.get("/support/tickets/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, req.params.id));
+    const id = req.params.id as string;
+    const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, id));
     if (!ticket) { res.status(404).json({ error: "Ticket not found" }); return; }
     const messages = await db.select().from(supportMessages).where(eq(supportMessages.ticketId, ticket.id)).orderBy(supportMessages.createdAt);
     const [userData] = await db.select({ id: users.id, email: users.email, role: users.role }).from(users).where(eq(users.id, ticket.userId));
@@ -746,7 +747,7 @@ router.get("/support/tickets/:id", requireAdmin, async (req: Request, res: Respo
 });
 
 router.put("/support/tickets/:id/status", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { status, assignedTo } = req.body;
   try {
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
@@ -762,7 +763,7 @@ router.put("/support/tickets/:id/status", requireAdmin, async (req: Request, res
 });
 
 router.post("/support/tickets/:id/reply", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { message } = req.body;
   if (!message) { res.status(400).json({ error: "message required" }); return; }
   try {
@@ -788,7 +789,7 @@ router.get("/support/feedback", requireAdmin, async (_req: Request, res: Respons
 });
 
 router.put("/support/feature-requests/:id/status", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { status } = req.body;
   const valid = ["new", "reviewing", "planned", "in_development", "completed", "rejected"];
   if (!status || !valid.includes(status)) { res.status(400).json({ error: "Invalid status" }); return; }
@@ -842,7 +843,7 @@ router.post("/deploy-providers", requireAdmin, async (req: Request, res: Respons
 });
 
 router.put("/deploy-providers/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const fields = ["providerId", "name", "description", "icon", "color", "isEnabled", "configSchema", "minTariff", "maxDeploys", "sortOrder"];
   const update: Record<string, unknown> = { updatedAt: new Date() };
   for (const f of fields) {
@@ -859,7 +860,7 @@ router.put("/deploy-providers/:id", requireAdmin, async (req: Request, res: Resp
 });
 
 router.delete("/deploy-providers/:id", requireAdmin, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(deployProviderSettings).where(eq(deployProviderSettings.id, id));
     res.json({ success: true });

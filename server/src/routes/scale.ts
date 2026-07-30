@@ -6,7 +6,6 @@ import {
   loadBalancerConfigs,
   failoverConfigs,
   scalingPolicies,
-  gatewayProviders,
 } from "../db/schema.js";
 import { eq, and, desc, count } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
@@ -70,7 +69,7 @@ router.post("/nodes", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.put("/nodes/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { name, url, status, region, capabilities, version, config, priority } = req.body;
 
   try {
@@ -94,7 +93,7 @@ router.put("/nodes/:id", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.delete("/nodes/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(runtimeNodes).where(eq(runtimeNodes.id, id));
     res.json({ success: true });
@@ -105,7 +104,7 @@ router.delete("/nodes/:id", requireAuth, async (req: Request, res: Response) => 
 });
 
 router.post("/nodes/:id/heartbeat", async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     const [node] = await db
       .update(runtimeNodes)
@@ -149,7 +148,7 @@ router.post("/load-balancers", requireAuth, async (req: Request, res: Response) 
 });
 
 router.put("/load-balancers/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { name, provider, strategy, targets, rules, isActive } = req.body;
 
   try {
@@ -171,7 +170,7 @@ router.put("/load-balancers/:id", requireAuth, async (req: Request, res: Respons
 });
 
 router.delete("/load-balancers/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(loadBalancerConfigs).where(eq(loadBalancerConfigs.id, id));
     res.json({ success: true });
@@ -210,7 +209,7 @@ router.post("/failover", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.put("/failover/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { name, provider, primaryEndpoint, backupEndpoints, strategy, healthCheckInterval, maxRetries, cooldownPeriod, isActive } = req.body;
 
   try {
@@ -235,7 +234,7 @@ router.put("/failover/:id", requireAuth, async (req: Request, res: Response) => 
 });
 
 router.delete("/failover/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(failoverConfigs).where(eq(failoverConfigs.id, id));
     res.json({ success: true });
@@ -274,7 +273,7 @@ router.post("/scaling-policies", requireAuth, async (req: Request, res: Response
 });
 
 router.put("/scaling-policies/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { name, target, metric, minInstances, maxInstances, scaleUpThreshold, scaleDownThreshold, cooldownSeconds, isActive } = req.body;
 
   try {
@@ -299,7 +298,7 @@ router.put("/scaling-policies/:id", requireAuth, async (req: Request, res: Respo
 });
 
 router.delete("/scaling-policies/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(scalingPolicies).where(eq(scalingPolicies.id, id));
     res.json({ success: true });
@@ -312,7 +311,7 @@ router.delete("/scaling-policies/:id", requireAuth, async (req: Request, res: Re
 // ── Simulate failover (demo/test) ──
 
 router.post("/failover/:id/trigger", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     const [config] = await db.select().from(failoverConfigs).where(eq(failoverConfigs.id, id));
     if (!config) { res.status(404).json({ error: "Failover config not found" }); return; }

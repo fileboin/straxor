@@ -35,7 +35,8 @@ router.post("/tickets", requireAuth, async (req: Request, res: Response) => {
 
 router.get("/tickets/:id", requireAuth, async (req: Request, res: Response) => {
   try {
-    const [ticket] = await db.select().from(supportTickets).where(and(eq(supportTickets.id, req.params.id), eq(supportTickets.userId, req.user!.userId)));
+    const id = req.params.id as string;
+    const [ticket] = await db.select().from(supportTickets).where(and(eq(supportTickets.id, id), eq(supportTickets.userId, req.user!.userId)));
     if (!ticket) { res.status(404).json({ error: "Ticket not found" }); return; }
     const messages = await db.select().from(supportMessages).where(eq(supportMessages.ticketId, ticket.id)).orderBy(supportMessages.createdAt);
     const [userData] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, ticket.userId));
@@ -50,7 +51,8 @@ router.post("/tickets/:id/messages", requireAuth, async (req: Request, res: Resp
   const { message } = req.body;
   if (!message) { res.status(400).json({ error: "message required" }); return; }
   try {
-    const [ticket] = await db.select().from(supportTickets).where(and(eq(supportTickets.id, req.params.id), eq(supportTickets.userId, req.user!.userId)));
+    const id = req.params.id as string;
+    const [ticket] = await db.select().from(supportTickets).where(and(eq(supportTickets.id, id), eq(supportTickets.userId, req.user!.userId)));
     if (!ticket) { res.status(404).json({ error: "Ticket not found" }); return; }
     const [msg] = await db.insert(supportMessages).values({ ticketId: ticket.id, userId: req.user!.userId, message }).returning();
     await db.update(supportTickets).set({ updatedAt: new Date() }).where(eq(supportTickets.id, ticket.id));
@@ -101,14 +103,15 @@ router.post("/feature-requests", requireAuth, async (req: Request, res: Response
 
 router.post("/feature-requests/:id/vote", requireAuth, async (req: Request, res: Response) => {
   try {
-    const existing = await db.select().from(featureVotes).where(and(eq(featureVotes.featureRequestId, req.params.id), eq(featureVotes.userId, req.user!.userId)));
+    const id = req.params.id as string;
+    const existing = await db.select().from(featureVotes).where(and(eq(featureVotes.featureRequestId, id), eq(featureVotes.userId, req.user!.userId)));
     if (existing.length > 0) {
       await db.delete(featureVotes).where(eq(featureVotes.id, existing[0].id));
-      await db.update(featureRequests).set({ voteCount: sql`vote_count - 1` }).where(eq(featureRequests.id, req.params.id));
+      await db.update(featureRequests).set({ voteCount: sql`vote_count - 1` }).where(eq(featureRequests.id, id));
       res.json({ voted: false });
     } else {
-      await db.insert(featureVotes).values({ featureRequestId: req.params.id, userId: req.user!.userId });
-      await db.update(featureRequests).set({ voteCount: sql`vote_count + 1` }).where(eq(featureRequests.id, req.params.id));
+      await db.insert(featureVotes).values({ featureRequestId: id, userId: req.user!.userId });
+      await db.update(featureRequests).set({ voteCount: sql`vote_count + 1` }).where(eq(featureRequests.id, id));
       res.json({ voted: true });
     }
   } catch (error) {

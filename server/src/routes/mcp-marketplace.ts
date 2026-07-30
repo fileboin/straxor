@@ -188,7 +188,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 // PUT /api/mcp-marketplace/:id — update MCP server
 router.put("/:id", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
   const body = req.body as McpServerBody;
 
   try {
@@ -222,7 +222,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
 // DELETE /api/mcp-marketplace/:id
 router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   try {
     await db

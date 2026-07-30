@@ -20,7 +20,7 @@ function generateUrl(slug: string): string {
 // GET /api/publish/:projectId — list publish links for a project
 router.get("/:projectId", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId as string;
-  const { projectId } = req.params;
+  const projectId = req.params.projectId as string;
   try {
     const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
     if (!project) { res.status(404).json({ error: "Project not found" }); return; }
@@ -37,7 +37,7 @@ router.get("/:projectId", requireAuth, async (req: Request, res: Response) => {
 // POST /api/publish/:projectId — create publish link
 router.post("/:projectId", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId as string;
-  const { projectId } = req.params;
+  const projectId = req.params.projectId as string;
   const { password, expiresInHours } = req.body as { password?: string; expiresInHours?: number };
   try {
     const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
@@ -57,7 +57,8 @@ router.post("/:projectId", requireAuth, async (req: Request, res: Response) => {
 // PUT /api/publish/:projectId/:linkId — update publish link
 router.put("/:projectId/:linkId", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId as string;
-  const { projectId, linkId } = req.params;
+  const projectId = req.params.projectId as string;
+  const linkId = req.params.linkId as string;
   const { isEnabled, password, expiresInHours } = req.body as { isEnabled?: boolean; password?: string | null; expiresInHours?: number | null };
   try {
     const [existing] = await db.select().from(publishLinks).where(and(eq(publishLinks.id, linkId), eq(publishLinks.projectId, projectId), eq(publishLinks.userId, userId)));
@@ -77,7 +78,8 @@ router.put("/:projectId/:linkId", requireAuth, async (req: Request, res: Respons
 // DELETE /api/publish/:projectId/:linkId — delete publish link
 router.delete("/:projectId/:linkId", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId as string;
-  const { projectId, linkId } = req.params;
+  const projectId = req.params.projectId as string;
+  const linkId = req.params.linkId as string;
   try {
     const [existing] = await db.select().from(publishLinks).where(and(eq(publishLinks.id, linkId), eq(publishLinks.projectId, projectId), eq(publishLinks.userId, userId)));
     if (!existing) { res.status(404).json({ error: "Link not found" }); return; }
@@ -91,7 +93,7 @@ router.delete("/:projectId/:linkId", requireAuth, async (req: Request, res: Resp
 
 // POST /api/publish/verify/:slug — verify password for protected link (public)
 router.post("/verify/:slug", async (req: Request, res: Response) => {
-  const { slug } = req.params;
+  const slug = req.params.slug as string;
   const { password } = req.body as { password?: string };
   try {
     const [link] = await db.select().from(publishLinks).where(and(eq(publishLinks.slug, slug), eq(publishLinks.isEnabled, true)));

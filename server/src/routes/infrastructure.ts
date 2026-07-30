@@ -82,7 +82,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 // PUT /api/infrastructure/:id — update config
 router.put("/:id", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
   const body = req.body as Record<string, any>;
 
   try {
@@ -114,7 +114,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
 // DELETE /api/infrastructure/:id
 router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   try {
     await db.delete(infraConfigs).where(and(eq(infraConfigs.id, id), eq(infraConfigs.userId, userId)));
@@ -128,7 +128,7 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
 // POST /api/infrastructure/:id/test — test/health check
 router.post("/:id/test", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   try {
     const [row] = await db

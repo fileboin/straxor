@@ -9,7 +9,7 @@ const router = Router();
 
 // GET /api/projects/:projectId/comments — list comments for a file (optional)
 router.get("/:projectId", requireAuth, async (req: Request, res: Response) => {
-  const { projectId } = req.params;
+  const projectId = req.params.projectId as string;
   const { filePath } = req.query;
 
   try {
@@ -54,7 +54,7 @@ router.get("/:projectId", requireAuth, async (req: Request, res: Response) => {
 // POST /api/projects/:projectId/comments — add comment
 router.post("/:projectId", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { projectId } = req.params;
+  const projectId = req.params.projectId as string;
   const { filePath, lineStart, lineEnd, content, parentId } = req.body as {
     filePath: string;
     lineStart: number;
@@ -91,7 +91,8 @@ router.post("/:projectId", requireAuth, async (req: Request, res: Response) => {
 
 // PUT /api/projects/:projectId/comments/:commentId — update/resolve
 router.put("/:projectId/comments/:commentId", requireAuth, async (req: Request, res: Response) => {
-  const { projectId, commentId } = req.params;
+  const projectId = req.params.projectId as string;
+  const commentId = req.params.commentId as string;
   const { content, isResolved } = req.body as { content?: string; isResolved?: boolean };
 
   try {
@@ -114,7 +115,8 @@ router.put("/:projectId/comments/:commentId", requireAuth, async (req: Request, 
 
 // DELETE /api/projects/:projectId/comments/:commentId
 router.delete("/:projectId/comments/:commentId", requireAuth, async (req: Request, res: Response) => {
-  const { projectId, commentId } = req.params;
+  const projectId = req.params.projectId as string;
+  const commentId = req.params.commentId as string;
 
   try {
     await db

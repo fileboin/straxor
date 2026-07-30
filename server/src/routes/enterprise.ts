@@ -122,7 +122,7 @@ router.post("/sso", requireAuth, async (req: Request, res: Response) => {
 
 // PUT /api/enterprise/sso/:id — update SSO config
 router.put("/sso/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { label, config, isEnabled } = req.body as {
     label?: string; config?: string; isEnabled?: boolean;
   };
@@ -143,7 +143,7 @@ router.put("/sso/:id", requireAuth, async (req: Request, res: Response) => {
 
 // DELETE /api/enterprise/sso/:id — delete SSO config
 router.delete("/sso/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(ssoConfigs).where(eq(ssoConfigs.id, id));
     res.json({ success: true });
@@ -200,7 +200,7 @@ router.post("/encryption-keys", requireAuth, async (req: Request, res: Response)
 
 // PUT /api/enterprise/encryption-keys/:id — update
 router.put("/encryption-keys/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { name, algorithm, keyData, isActive } = req.body as {
     name?: string; algorithm?: string; keyData?: string; isActive?: boolean;
   };
@@ -221,7 +221,7 @@ router.put("/encryption-keys/:id", requireAuth, async (req: Request, res: Respon
 
 // DELETE /api/enterprise/encryption-keys/:id — delete
 router.delete("/encryption-keys/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(encryptionKeys).where(eq(encryptionKeys.id, id));
     res.json({ success: true });

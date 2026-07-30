@@ -120,7 +120,7 @@ export class SemanticSearch {
       const score = this.cosineSimilarity(queryVec, docVec);
       if (score > 0) {
         const matches = queryTokens.filter((t) => text.toLowerCase().includes(t));
-        results.push({ item, type, score, matches });
+        results.push({ item, type: type as "documentation" | "knowledge" | "decision", score, matches });
       }
     }
 

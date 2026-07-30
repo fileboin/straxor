@@ -66,7 +66,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 // GET /api/teams/:id — team details with members
 router.get("/:id", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   try {
     const [team] = await db.select().from(teams).where(eq(teams.id, id)).limit(1);
@@ -102,7 +102,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
 // PUT /api/teams/:id — update team
 router.put("/:id", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { name } = req.body as { name?: string };
 
   try {
@@ -125,7 +125,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
 // DELETE /api/teams/:id
 router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   try {
     const [team] = await db.select().from(teams).where(eq(teams.id, id)).limit(1);
@@ -142,7 +142,7 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
 // POST /api/teams/:id/members — add member
 router.post("/:id/members", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { email, role } = req.body as { email: string; role?: string };
 
   try {
@@ -188,7 +188,8 @@ router.post("/:id/members", requireAuth, async (req: Request, res: Response) => 
 // DELETE /api/teams/:id/members/:memberId — remove member
 router.delete("/:id/members/:memberId", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id, memberId } = req.params;
+  const id = req.params.id as string;
+  const memberId = req.params.memberId as string;
 
   try {
     const [team] = await db.select().from(teams).where(eq(teams.id, id)).limit(1);

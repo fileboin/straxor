@@ -9,7 +9,7 @@ const router = Router();
 
 // GET /api/projects/:projectId/collaborators
 router.get("/:projectId", requireAuth, async (req: Request, res: Response) => {
-  const { projectId } = req.params;
+  const projectId = req.params.projectId as string;
 
   try {
     const rows = await db
@@ -35,7 +35,7 @@ router.get("/:projectId", requireAuth, async (req: Request, res: Response) => {
 // POST /api/projects/:projectId/collaborators — add collaborator
 router.post("/:projectId", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { projectId } = req.params;
+  const projectId = req.params.projectId as string;
   const { email, role } = req.body as { email: string; role?: string };
 
   try {
@@ -75,7 +75,8 @@ router.post("/:projectId", requireAuth, async (req: Request, res: Response) => {
 
 // PUT /api/projects/:projectId/collaborators/:collabId — update role
 router.put("/:projectId/collaborators/:collabId", requireAuth, async (req: Request, res: Response) => {
-  const { projectId, collabId } = req.params;
+  const projectId = req.params.projectId as string;
+  const collabId = req.params.collabId as string;
   const { role } = req.body as { role: string };
 
   try {
@@ -94,7 +95,8 @@ router.put("/:projectId/collaborators/:collabId", requireAuth, async (req: Reque
 
 // DELETE /api/projects/:projectId/collaborators/:collabId
 router.delete("/:projectId/collaborators/:collabId", requireAuth, async (req: Request, res: Response) => {
-  const { projectId, collabId } = req.params;
+  const projectId = req.params.projectId as string;
+  const collabId = req.params.collabId as string;
 
   try {
     await db

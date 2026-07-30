@@ -6,7 +6,7 @@ import {
   marketplaceReviews,
   marketplaceInstallations,
 } from "../db/schema.js";
-import { eq, and, or, like, desc, sql, count, inArray } from "drizzle-orm";
+import { eq, and, or, like, desc, asc, sql, count, inArray } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -235,7 +235,7 @@ router.get("/", async (req: Request, res: Response) => {
           like(marketplaceItems.name, `%${search}%`),
           like(marketplaceItems.description, `%${search}%`),
           like(marketplaceItems.tags, `%${search}%`),
-        )
+        )!
       );
     }
 
@@ -245,7 +245,7 @@ router.get("/", async (req: Request, res: Response) => {
     let orderBy = desc(marketplaceItems.installCount);
     if (sort === "newest") orderBy = desc(marketplaceItems.createdAt);
     if (sort === "rating") orderBy = desc(marketplaceItems.rating);
-    if (sort === "name") orderBy = marketplaceItems.name;
+    if (sort === "name") orderBy = asc(marketplaceItems.name);
 
     const items = await db
       .select()
@@ -342,7 +342,7 @@ router.get("/types", (_req: Request, res: Response) => {
 
 // GET /api/marketplace/:id — get item detail
 router.get("/:id", async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     const [item] = await db.select().from(marketplaceItems).where(eq(marketplaceItems.id, id));
     if (!item) { res.status(404).json({ error: "Item not found" }); return; }
@@ -367,7 +367,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 
 // PUT /api/marketplace/:id — update item
 router.put("/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { name, description, longDescription, icon, tags, category, content, isPublic, version } = req.body;
 
   try {
@@ -395,7 +395,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
 
 // DELETE /api/marketplace/:id — delete item
 router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(marketplaceItems).where(eq(marketplaceItems.id, id));
     res.json({ success: true });
@@ -410,7 +410,7 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
 // POST /api/marketplace/:id/install
 router.post("/:id/install", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { projectId, config } = req.body;
 
   try {
@@ -432,7 +432,7 @@ router.post("/:id/install", requireAuth, async (req: Request, res: Response) => 
 // POST /api/marketplace/:id/reviews
 router.post("/:id/reviews", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { rating, comment } = req.body;
 
   if (!rating || rating < 1 || rating > 5) {

@@ -13,7 +13,7 @@ const router = Router();
 
 // Middleware to ensure project store is initialized
 async function withProject(req: Request, res: Response, fn: (projectId: string) => Promise<void>) {
-  const projectId = req.params.projectId;
+  const projectId = req.params.projectId as string;
   if (!projectId) { res.status(400).json({ error: "projectId required" }); return; }
   try {
     await engine.initProject(projectId);
@@ -52,7 +52,7 @@ router.get("/:projectId/knowledge", requireAuth, (req: Request, res: Response) =
 
 router.get("/:projectId/knowledge/:key", requireAuth, (req: Request, res: Response) => {
   withProject(req, res, async (projectId) => {
-    const item = await engine.projectMemory.getKnowledge(projectId, req.params.key);
+    const item = await engine.projectMemory.getKnowledge(projectId, req.params.key as string);
     if (!item) { res.status(404).json({ error: "Not found" }); return; }
     res.json(item);
   });
@@ -67,7 +67,7 @@ router.post("/:projectId/knowledge", requireAuth, (req: Request, res: Response) 
 
 router.put("/:projectId/knowledge/:key", requireAuth, (req: Request, res: Response) => {
   withProject(req, res, async (projectId) => {
-    const item = await engine.projectMemory.updateKnowledge(projectId, req.params.key, req.body);
+    const item = await engine.projectMemory.updateKnowledge(projectId, req.params.key as string, req.body);
     if (!item) { res.status(404).json({ error: "Not found" }); return; }
     res.json(item);
   });
@@ -75,7 +75,7 @@ router.put("/:projectId/knowledge/:key", requireAuth, (req: Request, res: Respon
 
 router.delete("/:projectId/knowledge/:key", requireAuth, (req: Request, res: Response) => {
   withProject(req, res, async (projectId) => {
-    await engine.projectMemory.deleteKnowledge(projectId, req.params.key);
+    await engine.projectMemory.deleteKnowledge(projectId, req.params.key as string);
     res.json({ success: true });
   });
 });
@@ -98,7 +98,7 @@ router.post("/:projectId/graph/nodes", requireAuth, (req: Request, res: Response
 
 router.delete("/:projectId/graph/nodes/:nodeId", requireAuth, (req: Request, res: Response) => {
   withProject(req, res, async (projectId) => {
-    await engine.graph.deleteNode(projectId, req.params.nodeId);
+    await engine.graph.deleteNode(projectId, req.params.nodeId as string);
     res.json({ success: true });
   });
 });
@@ -120,7 +120,7 @@ router.post("/:projectId/graph/edges", requireAuth, (req: Request, res: Response
 
 router.get("/:projectId/graph/connected/:nodeId", requireAuth, (req: Request, res: Response) => {
   withProject(req, res, async (projectId) => {
-    res.json(await engine.graph.getConnected(projectId, req.params.nodeId));
+    res.json(await engine.graph.getConnected(projectId, req.params.nodeId as string));
   });
 });
 
@@ -141,7 +141,7 @@ router.post("/:projectId/decisions", requireAuth, (req: Request, res: Response) 
 
 router.put("/:projectId/decisions/:id", requireAuth, (req: Request, res: Response) => {
   withProject(req, res, async (projectId) => {
-    const updated = await engine.decisions.update(projectId, req.params.id, req.body);
+    const updated = await engine.decisions.update(projectId, req.params.id as string, req.body);
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
     res.json(updated);
   });
@@ -149,7 +149,7 @@ router.put("/:projectId/decisions/:id", requireAuth, (req: Request, res: Respons
 
 router.delete("/:projectId/decisions/:id", requireAuth, (req: Request, res: Response) => {
   withProject(req, res, async (projectId) => {
-    await engine.decisions.delete(projectId, req.params.id);
+    await engine.decisions.delete(projectId, req.params.id as string);
     res.json({ success: true });
   });
 });
@@ -172,7 +172,7 @@ router.post("/:projectId/docs", requireAuth, (req: Request, res: Response) => {
 
 router.delete("/:projectId/docs/:id", requireAuth, (req: Request, res: Response) => {
   withProject(req, res, async (projectId) => {
-    await engine.docs.deleteDoc(projectId, req.params.id);
+    await engine.docs.deleteDoc(projectId, req.params.id as string);
     res.json({ success: true });
   });
 });

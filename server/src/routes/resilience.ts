@@ -61,7 +61,7 @@ router.post("/vault", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.put("/vault/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { name, value, type, algorithm, metadata, isActive } = req.body;
 
   try {
@@ -83,7 +83,7 @@ router.put("/vault/:id", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.delete("/vault/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(vaultSecrets).where(eq(vaultSecrets.id, id));
     res.json({ success: true });
@@ -94,7 +94,7 @@ router.delete("/vault/:id", requireAuth, async (req: Request, res: Response) => 
 });
 
 router.get("/vault/:id/decrypt", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     const [secret] = await db.select().from(vaultSecrets).where(eq(vaultSecrets.id, id));
     if (!secret) { res.status(404).json({ error: "Secret not found" }); return; }
@@ -144,7 +144,7 @@ router.post("/guardrails", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.put("/guardrails/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { maxTokens, maxCost, currentTokens, currentCost, isPaused } = req.body;
 
   try {
@@ -179,7 +179,7 @@ router.put("/guardrails/:id", requireAuth, async (req: Request, res: Response) =
 });
 
 router.post("/guardrails/:id/pause", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     const [updated] = await db
       .update(sessionGuardrails)
@@ -195,7 +195,7 @@ router.post("/guardrails/:id/pause", requireAuth, async (req: Request, res: Resp
 });
 
 router.post("/guardrails/:id/resume", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     const [updated] = await db
       .update(sessionGuardrails)
@@ -240,7 +240,7 @@ router.post("/snapshots", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.put("/snapshots/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { name, status, filePath, checksum } = req.body;
   try {
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
@@ -259,7 +259,7 @@ router.put("/snapshots/:id", requireAuth, async (req: Request, res: Response) =>
 });
 
 router.delete("/snapshots/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     await db.delete(systemSnapshots).where(eq(systemSnapshots.id, id));
     res.json({ success: true });
@@ -270,7 +270,7 @@ router.delete("/snapshots/:id", requireAuth, async (req: Request, res: Response)
 });
 
 router.post("/restore/:snapshotId", requireAuth, async (req: Request, res: Response) => {
-  const { snapshotId } = req.params;
+  const snapshotId = req.params.snapshotId as string;
   try {
     const [snapshot] = await db.select().from(systemSnapshots).where(eq(systemSnapshots.id, snapshotId));
     if (!snapshot) { res.status(404).json({ error: "Snapshot not found" }); return; }

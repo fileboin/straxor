@@ -76,7 +76,7 @@ export class ProjectMemory {
       existing.summary = summary;
       existing.updatedAt = Date.now();
       existing.source = source;
-      existing.confidence = Math.min(5, (existing.confidence + 1) as Confidence);
+      existing.confidence = Math.min(5, existing.confidence + 1) as Confidence;
       await this.store.saveKnowledge(existing);
       return existing;
     }

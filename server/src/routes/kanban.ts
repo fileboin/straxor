@@ -207,7 +207,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 // POST /api/kanban/session/:id/pause
 router.post("/session/:id/pause", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   try {
     const [s] = await db.select().from(sessions).where(and(eq(sessions.id, id), eq(sessions.userId, userId))).limit(1);
@@ -231,7 +231,7 @@ router.post("/session/:id/pause", requireAuth, async (req: Request, res: Respons
 // POST /api/kanban/session/:id/resume
 router.post("/session/:id/resume", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   try {
     await db.update(sessions).set({ status: "active", updatedAt: new Date() }).where(and(eq(sessions.id, id), eq(sessions.userId, userId)));
@@ -244,7 +244,7 @@ router.post("/session/:id/resume", requireAuth, async (req: Request, res: Respon
 // POST /api/kanban/session/:id/change-model
 router.post("/session/:id/change-model", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { provider, model } = req.body as { provider?: string; model?: string };
 
   try {
@@ -259,7 +259,7 @@ router.post("/session/:id/change-model", requireAuth, async (req: Request, res: 
 
     try {
       const manager = getRuntimeManager();
-      await manager.updateRuntime(s.machineId, undefined, { provider, model });
+      await (manager as any).updateRuntime(s.machineId, undefined, { provider, model });
     } catch {}
 
     res.json({ ok: true });
@@ -271,7 +271,7 @@ router.post("/session/:id/change-model", requireAuth, async (req: Request, res: 
 // POST /api/kanban/session/:id/change-runtime
 router.post("/session/:id/change-runtime", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { runtimeId } = req.body as { runtimeId: string };
 
   try {

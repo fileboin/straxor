@@ -243,7 +243,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
 // GET /api/plugins/:id — get plugin details
 router.get("/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     const [plugin] = await db.select().from(plugins).where(eq(plugins.id, id));
     if (!plugin) { res.status(404).json({ error: "Plugin not found" }); return; }
@@ -258,7 +258,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
 
 // PUT /api/plugins/:id — update plugin (enable/disable, settings)
 router.put("/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { isEnabled, settings, config } = req.body;
 
   try {
@@ -278,7 +278,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
 
 // DELETE /api/plugins/:id — uninstall plugin
 router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
     const [plugin] = await db.select().from(plugins).where(eq(plugins.id, id));
     if (!plugin) { res.status(404).json({ error: "Plugin not found" }); return; }
@@ -297,7 +297,7 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
 
 // POST /api/plugins/:id/events — register event handler
 router.post("/:id/events", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { event, handler } = req.body;
 
   if (!event || !handler) {
@@ -316,7 +316,7 @@ router.post("/:id/events", requireAuth, async (req: Request, res: Response) => {
 
 // DELETE /api/plugins/:id/events/:eventId — remove event handler
 router.delete("/:id/events/:eventId", requireAuth, async (req: Request, res: Response) => {
-  const { eventId } = req.params;
+  const eventId = req.params.eventId as string;
   try {
     await db.delete(pluginEvents).where(eq(pluginEvents.id, eventId));
     res.json({ success: true });

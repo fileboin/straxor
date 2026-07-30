@@ -75,7 +75,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 // GET /api/organizations/:id — org details with members
 router.get("/:id", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   try {
     const [org] = await db.select().from(organizations).where(eq(organizations.id, id)).limit(1);
@@ -106,7 +106,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
 // PUT /api/organizations/:id
 router.put("/:id", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { name, billingEmail, plan } = req.body as Record<string, any>;
 
   try {
@@ -129,7 +129,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
 // DELETE /api/organizations/:id
 router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   try {
     const [org] = await db.select().from(organizations).where(eq(organizations.id, id)).limit(1);
@@ -147,7 +147,7 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
 
 router.post("/:id/members", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { email, role } = req.body as { email: string; role?: string };
 
   try {
@@ -170,7 +170,7 @@ router.post("/:id/members", requireAuth, async (req: Request, res: Response) => 
 
 router.delete("/:id/members/:memberId", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id, memberId } = req.params;
+  const id = req.params.id as string; const memberId = req.params.memberId as string;
 
   try {
     const [org] = await db.select().from(organizations).where(eq(organizations.id, id)).limit(1);
@@ -187,14 +187,14 @@ router.delete("/:id/members/:memberId", requireAuth, async (req: Request, res: R
 // ── API Keys ──
 
 router.get("/:id/api-keys", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const keys = await db.select().from(organizationApiKeys).where(eq(organizationApiKeys.orgId, id)).orderBy(desc(organizationApiKeys.createdAt));
   res.json(keys);
 });
 
 router.post("/:id/api-keys", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { provider, label, key } = req.body as { provider: string; label?: string; key: string };
 
   if (!provider || !key) { res.status(400).json({ error: "provider and key required" }); return; }
@@ -212,7 +212,7 @@ router.post("/:id/api-keys", requireAuth, async (req: Request, res: Response) =>
 });
 
 router.delete("/:id/api-keys/:keyId", requireAuth, async (req: Request, res: Response) => {
-  const { id, keyId } = req.params;
+  const id = req.params.id as string; const keyId = req.params.keyId as string;
   await db.delete(organizationApiKeys).where(and(eq(organizationApiKeys.id, keyId), eq(organizationApiKeys.orgId, id)));
   res.json({ ok: true });
 });
@@ -220,13 +220,13 @@ router.delete("/:id/api-keys/:keyId", requireAuth, async (req: Request, res: Res
 // ── Policies ──
 
 router.get("/:id/policies", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const policies = await db.select().from(organizationPolicies).where(eq(organizationPolicies.orgId, id)).orderBy(desc(organizationPolicies.createdAt));
   res.json(policies);
 });
 
 router.post("/:id/policies", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { type, name, description, config, isEnabled } = req.body as Record<string, any>;
 
   if (!type || !name) { res.status(400).json({ error: "type and name required" }); return; }
@@ -244,7 +244,7 @@ router.post("/:id/policies", requireAuth, async (req: Request, res: Response) =>
 });
 
 router.put("/:id/policies/:policyId", requireAuth, async (req: Request, res: Response) => {
-  const { id, policyId } = req.params;
+  const id = req.params.id as string; const policyId = req.params.policyId as string;
   const { name, description, config, isEnabled } = req.body as Record<string, any>;
 
   try {
@@ -263,7 +263,7 @@ router.put("/:id/policies/:policyId", requireAuth, async (req: Request, res: Res
 });
 
 router.delete("/:id/policies/:policyId", requireAuth, async (req: Request, res: Response) => {
-  const { id, policyId } = req.params;
+  const id = req.params.id as string; const policyId = req.params.policyId as string;
   await db.delete(organizationPolicies).where(and(eq(organizationPolicies.id, policyId), eq(organizationPolicies.orgId, id)));
   res.json({ ok: true });
 });
@@ -271,13 +271,13 @@ router.delete("/:id/policies/:policyId", requireAuth, async (req: Request, res: 
 // ── Budget ──
 
 router.get("/:id/budgets", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const budgets = await db.select().from(budgetLimits).where(eq(budgetLimits.orgId, id)).orderBy(desc(budgetLimits.createdAt));
   res.json(budgets);
 });
 
 router.post("/:id/budgets", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { projectId, monthlyLimit, currency, alertAtPercent } = req.body as Record<string, any>;
 
   try {
@@ -293,7 +293,7 @@ router.post("/:id/budgets", requireAuth, async (req: Request, res: Response) => 
 });
 
 router.put("/:id/budgets/:budgetId", requireAuth, async (req: Request, res: Response) => {
-  const { id, budgetId } = req.params;
+  const id = req.params.id as string; const budgetId = req.params.budgetId as string;
   const { monthlyLimit, currency, alertAtPercent, currentUsage } = req.body as Record<string, any>;
 
   try {
@@ -312,7 +312,7 @@ router.put("/:id/budgets/:budgetId", requireAuth, async (req: Request, res: Resp
 });
 
 router.delete("/:id/budgets/:budgetId", requireAuth, async (req: Request, res: Response) => {
-  const { id, budgetId } = req.params;
+  const id = req.params.id as string; const budgetId = req.params.budgetId as string;
   await db.delete(budgetLimits).where(and(eq(budgetLimits.id, budgetId), eq(budgetLimits.orgId, id)));
   res.json({ ok: true });
 });
@@ -320,7 +320,7 @@ router.delete("/:id/budgets/:budgetId", requireAuth, async (req: Request, res: R
 // ── Usage / Stats ──
 
 router.get("/:id/usage", requireAuth, async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   try {
     const budgets = await db.select().from(budgetLimits).where(eq(budgetLimits.orgId, id));

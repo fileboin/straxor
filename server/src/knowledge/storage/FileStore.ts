@@ -137,8 +137,8 @@ export class FileStore extends MemoryStore {
     this.dirty.clear();
   }
 
-  destroy(): void {
+  async destroy(_projectId: string): Promise<void> {
     if (this.flushTimer) clearInterval(this.flushTimer);
-    this.flush();
+    await this.flush();
   }
 }

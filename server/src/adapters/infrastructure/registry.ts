@@ -28,7 +28,7 @@ export function createInfrastructureRegistry(): InfrastructureRegistry {
       const now = new Date().toISOString();
 
       if (!provider) {
-        return { configId: config.id, status: "unknown", latency: null, message: "Unknown provider", checkedAt: now };
+        return { id: config.id, configId: config.id, status: "unknown", latency: null, message: "Unknown provider", checkedAt: now };
       }
 
       if (provider.type === "monitor") {
@@ -66,6 +66,7 @@ async function runMonitorCheck(config: InfraConfig): Promise<InfraHealthCheck> {
       const expected = (cfg.expected_status as number) || 200;
       const ok = resp.status === expected;
       return {
+        id: config.id,
         configId: config.id,
         status: ok ? "ok" : "degraded",
         latency,
@@ -73,7 +74,7 @@ async function runMonitorCheck(config: InfraConfig): Promise<InfraHealthCheck> {
         checkedAt: now,
       };
     } catch (err: any) {
-      return { configId: config.id, status: "down", latency: null, message: err.message, checkedAt: now };
+      return { id: config.id, configId: config.id, status: "down", latency: null, message: err.message, checkedAt: now };
     }
   }
 
@@ -81,6 +82,7 @@ async function runMonitorCheck(config: InfraConfig): Promise<InfraHealthCheck> {
     // TCP check via fetch to the host:port is not directly possible from Node.js fetch
     // Return a simulated response — real implementation would use net.connect
     return {
+      id: config.id,
       configId: config.id,
       status: "unknown",
       latency: null,
@@ -91,6 +93,7 @@ async function runMonitorCheck(config: InfraConfig): Promise<InfraHealthCheck> {
 
   if (config.adapter === "ping-monitor") {
     return {
+      id: config.id,
       configId: config.id,
       status: "unknown",
       latency: null,
@@ -99,12 +102,13 @@ async function runMonitorCheck(config: InfraConfig): Promise<InfraHealthCheck> {
     };
   }
 
-  return { configId: config.id, status: "unknown", latency: null, message: "Unknown monitor type", checkedAt: now };
+  return { id: config.id, configId: config.id, status: "unknown", latency: null, message: "Unknown monitor type", checkedAt: now };
 }
 
 async function runGenericHealthCheck(config: InfraConfig, provider: InfraProviderDef): Promise<InfraHealthCheck> {
   const now = new Date().toISOString();
   return {
+    id: config.id,
     configId: config.id,
     status: "unknown",
     latency: null,
