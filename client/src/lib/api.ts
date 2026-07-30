@@ -1,11 +1,10 @@
 type ApiOptions = Omit<RequestInit, "body"> & { body?: unknown };
 
-const API_BASE = import.meta.env.VITE_API_URL || "/api";
-
 export async function api<T>(
   path: string,
   options: ApiOptions = {}
 ): Promise<T> {
+  const base = import.meta.env.VITE_API_URL || "";
   const token = localStorage.getItem("token");
 
   const body = options.body !== undefined
@@ -14,7 +13,7 @@ export async function api<T>(
         : options.body as BodyInit)
     : undefined;
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${base}/api${path}`, {
     ...options,
     body,
     headers: {
