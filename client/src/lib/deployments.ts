@@ -35,7 +35,7 @@ export interface ProviderInfo {
   configured: boolean;
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem("token");

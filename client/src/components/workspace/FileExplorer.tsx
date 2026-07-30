@@ -39,10 +39,9 @@ export default function FileExplorer({ machineId, rootPath = ".", onFileSelect, 
     setLoading(true);
     setError(null);
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
       const token = localStorage.getItem("token");
       const res = await fetch(
-        `${API_BASE}/api/files/tree?machineId=${machineId}&rootPath=${encodeURIComponent(rootPath)}`,
+        `${import.meta.env.VITE_API_URL || ""}/api/files/tree?machineId=${machineId}&rootPath=${encodeURIComponent(rootPath)}`,
         { headers: token ? { Authorization: `Bearer ${token}` } : {} }
       );
       if (!res.ok) throw new Error("Greška pri učitavanju");
@@ -288,10 +287,9 @@ function TreeNode({
     if (!machineId || entry.type !== "directory") return;
     setLoadingChildren(true);
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
       const token = localStorage.getItem("token");
       const res = await fetch(
-        `${API_BASE}/api/files/tree?machineId=${machineId}&rootPath=${encodeURIComponent(entry.path)}`,
+        `${import.meta.env.VITE_API_URL || ""}/api/files/tree?machineId=${machineId}&rootPath=${encodeURIComponent(entry.path)}`,
         { headers: token ? { Authorization: `Bearer ${token}` } : {} }
       );
       if (res.ok) {
