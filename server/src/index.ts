@@ -57,6 +57,10 @@ import supportRoutes from "./routes/support.js";
 import publishRoutes from "./routes/publish.js";
 import knowledgeRoutes from "./knowledge/api/routes.js";
 import { default as imageRoutes } from "./image/api/routes.js";
+import { createMarketplaceRouter } from "./marketplace/api/routes.js";
+import { createConnectionsRouter } from "./connections/api/routes.js";
+import { imageAgentRoutes } from "./agents/image-agent/api/routes.js";
+import { verificationRoutes } from "./verification/api/routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -182,6 +186,16 @@ app.use("/api/knowledge", knowledgeRoutes);
 app.use("/api/image", imageRoutes);
 app.use("/api/support", supportRoutes);
 app.use("/api/admin", adminRoutes);
+
+// Set up Marketplace Core (independent system)
+const marketplaceRouter = createMarketplaceRouter();
+app.use("/api/marketplace-core", marketplaceRouter);
+
+const connectionsRouter = createConnectionsRouter();
+app.use("/api/connections", connectionsRouter);
+
+app.use("/api/image-agent", imageAgentRoutes);
+app.use("/api/verification", verificationRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

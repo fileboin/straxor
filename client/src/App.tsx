@@ -13,6 +13,9 @@ import Help from "./pages/Help.js";
 import DeployManager from "./pages/DeployManager.js";
 import Knowledge from "./pages/Knowledge.js";
 import ImageStudio from "./pages/ImageStudio.js";
+import ImageAgent from "./pages/ImageAgent.js";
+import Marketplace from "./pages/Marketplace.js";
+import Connections from "./pages/Connections.js";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -108,6 +111,14 @@ export default function App() {
               }
             />
             <Route
+              path="/project/:id/image-agent"
+              element={
+                <ProtectedRoute>
+                  <ImageAgent />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/project/:id/knowledge"
               element={
                 <ProtectedRoute>
@@ -120,6 +131,30 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Help />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/marketplace"
+              element={
+                <ProtectedRoute>
+                  <Marketplace />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/marketplace/category/:category"
+              element={
+                <ProtectedRoute>
+                  <Marketplace />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/connections"
+              element={
+                <ProtectedRoute>
+                  <Connections />
                 </ProtectedRoute>
               }
             />

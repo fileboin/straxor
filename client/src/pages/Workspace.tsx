@@ -54,6 +54,7 @@ import EnterpriseResilience from "../components/workspace/EnterpriseResilience.j
 import CollaboratorsPanel from "../components/workspace/CollaboratorsPanel.js";
 import OrganizationDashboard from "../components/workspace/OrganizationDashboard.js";
 import AdminCenter from "../components/workspace/AdminCenter.js";
+import VerificationPanel from "../components/workspace/VerificationPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -141,6 +142,7 @@ export default function Workspace() {
   const [showScale, setShowScale] = useState(false);
   const [showResilience, setShowResilience] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -1292,6 +1294,8 @@ export default function Workspace() {
           onOpenRuntimeManager={() => setShowRuntimeManager(true)}
           onOpenQuickStart={() => setShowQuickStart(true)}
           onOpenImage={() => navigate(`/project/${projectIdFromUrl || "unknown"}/image`)}
+          onOpenImageAgent={() => navigate(`/project/${projectIdFromUrl || "unknown"}/image-agent`)}
+          onOpenVerification={() => setShowVerification(true)}
           onOpenKnowledge={() => navigate(`/project/${projectIdFromUrl || "unknown"}/knowledge`)}
         />
 
@@ -1838,6 +1842,14 @@ export default function Workspace() {
             }
           }}
           onClose={() => setShowSessionPicker(false)}
+        />
+      )}
+
+      {/* Verification Panel */}
+      {showVerification && (
+        <VerificationPanel
+          sessionId={agentSessionId}
+          onClose={() => setShowVerification(false)}
         />
       )}
 

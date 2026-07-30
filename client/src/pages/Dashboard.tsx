@@ -95,6 +95,12 @@ export default function Dashboard() {
               Admin
             </button>
           )}
+          <button onClick={() => navigate("/connections")} className="text-sm px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-text-secondary hover:text-text transition-colors">
+            Connections
+          </button>
+          <button onClick={() => navigate("/marketplace")} className="text-sm px-3 py-1.5 rounded-lg bg-surface-2 border border-accent/30 text-accent hover:bg-accent/10 transition-colors">
+            Marketplace
+          </button>
           <button onClick={() => navigate("/help")} className="text-sm px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-text-secondary hover:text-text transition-colors">
             Help
           </button>

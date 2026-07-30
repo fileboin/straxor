@@ -30,6 +30,8 @@ interface Props {
   onOpenQuickStart?: () => void;
   onOpenKnowledge?: () => void;
   onOpenImage?: () => void;
+  onOpenImageAgent?: () => void;
+  onOpenVerification?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -76,6 +78,8 @@ export default function WorkspaceTopbar({
   onOpenQuickStart,
   onOpenKnowledge,
   onOpenImage,
+  onOpenImageAgent,
+  onOpenVerification,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -235,6 +239,24 @@ export default function WorkspaceTopbar({
             🎨
           </button>
         )}
+        {onOpenVerification && (
+          <button
+            onClick={onOpenVerification}
+            className="hidden sm:flex w-8 h-8 items-center justify-center rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+            title="Proof Loop Verification"
+          >
+            ✓
+          </button>
+        )}
+        {onOpenImageAgent && (
+          <button
+            onClick={onOpenImageAgent}
+            className="hidden sm:flex w-8 h-8 items-center justify-center rounded-lg border border-accent/30 bg-transparent text-accent text-xs hover:bg-accent/10 transition-colors"
+            title="Image Agent"
+          >
+            🤖
+          </button>
+        )}
         {onOpenKnowledge && (
           <button
             onClick={onOpenKnowledge}
@@ -244,6 +266,20 @@ export default function WorkspaceTopbar({
             🧠
           </button>
         )}
+        <button
+          onClick={() => navigate("/marketplace")}
+          className="hidden sm:flex w-8 h-8 items-center justify-center rounded-lg border border-accent/30 bg-transparent text-accent text-xs hover:bg-accent/10 transition-colors"
+          title="Marketplace"
+        >
+          🏪
+        </button>
+        <button
+          onClick={() => navigate("/connections")}
+          className="hidden sm:flex w-8 h-8 items-center justify-center rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+          title="Universal Connections"
+        >
+          🔗
+        </button>
         <button
           onClick={() => navigate("/help")}
           className="hidden sm:flex w-8 h-8 items-center justify-center rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
