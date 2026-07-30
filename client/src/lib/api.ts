@@ -1,6 +1,6 @@
 type ApiOptions = Omit<RequestInit, "body"> & { body?: unknown };
 
-const API_BASE = "/api";
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 export async function api<T>(
   path: string,
