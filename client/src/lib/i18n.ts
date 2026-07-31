@@ -185,6 +185,10 @@ const DICT: Record<string, { en: string; bs: string }> = {
   "auth.registerTab": { en: "Register", bs: "Registruj se" },
   "auth.loginLoading": { en: "Logging in...", bs: "Prijavljivanje..." },
   "auth.registerLoading": { en: "Registering...", bs: "Registracija..." },
+  "auth.firstAdmin": {
+    en: "No administrator yet — the first registered account is created as Admin",
+    bs: "Još nema administratora — prvi registrovani račun se kreira kao Administrator",
+  },
   "auth.passwordMin": {
     en: "Min. 6 characters",
     bs: "Min. 6 karaktera",

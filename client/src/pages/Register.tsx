@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useAuth } from "../lib/auth.js";
 import { Link } from "react-router-dom";
 import { useTheme } from "../lib/theme.js";
 import { t, useLang } from "../lib/i18n.js";
+import { api } from "../lib/api.js";
 
 export default function Register() {
   const { register } = useAuth();
@@ -13,6 +14,21 @@ export default function Register() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [noAdmin, setNoAdmin] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    api<{ adminExists: boolean; adminEmailConfigured: boolean }>("/auth/admin-status")
+      .then((s) => {
+        if (active) setNoAdmin(!s.adminExists);
+      })
+      .catch(() => {
+        if (active) setNoAdmin(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -58,6 +74,13 @@ export default function Register() {
             {t("auth.registerTab")}
           </button>
         </div>
+
+        {noAdmin === true && (
+          <div className="mb-4 flex items-start gap-2.5 bg-accent-dim border border-accent/30 rounded-xl p-3 text-[12px] text-accent leading-relaxed">
+            <span className="text-base leading-none shrink-0 mt-0.5">👑</span>
+            <span>{t("auth.firstAdmin")}</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>

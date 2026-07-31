@@ -2,7 +2,9 @@
 // Network-first for navigations (falls back to cached shell offline),
 // stale-while-revalidate for static assets, network-only for /api/*.
 
-const CACHE = "straxor-shell-v1";
+// Bump this version on every deploy that changes the app shell so stale
+// browser caches are flushed automatically (old caches deleted on activate).
+const CACHE = "straxor-shell-v2";
 
 const PRECACHE = [
   "/",

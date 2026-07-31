@@ -25,13 +25,22 @@ export function isAdminEmail(email: string): boolean {
     .includes(e);
 }
 
-export async function resolveRoleForEmail(email: string): Promise<string> {
-  if (isAdminEmail(email)) return "admin";
+export function isAdminEmailConfigured(): boolean {
+  return (process.env.ADMIN_EMAIL || "").trim().length > 0;
+}
+
+export async function adminCount(): Promise<number> {
   const rows = await db
     .select({ total: count() })
     .from(users)
     .where(or(eq(users.role, "admin"), eq(users.role, "super_admin")));
-  if ((rows[0]?.total ?? 0) === 0) return "admin"; // bootstrap first user
+  return rows[0]?.total ?? 0;
+}
+
+export async function resolveRoleForEmail(email: string): Promise<string> {
+  if (isAdminEmail(email)) return "admin";
+  const total = await adminCount();
+  if (total === 0) return "admin"; // bootstrap first user
   return "user";
 }
 
@@ -153,6 +162,21 @@ router.post("/register", async (req, res) => {
   } catch (err) {
     console.error("Register error:", err);
     res.status(500).json({ error: "Greška pri registraciji" });
+  }
+});
+
+// GET /auth/admin-status — public info used by the Register page to show the
+// first-admin bootstrap option. Never leaks emails, only a boolean.
+router.get("/admin-status", async (_req, res) => {
+  try {
+    const total = await adminCount();
+    res.json({
+      adminExists: total > 0,
+      adminEmailConfigured: isAdminEmailConfigured(),
+    });
+  } catch (err) {
+    console.error("Admin status error:", err);
+    res.status(500).json({ error: "Greška" });
   }
 });
 

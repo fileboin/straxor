@@ -13,7 +13,9 @@ export function registerServiceWorker(): void {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/sw.js")
-      .then(() => {
+      .then((reg) => {
+        // Proactively check for a new service worker (new deploy) on load.
+        reg.update().catch(() => {});
         // Optional: proactively update on new builds
         navigator.serviceWorker.addEventListener("controllerchange", () => {
           window.location.reload();
