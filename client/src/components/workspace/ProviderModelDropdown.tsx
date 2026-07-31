@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import {
-  PROVIDERS,
+  useModelCatalog,
   THINKING_BUDGETS,
   type Provider,
   type Model,
@@ -34,8 +34,9 @@ export default function ProviderModelDropdown({
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [providerKeys, setProviderKeys] = useState<Record<string, boolean>>({});
   const ref = useRef<HTMLDivElement>(null);
+  const { providers } = useModelCatalog();
 
-  const currentProvider = PROVIDERS.find((p) => p.id === providerId);
+  const currentProvider = providers.find((p) => p.id === providerId);
   const currentModel = currentProvider?.models.find((m) => m.id === modelId);
 
   // Load API key status for all providers
@@ -43,14 +44,14 @@ export default function ProviderModelDropdown({
     if (open) {
       const loadKeys = async () => {
         const keys: Record<string, boolean> = {};
-        for (const p of PROVIDERS) {
+        for (const p of providers) {
           keys[p.id] = await hasApiKey(p.id);
         }
         setProviderKeys(keys);
       };
       loadKeys();
     }
-  }, [open]);
+  }, [open, providers]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -141,7 +142,7 @@ export default function ProviderModelDropdown({
           {/* Provider list */}
           {view === "providers" && !showKeyInput && (
             <div className="overflow-y-auto flex-1">
-              {PROVIDERS.map((p) => {
+              {providers.map((p) => {
                 const hasKey = providerKeys[p.id] || false;
                 return (
                   <button

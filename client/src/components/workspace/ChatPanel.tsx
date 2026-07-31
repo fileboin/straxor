@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import ProviderModelDropdown from "./ProviderModelDropdown.js";
+import ModelPickerModal from "./ModelPickerModal.js";
 import InputToolbar from "./InputToolbar.js";
 import PlanActToggle, { type PlanActMode } from "./PlanActToggle.js";
 import PlanPreview from "./PlanPreview.js";
-import type { ThinkingBudget } from "../../lib/models.js";
+import { useModelCatalog, type ThinkingBudget } from "../../lib/models.js";
 
 export interface ToolCall {
   id: string;
@@ -137,7 +138,9 @@ export default function ChatPanel({
   const [input, setInput] = useState("");
   const [showPlanPreview, setShowPlanPreview] = useState(false);
   const [pendingMessage, setPendingMessage] = useState("");
+  const [showModelPicker, setShowModelPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { providers: catalogProviders, loading: catalogLoading } = useModelCatalog();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -223,6 +226,14 @@ export default function ChatPanel({
             </button>
           )}
           <PlanActToggle mode={planActMode} onChange={onPlanActChange} />
+          <button
+            onClick={() => setShowModelPicker(true)}
+            className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
+            title="Model picker (kompletan katalog)"
+            aria-label="Model picker"
+          >
+            ✦
+          </button>
           <ProviderModelDropdown
             providerId={providerId}
             modelId={modelId}
@@ -234,6 +245,22 @@ export default function ChatPanel({
           />
         </div>
       </div>
+
+      {/* Model picker modal */}
+      <ModelPickerModal
+        open={showModelPicker}
+        title={`${title} — model picker`}
+        providerId={providerId}
+        modelId={modelId}
+        thinking={thinking}
+        providers={catalogProviders}
+        loading={catalogLoading}
+        onProviderChange={onProviderChange}
+        onModelChange={onModelChange}
+        onThinkingChange={onThinkingChange}
+        onApiKeyChange={onApiKeyChange}
+        onClose={() => setShowModelPicker(false)}
+      />
 
       {/* Optional header content (e.g. TodoList) */}
       {headerContent}

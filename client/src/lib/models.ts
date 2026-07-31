@@ -1,3 +1,6 @@
+import { api } from "./api.js";
+import { useEffect, useState } from "react";
+
 export type ProviderStatus = "ready" | "needs-setup";
 
 export interface Provider {
@@ -150,3 +153,37 @@ export const THINKING_BUDGETS: { id: ThinkingBudget; label: string; desc: string
   { id: "medium", label: "Medium", desc: "Balansirano" },
   { id: "high", label: "High", desc: "Duboka analiza" },
 ];
+
+// Fetch the full provider/model catalog from the server. Falls back to the
+// static PROVIDERS list if the endpoint is unreachable or empty.
+export async function fetchModelCatalog(): Promise<{ providers: Provider[] }> {
+  try {
+    const data = await api<{ providers: Provider[] }>("/models");
+    if (Array.isArray(data.providers) && data.providers.length > 0) {
+      return data;
+    }
+  } catch {}
+  return { providers: PROVIDERS };
+}
+
+export function useModelCatalog() {
+  const [providers, setProviders] = useState<Provider[]>(PROVIDERS);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    fetchModelCatalog()
+      .then((catalog) => {
+        if (active) setProviders(catalog.providers);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return { providers, loading };
+}
