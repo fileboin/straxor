@@ -12,6 +12,7 @@ import DiffReview, { type DiffFile } from "../components/workspace/DiffReview.js
 import PermissionsPanel from "../components/workspace/PermissionsPanel.js";
 import ToolConfirmDialog from "../components/workspace/ToolConfirmDialog.js";
 import type { ChatMessage, ToolCall } from "../components/workspace/ChatPanel.js";
+import type { Attachment } from "../lib/attachments.js";
 import type { PlanActMode } from "../components/workspace/PlanActToggle.js";
 import type { ThinkingBudget } from "../lib/models.js";
 import { streamChat, hasApiKey } from "../lib/chat.js";
@@ -500,8 +501,13 @@ export default function Workspace() {
     }
   }, [agentMachineId, agentSessionId]);
 
-  const handleAskSend = useCallback((msg: string) => {
-    const userMsg: ChatMessage = { id: `a-${Date.now()}`, role: "user", content: msg };
+  const handleAskSend = useCallback((msg: string, attachments?: Attachment[]) => {
+    const userMsg: ChatMessage = {
+      id: `a-${Date.now()}`,
+      role: "user",
+      content: msg,
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
+    };
     const assistantMsg: ChatMessage = {
       id: `a-${Date.now() + 1}`,
       role: "assistant",
@@ -567,7 +573,7 @@ export default function Workspace() {
     []
   );
 
-  const handleAgentSend = useCallback(async (msg: string) => {
+  const handleAgentSend = useCallback(async (msg: string, attachments?: Attachment[]) => {
     if (!agentMachineId) {
       setAgentMessages((prev) => [
         ...prev,
@@ -620,7 +626,12 @@ export default function Workspace() {
         ? `${systemParts.join("\n\n")}\n\n---\n\n${msg}`
         : msg;
 
-    const userMsg: ChatMessage = { id: `g-${Date.now()}`, role: "user", content: msg };
+    const userMsg: ChatMessage = {
+      id: `g-${Date.now()}`,
+      role: "user",
+      content: msg,
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
+    };
     const assistantMsg: ChatMessage = {
       id: `g-${Date.now() + 1}`,
       role: "assistant",
@@ -1379,17 +1390,17 @@ export default function Workspace() {
           panelsLayout === "side" ? "md:flex-row" : ""
         }`}
       >
-        {/* Layout toggle (desktop) — hidden while a panel is expanded */}
+        {/* Layout toggle — visible on all screens; stacked stays automatic on mobile */}
         <div
-          className={`hidden md:flex items-center justify-end gap-1 px-2 py-1 border-b border-border bg-surface shrink-0 transition-opacity ${
-            panelMode !== "split" ? "md:hidden" : ""
+          className={`flex items-center justify-end gap-1 px-2 py-1 border-b border-border bg-surface shrink-0 transition-opacity ${
+            panelMode !== "split" ? "hidden" : ""
           }`}
         >
           <div className="flex items-center gap-0.5 bg-surface-2 rounded-lg p-0.5">
             <button
               onClick={() => setPanelsLayout("side")}
-              title="Side-by-side (Ask | Agent)"
-              aria-label="Side-by-side layout"
+              title={t("layout.side")}
+              aria-label={t("layout.side")}
               className={`w-8 h-6 rounded-md flex items-center justify-center text-[13px] transition-colors ${
                 panelsLayout === "side"
                   ? "bg-accent/15 text-accent"
@@ -1400,8 +1411,8 @@ export default function Workspace() {
             </button>
             <button
               onClick={() => setPanelsLayout("stack")}
-              title="Stacked (Ask / Agent)"
-              aria-label="Stacked layout"
+              title={t("layout.stack")}
+              aria-label={t("layout.stack")}
               className={`w-8 h-6 rounded-md flex items-center justify-center text-[13px] transition-colors ${
                 panelsLayout === "stack"
                   ? "bg-accent/15 text-accent"
@@ -1411,6 +1422,9 @@ export default function Workspace() {
               ▥
             </button>
           </div>
+          <span className="hidden sm:inline text-[10px] text-text-muted ml-1">
+            {panelsLayout === "side" ? t("layout.sideLabel") : t("layout.stackLabel")}
+          </span>
         </div>
 
         {/* Ask panel */}

@@ -2,5 +2,7 @@ node_modules/
 dist/
 /.env
 server/.env
+server/uploads/
+server/image-data/
 *.log
 .DS_Store

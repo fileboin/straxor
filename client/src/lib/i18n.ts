@@ -29,9 +29,23 @@ const DICT: Record<string, { en: string; bs: string }> = {
   // ── Chat input / toolbar ──
   "toolbar.attach": { en: "Add attachment", bs: "Dodaj prilog" },
   "toolbar.mic": { en: "Microphone", bs: "Mikrofon" },
+  "toolbar.mic.stop": { en: "Stop recording", bs: "Zaustavi snimanje" },
+  "toolbar.mic.recording": { en: "Recording…", bs: "Snimanje…" },
+  "toolbar.mic.processing": { en: "Processing audio…", bs: "Obrada zvuka…" },
+  "toolbar.mic.unsupported": { en: "Speech recognition not supported in this browser", bs: "Prepoznavanje govora nije podržano u ovom pregledniku" },
   "toolbar.camera": { en: "Camera", bs: "Kamera" },
+  "toolbar.camera.alt": { en: "Camera capture", bs: "Snimanje kamerom" },
+  "toolbar.camera.take": { en: "Capture photo", bs: "Snimi fotografiju" },
+  "toolbar.camera.close": { en: "Close camera", bs: "Zatvori kameru" },
   "toolbar.file": { en: "File", bs: "Fajl" },
   "toolbar.image": { en: "Image", bs: "Slika" },
+  "upload.uploading": { en: "Uploading…", bs: "Prijenos…" },
+  "upload.failed": { en: "Upload failed", bs: "Prijenos nije uspio" },
+  "upload.remove": { en: "Remove", bs: "Ukloni" },
+  "upload.reject": { en: "File type not allowed", bs: "Tip datoteke nije dozvoljen" },
+  "upload.camera.error": { en: "Camera unavailable. Check browser permission.", bs: "Kamera nije dostupna. Provjeri dozvolu preglednika." },
+  "upload.mic.error": { en: "Microphone unavailable. Check browser permission.", bs: "Mikrofon nije dostupan. Provjeri dozvolu preglednika." },
+  "upload.attach.hint": { en: "attached", bs: "priloženo" },
   "chat.placeholder": {
     en: "Ask Straxor anything...",
     bs: "Pitajte Straxor bilo šta...",
@@ -114,6 +128,22 @@ const DICT: Record<string, { en: string; bs: string }> = {
   "panel.expand.enter": {
     en: "Expand to fullscreen",
     bs: "Proširi na puni ekran",
+  },
+  "layout.side": {
+    en: "Side-by-side (Ask | Agent)",
+    bs: "Jedan pored drugog (Ask | Agent)",
+  },
+  "layout.stack": {
+    en: "Stacked (Ask / Agent)",
+    bs: "Jedan ispod drugog (Ask / Agent)",
+  },
+  "layout.sideLabel": {
+    en: "side-by-side",
+    bs: "jedan pored drugog",
+  },
+  "layout.stackLabel": {
+    en: "stacked",
+    bs: "jedan ispod drugog",
   },
 
   // ── Auth pages ──

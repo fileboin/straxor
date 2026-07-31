@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type FormEvent } from "react";
+import { useState, useRef, useEffect, type FormEvent, type ChangeEvent } from "react";
 import ProviderModelDropdown from "./ProviderModelDropdown.js";
 import ModelPickerModal from "./ModelPickerModal.js";
 import InputToolbar from "./InputToolbar.js";
@@ -6,6 +6,21 @@ import PlanActToggle, { type PlanActMode } from "./PlanActToggle.js";
 import PlanPreview from "./PlanPreview.js";
 import { useModelCatalog, type ThinkingBudget } from "../../lib/models.js";
 import { t, useLang } from "../../lib/i18n.js";
+import {
+  type Attachment,
+  type UploadResponse,
+  uploadFile,
+  isImageAttachment,
+  isAudioAttachment,
+  formatFileSize,
+} from "../../lib/attachments.js";
+import {
+  hasSpeechRecognition,
+  createSpeechRecognition,
+  recordAudio,
+  openCameraStream,
+  capturePhoto,
+} from "../../lib/media.js";
 
 export interface ToolCall {
   id: string;
@@ -21,6 +36,7 @@ export interface ChatMessage {
   content: string;
   label?: string;
   toolCalls?: ToolCall[];
+  attachments?: Attachment[];
 }
 
 interface Props {
@@ -39,7 +55,7 @@ interface Props {
   onPlanActChange: (mode: PlanActMode) => void;
   messages: ChatMessage[];
   inputPlaceholder: string;
-  onSend: (message: string) => void;
+  onSend: (message: string, attachments?: Attachment[]) => void;
   loading?: boolean;
   streamingMessageId?: string | null;
   onApiKeyChange?: () => void;
@@ -55,6 +71,8 @@ interface Props {
   onSteerSend?: (message: string) => void;
   steerStatusText?: string;
 }
+
+const ACCEPTED_EXT_RE = /\.(jpe?g|png|webp|gif|avif|mp3|wav|ogg|webm|m4a|pdf|txt|md|csv|json)$/i;
 
 function ToolCallCard({ tool }: { tool: ToolCall }) {
   const [expanded, setExpanded] = useState(false);
@@ -104,6 +122,73 @@ function ToolCallCard({ tool }: { tool: ToolCall }) {
   );
 }
 
+function MessageAttachments({ attachments }: { attachments: Attachment[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-1.5">
+      {attachments.map((att) => (
+        <a key={att.id} href={att.url} target="_blank" rel="noreferrer" title={`${att.name} (${formatFileSize(att.size)})`}>
+          {isImageAttachment(att) ? (
+            <img
+              src={att.url}
+              alt={att.name}
+              loading="lazy"
+              className="max-w-[180px] max-h-[160px] rounded-lg object-cover border border-border"
+            />
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-border bg-surface-2 text-[11px] text-text-muted">
+              <span>{isAudioAttachment(att) ? "🎵" : "📄"}</span>
+              <span className="max-w-[140px] truncate">{att.name}</span>
+            </span>
+          )}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function AttachmentChips({
+  attachments,
+  uploadingCount,
+  onRemove,
+}: {
+  attachments: Attachment[];
+  uploadingCount: number;
+  onRemove: (id: string) => void;
+}) {
+  if (attachments.length === 0 && uploadingCount === 0) return null;
+  return (
+    <div className="mb-2 flex flex-wrap gap-1.5">
+      {attachments.map((att) => (
+        <div key={att.id} className="group relative flex items-center gap-1.5 pl-1 pr-1.5 py-0.5 rounded-lg border border-border bg-surface-2">
+          {isImageAttachment(att) ? (
+            <img src={att.url} alt={att.name} className="w-7 h-7 rounded-md object-cover" />
+          ) : (
+            <span className="w-7 h-7 rounded-md bg-surface-3 flex items-center justify-center text-xs">
+              {isAudioAttachment(att) ? "🎵" : "📄"}
+            </span>
+          )}
+          <span className="text-[11px] text-text-muted max-w-[120px] truncate">{att.name}</span>
+          <button
+            type="button"
+            onClick={() => onRemove(att.id)}
+            className="opacity-60 hover:opacity-100 text-[10px] text-text-muted hover:text-text"
+            title={t("upload.remove")}
+            aria-label={t("upload.remove")}
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      {uploadingCount > 0 && (
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-border bg-surface-2">
+          <span className="w-3 h-3 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+          <span className="text-[11px] text-text-muted">{t("upload.uploading")}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ChatPanel({
   title,
   icon,
@@ -141,8 +226,22 @@ export default function ChatPanel({
   useLang();
   const [pendingMessage, setPendingMessage] = useState("");
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const [micState, setMicState] = useState<"idle" | "recording" | "processing">("idle");
+  const [micError, setMicError] = useState("");
+  const [uploadError, setUploadError] = useState("");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { providers: catalogProviders, loading: catalogLoading } = useModelCatalog();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition>>(null);
+  const recorderStopRef = useRef<(() => void) | null>(null);
+  const cameraCleanupRef = useRef<(() => void) | null>(null);
+  const cameraVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -155,10 +254,210 @@ export default function ChatPanel({
     }
   }, [prefill]);
 
+  // Camera stream lifecycle
+  useEffect(() => {
+    if (!cameraOpen) return;
+    const video = cameraVideoRef.current;
+    if (!video) return;
+    setCameraError("");
+    cameraCleanupRef.current = openCameraStream(video, {
+      onError: () => setCameraError(t("upload.camera.error")),
+    });
+    return () => {
+      cameraCleanupRef.current?.();
+      cameraCleanupRef.current = null;
+    };
+  }, [cameraOpen]);
+
+  // Auto-clear transient errors
+  useEffect(() => {
+    if (!micError && !uploadError) return;
+    const timer = setTimeout(() => {
+      setMicError("");
+      setUploadError("");
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [micError, uploadError]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      try {
+        recognitionRef.current?.abort?.();
+      } catch {
+        /* noop */
+      }
+      recorderStopRef.current?.();
+      cameraCleanupRef.current?.();
+    };
+  }, []);
+
+  const addAttachment = (up: UploadResponse) => {
+    setPendingAttachments((prev) => [
+      ...prev,
+      { id: up.id, url: up.url, name: up.name, size: up.size, mimeType: up.mimeType },
+    ]);
+  };
+
+  const uploadFileList = async (files: FileList | File[]) => {
+    const list = Array.from(files);
+    const valid: File[] = [];
+    let rejected = 0;
+    for (const f of list) {
+      if (ACCEPTED_EXT_RE.test(f.name)) valid.push(f);
+      else rejected++;
+    }
+    if (rejected > 0) setUploadError(t("upload.reject"));
+    setUploadingCount((n) => n + valid.length);
+    for (const f of valid) {
+      try {
+        const up = await uploadFile(f);
+        addAttachment(up);
+      } catch {
+        setUploadError(t("upload.failed"));
+      } finally {
+        setUploadingCount((n) => Math.max(0, n - 1));
+      }
+    }
+  };
+
+  const handleFilesSelected = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) uploadFileList(files);
+    e.target.value = "";
+  };
+
+  const startMicFallback = () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicError(t("toolbar.mic.unsupported"));
+      setMicState("idle");
+      return;
+    }
+    setMicState("processing");
+    recorderStopRef.current = recordAudio({
+      onStart: () => setMicState("recording"),
+      onBlob: (blob) => {
+        const ext =
+          blob.type.includes("ogg") ? "ogg" :
+          blob.type.includes("mp4") ? "m4a" :
+          "webm";
+        const file = new File([blob], `mic-${Date.now()}.${ext}`, {
+          type: blob.type || "audio/webm",
+        });
+        setMicState("processing");
+        uploadFile(file)
+          .then(addAttachment)
+          .catch(() => setUploadError(t("upload.failed")))
+          .finally(() => setMicState("idle"));
+      },
+      onError: () => {
+        setMicError(t("upload.mic.error"));
+        setMicState("idle");
+      },
+    });
+  };
+
+  const handleMicToggle = () => {
+    if (micState !== "idle") {
+      stopMic();
+      return;
+    }
+    setMicError("");
+    if (hasSpeechRecognition()) {
+      const rec = createSpeechRecognition();
+      if (!rec) {
+        startMicFallback();
+        return;
+      }
+      recognitionRef.current = rec;
+      rec.onresult = (e) => {
+        let text = "";
+        const results = e.results;
+        if (results) {
+          for (let i = 0; i < results.length; i++) {
+            const r = results[i];
+            if (r && r[0]?.transcript) text += r[0].transcript;
+          }
+        }
+        if (text) setInput((prev) => (prev ? `${prev} ${text}` : text));
+      };
+      rec.onerror = (ev) => {
+        if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
+          setMicError(t("upload.mic.error"));
+        }
+      };
+      rec.onend = () => {
+        recognitionRef.current = null;
+        setMicState("idle");
+      };
+      try {
+        rec.start();
+        setMicState("recording");
+      } catch {
+        recognitionRef.current = null;
+        setMicState("idle");
+        startMicFallback();
+      }
+    } else {
+      startMicFallback();
+    }
+  };
+
+  const stopMic = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        /* noop */
+      }
+      recognitionRef.current = null;
+    }
+    recorderStopRef.current?.();
+    recorderStopRef.current = null;
+    setMicState("idle");
+  };
+
+  const handleToolbarAction = (actionId: string) => {
+    if (actionId === "mic") {
+      handleMicToggle();
+      return;
+    }
+    if (actionId === "camera") {
+      setCameraOpen(true);
+      return;
+    }
+    if (actionId === "file") {
+      fileInputRef.current?.click();
+      return;
+    }
+    if (actionId === "image") {
+      imageInputRef.current?.click();
+      return;
+    }
+  };
+
+  const handleCameraClose = () => setCameraOpen(false);
+
+  const handleCameraCapture = async () => {
+    const video = cameraVideoRef.current;
+    if (!video) return;
+    const blob = await capturePhoto(video);
+    if (!blob) return;
+    const file = new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" });
+    setUploadingCount((n) => n + 1);
+    uploadFile(file)
+      .then(addAttachment)
+      .catch(() => setUploadError(t("upload.failed")))
+      .finally(() => {
+        setUploadingCount((n) => Math.max(0, n - 1));
+        setCameraOpen(false);
+      });
+  };
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = input.trim();
-    if (!trimmed) return;
+    if (!trimmed && pendingAttachments.length === 0) return;
 
     // Steer mode — send instruction to running agent
     if (isSteerable && onSteerSend) {
@@ -175,15 +474,17 @@ export default function ChatPanel({
       return;
     }
 
-    onSend(trimmed);
+    onSend(trimmed, pendingAttachments);
     setInput("");
+    setPendingAttachments([]);
   };
 
   const handlePlanConfirm = () => {
     setShowPlanPreview(false);
-    onSend(pendingMessage);
+    onSend(pendingMessage, pendingAttachments);
     setInput("");
     setPendingMessage("");
+    setPendingAttachments([]);
   };
 
   const handlePlanCancel = () => {
@@ -291,6 +592,10 @@ export default function ChatPanel({
                 <span className="inline-block w-2 h-4 ml-0.5 bg-accent animate-pulse" />
               )}
             </div>
+            {/* Message attachments */}
+            {msg.attachments && msg.attachments.length > 0 && (
+              <MessageAttachments attachments={msg.attachments} />
+            )}
             {/* Tool calls */}
             {msg.toolCalls && msg.toolCalls.length > 0 && (
               <div className="mt-1">
@@ -317,7 +622,7 @@ export default function ChatPanel({
         <div ref={messagesEndRef} />
       </div>
 
-          {/* Steer status bar */}
+      {/* Steer status bar */}
       {isSteerable && (
         <div className="px-3 py-1.5 border-t border-accent/30 bg-accent/5 flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
@@ -344,13 +649,47 @@ export default function ChatPanel({
             />
           </div>
         )}
+
+        {/* Mic status */}
+        {(micState === "recording" || micState === "processing") && (
+          <div className="mb-2 flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-[11px] text-red-500">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+            <span className="flex-1 min-w-0 truncate">
+              {micState === "processing" ? t("toolbar.mic.processing") : t("toolbar.mic.recording")}
+            </span>
+            <button type="button" onClick={stopMic} className="shrink-0 hover:opacity-70">
+              ■ {t("toolbar.mic.stop")}
+            </button>
+          </div>
+        )}
+
+        {/* Errors */}
+        {(micError || uploadError) && (
+          <div className="mb-2 px-2.5 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-[11px] text-red-500">
+            {micError || uploadError}
+          </div>
+        )}
+
+        {/* Pending attachments */}
+        <AttachmentChips
+          attachments={pendingAttachments}
+          uploadingCount={uploadingCount}
+          onRemove={(id) =>
+            setPendingAttachments((prev) => prev.filter((a) => a.id !== id))
+          }
+        />
+
         <form
           onSubmit={handleSubmit}
           className={`flex items-center gap-2 px-2.5 py-1.5 rounded-[20px] border border-border bg-surface-2 transition-colors focus-within:border-accent sm:px-3 ${
             iconColor === "blue" ? "focus-within:border-accent-blue" : ""
           }`}
         >
-          <InputToolbar onAction={() => {}} />
+          <InputToolbar
+            onAction={handleToolbarAction}
+            micState={micState}
+            onMicToggle={handleMicToggle}
+          />
           <input
             type="text"
             value={input}
@@ -361,7 +700,7 @@ export default function ChatPanel({
           />
           <button
             type="submit"
-            disabled={(loading && !isSteerable) || !input.trim()}
+            disabled={(loading && !isSteerable) || (!input.trim() && pendingAttachments.length === 0)}
             className={`w-[30px] h-[30px] rounded-full border-none text-white text-sm flex items-center justify-center transition-opacity shrink-0 disabled:opacity-30 ${
               isSteerable ? "bg-accent" : iconColor === "blue" ? "bg-accent-blue" : "bg-accent"
             } hover:opacity-85`}
@@ -369,7 +708,68 @@ export default function ChatPanel({
             {isSteerable ? "\u2191" : "\u2191"}
           </button>
         </form>
+
+        {/* Hidden file pickers */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleFilesSelected}
+          accept=".jpg,.jpeg,.png,.webp,.gif,.avif,.pdf,.txt,.md,.csv,.json,.mp3,.wav,.ogg,.webm,.m4a"
+        />
+        <input
+          ref={imageInputRef}
+          type="file"
+          multiple
+          accept="image/*"
+          className="hidden"
+          onChange={handleFilesSelected}
+        />
       </div>
+
+      {/* Camera overlay */}
+      {cameraOpen && (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-black/90 p-4">
+          <div className="flex items-center justify-between mb-3 shrink-0">
+            <span className="text-[13px] font-semibold text-white">
+              {t("toolbar.camera.alt")}
+            </span>
+            <button
+              type="button"
+              onClick={handleCameraClose}
+              className="w-8 h-8 rounded-full bg-white/10 text-white hover:bg-white/20 flex items-center justify-center transition-colors"
+              title={t("toolbar.camera.close")}
+              aria-label={t("toolbar.camera.close")}
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center min-h-0">
+            <video
+              ref={cameraVideoRef}
+              playsInline
+              muted
+              autoPlay
+              className="max-w-full max-h-full rounded-xl object-contain"
+            />
+          </div>
+          {cameraError && (
+            <div className="text-red-400 text-[12px] text-center py-2 shrink-0">
+              {cameraError}
+            </div>
+          )}
+          <div className="flex items-center justify-center py-4 shrink-0">
+            <button
+              type="button"
+              onClick={handleCameraCapture}
+              className="w-14 h-14 rounded-full border-4 border-white bg-white/20 hover:bg-white/30 transition-colors"
+              title={t("toolbar.camera.take")}
+              aria-label={t("toolbar.camera.take")}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

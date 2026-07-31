@@ -13,11 +13,14 @@ export async function api<T>(
         : options.body as BodyInit)
     : undefined;
 
+  const isForm = body instanceof FormData;
+  const isUrlEncoded = body instanceof URLSearchParams;
+
   const res = await fetch(`${base}/api${path}`, {
     ...options,
     body,
     headers: {
-      "Content-Type": "application/json",
+      ...(!isForm && !isUrlEncoded ? { "Content-Type": "application/json" } : {}),
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers as Record<string, string>,
     },
