@@ -429,6 +429,17 @@ router.get("/dashboard", requireAdmin, async (_req: Request, res: Response) => {
       subscriptions: totalSubs,
       wallets: totalWallets,
       featureFlags: { active: activeFlags, total: totalFlags },
+      system: {
+        uptimeSec: Math.floor(process.uptime()),
+        nodeVersion: process.version,
+        env: process.env.NODE_ENV || "development",
+        adminEmailConfigured: !!process.env.ADMIN_EMAIL,
+      },
+      recentActivity: await db
+        .select({ id: logs.id, category: logs.category, level: logs.level, message: logs.message, createdAt: logs.createdAt })
+        .from(logs)
+        .orderBy(desc(logs.createdAt))
+        .limit(8),
     });
   } catch (error) {
     console.error("Admin dashboard error:", error);

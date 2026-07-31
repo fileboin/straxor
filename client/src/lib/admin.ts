@@ -106,6 +106,19 @@ export interface AdminDashboardStats {
   subscriptions: number;
   wallets: number;
   featureFlags: { active: number; total: number };
+  system: {
+    uptimeSec: number;
+    nodeVersion: string;
+    env: string;
+    adminEmailConfigured: boolean;
+  };
+  recentActivity: {
+    id: string;
+    category: string;
+    level: string;
+    message: string;
+    createdAt: string;
+  }[];
 }
 
 // ── Feature Flags ──

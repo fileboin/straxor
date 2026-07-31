@@ -319,6 +319,29 @@ export default function Admin() {
                 <div className="p-4 rounded-xl bg-surface-2 border border-border"><div className="text-[11px] text-text-muted">Wallets</div><div className="text-2xl font-bold text-text mt-1">{dashStats.wallets}</div></div>
                 <div className="p-4 rounded-xl bg-surface-2 border border-border"><div className="text-[11px] text-text-muted">Feature Flags</div><div className="text-2xl font-bold text-text mt-1">{dashStats.featureFlags.active}<span className="text-text-muted text-[13px] font-normal">/{dashStats.featureFlags.total}</span></div></div>
               </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="p-4 rounded-xl bg-surface-2 border border-border">
+                  <h3 className="text-[12px] font-semibold text-text mb-3">Sistem Status</h3>
+                  <div className="space-y-2 text-[12px]">
+                    <div className="flex justify-between"><span className="text-text-muted">Env</span><span className="text-text">{dashStats.system.env}</span></div>
+                    <div className="flex justify-between"><span className="text-text-muted">Node</span><span className="text-text">{dashStats.system.nodeVersion}</span></div>
+                    <div className="flex justify-between"><span className="text-text-muted">Uptime</span><span className="text-text">{Math.floor(dashStats.system.uptimeSec / 60)} min</span></div>
+                    <div className="flex justify-between"><span className="text-text-muted">ADMIN_EMAIL</span><span className={dashStats.system.adminEmailConfigured ? "text-green-400" : "text-yellow-400"}>{dashStats.system.adminEmailConfigured ? "configurisan" : "nije postavljen"}</span></div>
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-surface-2 border border-border">
+                  <h3 className="text-[12px] font-semibold text-text mb-3">Nedavna Aktivnost</h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {dashStats.recentActivity.length === 0 && <div className="text-[11px] text-text-muted">Nema aktivnosti</div>}
+                    {dashStats.recentActivity.map((a) => (
+                      <div key={a.id} className="flex items-start justify-between gap-3 text-[11px] border-b border-border/40 pb-1.5">
+                        <span className="text-text truncate">{a.message}</span>
+                        <span className="text-text-muted whitespace-nowrap">{new Date(a.createdAt).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

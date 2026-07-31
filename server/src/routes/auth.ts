@@ -4,12 +4,36 @@ import jwt from "jsonwebtoken";
 import { randomBytes } from "crypto";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { eq, or, count } from "drizzle-orm";
 import { sendEmail, buildAppUrl } from "../lib/mail.js";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+// ── Admin role resolution ──
+// ADMIN_EMAIL (comma-separated) always has admin access as a failsafe.
+// Otherwise the very first registered user is bootstrapped as admin; every
+// subsequent user defaults to the regular "user" role.
+
+export function isAdminEmail(email: string): boolean {
+  const e = email.trim().toLowerCase();
+  return (process.env.ADMIN_EMAIL || "")
+    .split(",")
+    .map((a) => a.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(e);
+}
+
+export async function resolveRoleForEmail(email: string): Promise<string> {
+  if (isAdminEmail(email)) return "admin";
+  const rows = await db
+    .select({ total: count() })
+    .from(users)
+    .where(or(eq(users.role, "admin"), eq(users.role, "super_admin")));
+  if ((rows[0]?.total ?? 0) === 0) return "admin"; // bootstrap first user
+  return "user";
+}
 
 interface PublicUser {
   id: string;
@@ -25,6 +49,19 @@ function toPublicUser(u: {
   emailVerified: boolean | null;
 }): PublicUser {
   return { id: u.id, email: u.email, role: u.role, emailVerified: !!u.emailVerified };
+}
+
+async function publicUserWithFailsafe(user: {
+  id: string;
+  email: string;
+  role: string;
+  emailVerified: boolean | null;
+}): Promise<PublicUser> {
+  if (isAdminEmail(user.email) && user.role !== "admin") {
+    await db.update(users).set({ role: "admin" }).where(eq(users.id, user.id));
+    return { ...toPublicUser(user), role: "admin" };
+  }
+  return toPublicUser(user);
 }
 
 function signToken(user: PublicUser): string {
@@ -95,9 +132,10 @@ router.post("/register", async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const verificationToken = randomBytes(32).toString("hex");
+    const role = await resolveRoleForEmail(email);
     const [user] = await db
       .insert(users)
-      .values({ email, passwordHash, verificationToken })
+      .values({ email, passwordHash, verificationToken, role })
       .returning({ id: users.id, email: users.email, role: users.role, emailVerified: users.emailVerified });
 
     const appUrl = buildAppUrl(req);
@@ -136,7 +174,7 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Neispravni podaci" });
     }
 
-    const publicUser = toPublicUser(user);
+    const publicUser = await publicUserWithFailsafe(user);
     const token = signToken(publicUser);
 
     res.json({ user: publicUser, token });
@@ -295,7 +333,7 @@ router.get("/me", async (req, res) => {
       return res.status(401).json({ error: "Korisnik ne postoji" });
     }
 
-    res.json({ user: toPublicUser(user) });
+    res.json({ user: await publicUserWithFailsafe(user) });
   } catch {
     res.status(401).json({ error: "Neispravan token" });
   }
