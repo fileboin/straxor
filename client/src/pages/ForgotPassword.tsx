@@ -2,9 +2,11 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { useTheme } from "../lib/theme.js";
+import { t, useLang } from "../lib/i18n.js";
 
 export default function ForgotPassword() {
   const { toggleTheme, theme } = useTheme();
+  useLang();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "sent">("idle");
   const [error, setError] = useState("");
@@ -20,7 +22,7 @@ export default function ForgotPassword() {
       });
       setStatus("sent");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Greška");
+      setError(err instanceof Error ? err.message : t("common.error"));
       setStatus("idle");
     }
   };
@@ -44,27 +46,26 @@ export default function ForgotPassword() {
         </div>
 
         <Link to="/login" className="text-sm text-text-muted hover:text-text-secondary transition-colors mb-6 inline-block">
-          ← Nazad na prijavu
+          ← {t("auth.backToLogin")}
         </Link>
 
         {status === "sent" ? (
           <div className="bg-surface-2 border border-border rounded-xl p-6 text-center">
             <div className="text-3xl mb-3">📬</div>
-            <h2 className="text-lg font-bold mb-2">Provjerite svoj email</h2>
+            <h2 className="text-lg font-bold mb-2">{t("auth.checkEmail")}</h2>
             <p className="text-sm text-text-muted leading-relaxed">
-              Ako račun sa tom adresom postoji, poslali smo link za reset lozinke.
-              Link važi 1 sat.
+              {t("auth.resetSent")}
             </p>
           </div>
         ) : (
           <>
-            <h2 className="text-lg font-bold mb-2">Zaboravili ste lozinku?</h2>
+            <h2 className="text-lg font-bold mb-2">{t("auth.forgotTitle")}</h2>
             <p className="text-sm text-text-muted mb-6">
-              Unesite email adresu i poslat ćemo vam link za reset lozinke.
+              {t("auth.forgotSubtitle")}
             </p>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
-                <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Email</label>
+                <label className="block text-[13px] font-medium text-text-secondary mb-1.5">{t("auth.email")}</label>
                 <input
                   type="email"
                   placeholder="you@example.com"
@@ -80,7 +81,7 @@ export default function ForgotPassword() {
                 disabled={status === "loading"}
                 className="w-full py-2.5 rounded-xl bg-accent hover:opacity-90 disabled:opacity-50 text-white text-sm font-semibold transition-opacity"
               >
-                {status === "loading" ? "Slanje..." : "Pošalji link"}
+                {status === "loading" ? t("auth.sending") : t("auth.sendLink")}
               </button>
             </form>
           </>

@@ -6,6 +6,7 @@ import {
 } from "../../lib/models.js";
 import ApiKeyInput from "./ApiKeyInput.js";
 import { hasApiKey } from "../../lib/chat.js";
+import { t, useLang } from "../../lib/i18n.js";
 
 interface Props {
   open: boolean;
@@ -40,6 +41,7 @@ export default function ModelPickerModal({
   const [selectedProviderId, setSelectedProviderId] = useState(providerId);
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [providerKeys, setProviderKeys] = useState<Record<string, boolean>>({});
+  useLang();
 
   useEffect(() => {
     if (open) {
@@ -98,7 +100,7 @@ export default function ModelPickerModal({
           <button
             onClick={onClose}
             className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 transition-colors shrink-0"
-            title="Zatvori"
+            title={t("common.close")}
           >
             ✕
           </button>
@@ -110,7 +112,7 @@ export default function ModelPickerModal({
             autoFocus
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Pretraži modele po imenu ili ID-u..."
+            placeholder={t("models.search")}
             className="w-full px-3 py-2 text-[13px] rounded-lg border border-border bg-surface-2 text-text placeholder-text-muted outline-none focus:border-accent transition-colors"
           />
         </div>
@@ -200,14 +202,14 @@ export default function ModelPickerModal({
                         </button>
                       )}
                     <span className="text-[10px] text-text-muted">
-                      {selectedProvider.models.length} modela
+                      {t("models.count", { n: selectedProvider.models.length })}
                     </span>
                   </div>
                 </div>
                 <div className="overflow-y-auto flex-1">
                   {selectedProvider.models.length === 0 && (
                     <div className="p-4 text-center text-[12px] text-text-muted">
-                      Nema rezultata
+                      {t("models.noResults")}
                     </div>
                   )}
                   {selectedProvider.models.map((m) => (
@@ -250,7 +252,7 @@ export default function ModelPickerModal({
             {/* Thinking budget */}
             <div className="border-t border-border px-4 py-2.5 shrink-0">
               <div className="text-[10px] text-text-muted mb-1.5 font-medium uppercase tracking-wider">
-                Thinking Budget
+                {t("models.thinking")}
               </div>
               <div className="flex gap-1">
                 {THINKING_BUDGETS.map((b) => (

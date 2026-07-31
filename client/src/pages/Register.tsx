@@ -2,10 +2,12 @@ import { useState, type FormEvent } from "react";
 import { useAuth } from "../lib/auth.js";
 import { Link } from "react-router-dom";
 import { useTheme } from "../lib/theme.js";
+import { t, useLang } from "../lib/i18n.js";
 
 export default function Register() {
   const { register } = useAuth();
   const { toggleTheme, theme } = useTheme();
+  useLang();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -20,7 +22,7 @@ export default function Register() {
       await register(email, password);
       setRegistered(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Greška");
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -50,16 +52,16 @@ export default function Register() {
             to="/login"
             className="flex-1 py-2 text-[13px] font-medium text-text-muted hover:text-text-secondary transition-colors text-center"
           >
-            Prijavi se
+            {t("auth.loginTab")}
           </Link>
           <button className="flex-1 py-2 text-[13px] font-medium bg-accent-dim text-accent">
-            Registruj se
+            {t("auth.registerTab")}
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Email</label>
+            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">{t("auth.email")}</label>
             <input
               type="email"
               placeholder="you@example.com"
@@ -70,10 +72,10 @@ export default function Register() {
             />
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Lozinka</label>
+            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">{t("auth.password")}</label>
             <input
               type="password"
-              placeholder="Min. 6 karaktera"
+              placeholder={t("auth.passwordMin")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               minLength={6}
@@ -87,13 +89,12 @@ export default function Register() {
             disabled={loading}
             className="w-full py-2.5 rounded-xl bg-accent hover:opacity-90 disabled:opacity-50 text-white text-sm font-semibold transition-opacity"
           >
-            {loading ? "Registracija..." : "Registruj se"}
+            {loading ? t("auth.registerLoading") : t("auth.registerTab")}
           </button>
         </form>
         {registered && (
           <div className="mt-4 bg-surface-2 border border-border rounded-xl p-4 text-[13px] text-text-muted leading-relaxed">
-            📬 Poslali smo vam <strong className="text-text-secondary">verifikacioni email</strong>.
-            Potvrdite email adresu iz inboxa da aktivirate račun.
+            📬 {t("auth.verificationNotice")}
           </div>
         )}
       </div>

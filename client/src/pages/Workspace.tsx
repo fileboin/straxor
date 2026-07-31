@@ -18,6 +18,7 @@ import { streamChat, hasApiKey } from "../lib/chat.js";
 import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges, sendSteerInstruction } from "../lib/agent.js";
 import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
 import { type AgentRole, getRoleById, fetchPrompts, type SavedPrompt } from "../lib/roles.js";
+import { t, useLang } from "../lib/i18n.js";
 import { checkBeforeInstall, type ScanVerdict } from "../lib/security.js";
 import RoleSelector from "../components/workspace/RoleSelector.js";
 import PromptLibrary from "../components/workspace/PromptLibrary.js";
@@ -85,6 +86,7 @@ export default function Workspace() {
   const navigate = useNavigate();
   const { id: projectIdFromUrl } = useParams<{ id: string }>();
   const { toggleTheme } = useTheme();
+  useLang();
   const [orchestrator, setOrchestrator] = useState(false);
 
   const [askProvider, setAskProvider] = useState("anthropic");
@@ -483,7 +485,7 @@ export default function Workspace() {
       const ackMsg: ChatMessage = {
         id: `steer-ack-${Date.now()}`,
         role: "assistant",
-        content: "\u2192 Instrukcija poslana agentu. Agent nastavlja sa smjernicama.",
+        content: `\u2192 ${t("chat.steer.sent")}`,
         label: "System",
       };
       setAskMessages((prev) => [...prev, ackMsg]);
@@ -491,7 +493,7 @@ export default function Workspace() {
       const errMsg: ChatMessage = {
         id: `steer-err-${Date.now()}`,
         role: "assistant",
-        content: `\u26A0 Gre\u0161ka pri slanju instrukcije: ${err.message}`,
+        content: `\u26A0 ${t("chat.steer.error")} ${err.message}`,
         label: "System",
       };
       setAskMessages((prev) => [...prev, errMsg]);
@@ -1443,19 +1445,19 @@ export default function Workspace() {
             onPlanActChange={setAskPlanAct}
             messages={askMessages}
             inputPlaceholder={
-              askHasKey ? "Pitaj bilo šta..." : "Prvo unesi API key..."
+              askHasKey ? t("chat.ask.any") : t("chat.ask.noKey")
             }
             onSend={handleAskSend}
             loading={askLoading}
             streamingMessageId={askStreamingId}
-            copyLabel="→ Copy to Agent"
+            copyLabel={`\u2192 ${t("chat.copy.agent")}`}
             onCopyTo={(content) => setAgentPrefill(content)}
             prefill={askPrefill}
             isExpanded={panelMode === "ask-full"}
             onToggleExpand={toggleAskExpand}
             isSteerable={isAgentSteerable}
             onSteerSend={handleSteerSend}
-            steerStatusText={agentTodos.length > 0 ? `Agent izvršava ${agentTodos.filter(t => t.status !== "completed").length} koraka — pošalji instrukciju` : undefined}
+            steerStatusText={agentTodos.length > 0 ? t("chat.steer.steps", { n: agentTodos.filter(t => t.status !== "completed").length }) : undefined}
           />
         </div>
 
@@ -1487,13 +1489,13 @@ export default function Workspace() {
             messages={agentMessages}
             inputPlaceholder={
               agentMachineId
-                ? "Naredi agentu šta da napravi..."
-                : "Poveži VPS za agenta..."
+                ? t("chat.agent.command")
+                : t("chat.agent.connect")
             }
             onSend={handleAgentSend}
             loading={agentLoading}
             streamingMessageId={agentStreamingId}
-            copyLabel="← Copy to Ask"
+            copyLabel={`\u2190 ${t("chat.copy.ask")}`}
             onCopyTo={(content) => setAskPrefill(content)}
             prefill={agentPrefill}
             isExpanded={panelMode === "agent-full"}

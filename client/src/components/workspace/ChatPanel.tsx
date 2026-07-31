@@ -5,6 +5,7 @@ import InputToolbar from "./InputToolbar.js";
 import PlanActToggle, { type PlanActMode } from "./PlanActToggle.js";
 import PlanPreview from "./PlanPreview.js";
 import { useModelCatalog, type ThinkingBudget } from "../../lib/models.js";
+import { t, useLang } from "../../lib/i18n.js";
 
 export interface ToolCall {
   id: string;
@@ -137,6 +138,7 @@ export default function ChatPanel({
 }: Props) {
   const [input, setInput] = useState("");
   const [showPlanPreview, setShowPlanPreview] = useState(false);
+  useLang();
   const [pendingMessage, setPendingMessage] = useState("");
   const [showModelPicker, setShowModelPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -220,7 +222,7 @@ export default function ChatPanel({
             <button
               onClick={onToggleExpand}
               className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
-              title={isExpanded ? "Izađi iz punog ekrana (Esc)" : "Proširi na puni ekran"}
+              title={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")}
             >
               {isExpanded ? "⊟" : "⊞"}
             </button>
@@ -229,7 +231,7 @@ export default function ChatPanel({
           <button
             onClick={() => setShowModelPicker(true)}
             className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
-            title="Model picker (kompletan katalog)"
+            title={t("models.pickerTitle")}
             aria-label="Model picker"
           >
             ✦
@@ -249,7 +251,7 @@ export default function ChatPanel({
       {/* Model picker modal */}
       <ModelPickerModal
         open={showModelPicker}
-        title={`${title} — model picker`}
+        title={t("models.modalTitle", { title })}
         providerId={providerId}
         modelId={modelId}
         thinking={thinking}
@@ -320,7 +322,7 @@ export default function ChatPanel({
         <div className="px-3 py-1.5 border-t border-accent/30 bg-accent/5 flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
           <span className="text-[11px] text-accent font-medium">
-            {steerStatusText || "Agent je aktivan — pošalji instrukciju za preusmjeravanje"}
+            {steerStatusText || t("chat.steer.active")}
           </span>
         </div>
       )}
@@ -353,7 +355,7 @@ export default function ChatPanel({
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={isSteerable ? "Instrukcija za aktivnog agenta..." : inputPlaceholder}
+            placeholder={isSteerable ? t("chat.steer.placeholder") : inputPlaceholder}
             disabled={loading && !isSteerable}
             className="flex-1 bg-transparent text-text text-[13px] placeholder-text-muted outline-none border-none disabled:opacity-50"
           />

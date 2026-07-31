@@ -2,10 +2,12 @@ import { useState, type FormEvent } from "react";
 import { useAuth } from "../lib/auth.js";
 import { Link } from "react-router-dom";
 import { useTheme } from "../lib/theme.js";
+import { t, useLang } from "../lib/i18n.js";
 
 export default function Login() {
   const { login } = useAuth();
   const { toggleTheme, theme } = useTheme();
+  useLang();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -18,7 +20,7 @@ export default function Login() {
     try {
       await login(email, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Greška");
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -45,19 +47,19 @@ export default function Login() {
 
         <div className="flex mb-6 border border-border rounded-xl overflow-hidden">
           <button className="flex-1 py-2 text-[13px] font-medium bg-accent-dim text-accent">
-            Prijavi se
+            {t("auth.loginTab")}
           </button>
           <Link
             to="/register"
             className="flex-1 py-2 text-[13px] font-medium text-text-muted hover:text-text-secondary transition-colors text-center"
           >
-            Registruj se
+            {t("auth.registerTab")}
           </Link>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Email</label>
+            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">{t("auth.email")}</label>
             <input
               type="email"
               placeholder="you@example.com"
@@ -68,7 +70,7 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Lozinka</label>
+            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">{t("auth.password")}</label>
             <input
               type="password"
               placeholder="••••••••"
@@ -81,7 +83,7 @@ export default function Login() {
           {error && <p className="text-danger text-sm">{error}</p>}
           <div className="flex justify-end">
             <Link to="/forgot-password" className="text-[13px] text-text-muted hover:text-accent transition-colors">
-              Zaboravili ste lozinku?
+              {t("auth.forgot")}
             </Link>
           </div>
           <button
@@ -89,7 +91,7 @@ export default function Login() {
             disabled={loading}
             className="w-full py-2.5 rounded-xl bg-accent hover:opacity-90 disabled:opacity-50 text-white text-sm font-semibold transition-opacity"
           >
-            {loading ? "Prijavljivanje..." : "Prijavi se"}
+            {loading ? t("auth.loginLoading") : t("auth.loginTab")}
           </button>
         </form>
       </div>

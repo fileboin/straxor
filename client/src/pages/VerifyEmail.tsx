@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { useTheme } from "../lib/theme.js";
+import { t, useLang } from "../lib/i18n.js";
 
 export default function VerifyEmail() {
   const { toggleTheme, theme } = useTheme();
+  useLang();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") || "";
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
@@ -13,7 +15,7 @@ export default function VerifyEmail() {
   useEffect(() => {
     if (!token) {
       setStatus("error");
-      setError("Neispravan verifikacioni link.");
+      setError(t("auth.verificationFailed"));
       return;
     }
     api<{ message?: string }>("/auth/verify-email", {
@@ -23,7 +25,7 @@ export default function VerifyEmail() {
       .then(() => setStatus("success"))
       .catch((err) => {
         setStatus("error");
-        setError(err instanceof Error ? err.message : "Greška");
+        setError(err instanceof Error ? err.message : t("common.error"));
       });
   }, [token]);
 
@@ -49,32 +51,32 @@ export default function VerifyEmail() {
           {status === "loading" && (
             <>
               <div className="text-3xl mb-3">⏳</div>
-              <p className="text-sm text-text-muted">Verifikacija u toku...</p>
+              <p className="text-sm text-text-muted">{t("auth.verifying")}</p>
             </>
           )}
           {status === "success" && (
             <>
               <div className="text-3xl mb-3">✅</div>
-              <h2 className="text-lg font-bold mb-2">Email potvrđen</h2>
-              <p className="text-sm text-text-muted mb-6">Vaša email adresa je uspješno potvrđena.</p>
+              <h2 className="text-lg font-bold mb-2">{t("auth.verifyDone")}</h2>
+              <p className="text-sm text-text-muted mb-6">{t("auth.verifyDoneSubtitle")}</p>
               <Link
                 to="/login"
                 className="inline-block w-full py-2.5 rounded-xl bg-accent hover:opacity-90 text-white text-sm font-semibold transition-opacity text-center"
               >
-                Prijavi se
+                {t("auth.loginTab")}
               </Link>
             </>
           )}
           {status === "error" && (
             <>
               <div className="text-3xl mb-3">⚠️</div>
-              <h2 className="text-lg font-bold mb-2">Verifikacija nije uspjela</h2>
+              <h2 className="text-lg font-bold mb-2">{t("auth.verifyFailedTitle")}</h2>
               <p className="text-sm text-danger mb-6">{error}</p>
               <Link
                 to="/login"
                 className="text-sm text-accent"
               >
-                Nazad na prijavu
+                {t("auth.backToLogin")}
               </Link>
             </>
           )}
