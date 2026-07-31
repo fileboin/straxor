@@ -191,6 +191,16 @@ export default function Workspace() {
   // Panel mode: split | ask-full | agent-full
   const [panelMode, setPanelMode] = useState<"split" | "ask-full" | "agent-full">("split");
 
+  // Panel layout: side-by-side | stacked (persisted)
+  const [panelsLayout, setPanelsLayout] = useState<"side" | "stack">(() => {
+    try {
+      const saved = localStorage.getItem("straxor.panelsLayout");
+      return saved === "stack" ? "stack" : "side";
+    } catch {
+      return "side";
+    }
+  });
+
   // Diff review modal
   const [showDiffReview, setShowDiffReview] = useState(false);
   const [diffFiles, setDiffFiles] = useState<DiffFile[]>([]);
@@ -200,6 +210,13 @@ export default function Workspace() {
   useEffect(() => {
     hasApiKey(askProvider).then(setAskHasKey);
   }, [askProvider]);
+
+  // Persist panel layout choice
+  useEffect(() => {
+    try {
+      localStorage.setItem("straxor.panelsLayout", panelsLayout);
+    } catch {}
+  }, [panelsLayout]);
 
   // Load permissions and saved prompts on mount
   useEffect(() => {
@@ -1326,10 +1343,46 @@ export default function Workspace() {
       </div>
 
       {/* Panels */}
-      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
+      <div
+        className={`flex-1 flex flex-col min-h-0 overflow-hidden ${
+          panelsLayout === "side" ? "md:flex-row" : ""
+        }`}
+      >
+        {/* Layout toggle (desktop) */}
+        <div className="hidden md:flex items-center justify-end gap-1 px-2 py-1 border-b border-border bg-surface shrink-0">
+          <div className="flex items-center gap-0.5 bg-surface-2 rounded-lg p-0.5">
+            <button
+              onClick={() => setPanelsLayout("side")}
+              title="Side-by-side (Ask | Agent)"
+              aria-label="Side-by-side layout"
+              className={`w-8 h-6 rounded-md flex items-center justify-center text-[13px] transition-colors ${
+                panelsLayout === "side"
+                  ? "bg-accent/15 text-accent"
+                  : "text-text-muted hover:text-text hover:bg-surface"
+              }`}
+            >
+              ▤
+            </button>
+            <button
+              onClick={() => setPanelsLayout("stack")}
+              title="Stacked (Ask / Agent)"
+              aria-label="Stacked layout"
+              className={`w-8 h-6 rounded-md flex items-center justify-center text-[13px] transition-colors ${
+                panelsLayout === "stack"
+                  ? "bg-accent/15 text-accent"
+                  : "text-text-muted hover:text-text hover:bg-surface"
+              }`}
+            >
+              ▥
+            </button>
+          </div>
+        </div>
+
         {/* Ask panel */}
         <div
-          className={`flex flex-col min-h-0 min-w-0 border-b md:border-b-0 md:border-r border-border ${
+          className={`flex flex-col min-h-0 min-w-0 border-b border-border ${
+            panelsLayout === "side" ? "md:border-b-0 md:border-r" : ""
+          } ${
             panelMode === "agent-full"
               ? "hidden md:hidden"
               : panelMode === "ask-full"
