@@ -25,11 +25,13 @@ Production‑deploy STRAXOR frontend+backend as single Render service; fix white
 - **P2 layout toggle done** (commit `27d6c29`): `Workspace.tsx` `panelsLayout` state ("side"|"stack"), persisted in `localStorage` under `straxor.panelsLayout`, desktop-only toggle (▤ side-by-side | ▥ stacked), stacked mode = Ask above Agent.
 - **P3 provider catalogs + model picker done**: new `server/src/routes/models.ts` (`GET /api/models`, 13 providers static catalog, live OpenRouter fetch with 8s abort + 10-min cache), mounted in `server/src/index.ts`; client `useModelCatalog()`/`fetchModelCatalog()` in `client/src/lib/models.ts` (falls back to static `PROVIDERS`); new `client/src/components/workspace/ModelPickerModal.tsx` (searchable two-column modal with provider status, API-key setup, thinking budget); per-panel ✦ button in `ChatPanel.tsx` header opens it (separate from InputToolbar attachment "+"); `ProviderModelDropdown.tsx` now uses the live catalog. Server `tsc` 0 errors; client `npm run build` passes; `/api/models` verified returning 13 providers (OpenRouter 364 models live).
 
+- **P4 expand/fullscreen per-panel UI done**: `panelMode` ("split"|"ask-full"|"agent-full") now persisted in `localStorage` under `straxor.panelMode`; Escape exits expanded mode; layout-toggle bar (▤/▥) hidden while a panel is expanded so the panel fills the whole workspace; switching mobile tabs resets to split; stray `border-r` on expanded Ask panel removed; `⊞/⊟` button tooltips updated (Esc hint). Plays nicely with both side-by-side and stacked layouts (other panel hidden via `hidden md:hidden`, expanded panel `flex-1`).
+
 ### Active
-- P4 (expand/fullscreen per-panel UI) not started — existing `panelMode`/`toggleAskExpand`/`toggleAgentExpand` in `Workspace.tsx` and `⊞/⊟` button in `ChatPanel.tsx` may be reused/expanded.
+- None. All four priorities (P1 SSH, P2 layout toggle, P3 catalogs + model picker, P4 expand/fullscreen) are implemented, committed, and pushed.
 
 ### Blocked
 - None
 
 ## Next Move
-Report P3 status to user, then implement P4: expand/fullscreen per-panel UI (ensure it plays nicely with the new side/stack layout toggle). Per user's rule: do NOT touch tests or Swagger until password reset + email verification are confirmed working.
+Report P4 status to user. Per user's rule: do NOT touch tests or Swagger until password reset + email verification are confirmed working.

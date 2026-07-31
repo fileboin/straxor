@@ -220,7 +220,7 @@ export default function ChatPanel({
             <button
               onClick={onToggleExpand}
               className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
-              title={isExpanded ? "Collapse" : "Expand"}
+              title={isExpanded ? "Izađi iz punog ekrana (Esc)" : "Proširi na puni ekran"}
             >
               {isExpanded ? "⊟" : "⊞"}
             </button>

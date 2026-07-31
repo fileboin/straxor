@@ -189,7 +189,13 @@ export default function Workspace() {
   const [agentPrefill, setAgentPrefill] = useState("");
 
   // Panel mode: split | ask-full | agent-full
-  const [panelMode, setPanelMode] = useState<"split" | "ask-full" | "agent-full">("split");
+  const [panelMode, setPanelMode] = useState<"split" | "ask-full" | "agent-full">(() => {
+    try {
+      const saved = localStorage.getItem("straxor.panelMode");
+      if (saved === "ask-full" || saved === "agent-full") return saved;
+    } catch {}
+    return "split";
+  });
 
   // Panel layout: side-by-side | stacked (persisted)
   const [panelsLayout, setPanelsLayout] = useState<"side" | "stack">(() => {
@@ -217,6 +223,23 @@ export default function Workspace() {
       localStorage.setItem("straxor.panelsLayout", panelsLayout);
     } catch {}
   }, [panelsLayout]);
+
+  // Persist panel mode (expand/fullscreen)
+  useEffect(() => {
+    try {
+      localStorage.setItem("straxor.panelMode", panelMode);
+    } catch {}
+  }, [panelMode]);
+
+  // Escape exits expanded/fullscreen mode
+  useEffect(() => {
+    if (panelMode === "split") return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPanelMode("split");
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [panelMode]);
 
   // Load permissions and saved prompts on mount
   useEffect(() => {
@@ -1319,7 +1342,10 @@ export default function Workspace() {
       {/* Mobile tab switcher */}
       <div className="flex border-b border-border bg-surface shrink-0 md:hidden">
         <button
-          onClick={() => setMobileTab("ask")}
+          onClick={() => {
+            setMobileTab("ask");
+            setPanelMode("split");
+          }}
           className={`flex-1 py-2.5 text-[13px] font-semibold border-b-2 -mb-px transition-colors flex items-center justify-center gap-1.5 ${
             mobileTab === "ask"
               ? "text-text border-accent-blue"
@@ -1330,7 +1356,10 @@ export default function Workspace() {
           Ask
         </button>
         <button
-          onClick={() => setMobileTab("agent")}
+          onClick={() => {
+            setMobileTab("agent");
+            setPanelMode("split");
+          }}
           className={`flex-1 py-2.5 text-[13px] font-semibold border-b-2 -mb-px transition-colors flex items-center justify-center gap-1.5 ${
             mobileTab === "agent"
               ? "text-text border-accent"
@@ -1348,8 +1377,12 @@ export default function Workspace() {
           panelsLayout === "side" ? "md:flex-row" : ""
         }`}
       >
-        {/* Layout toggle (desktop) */}
-        <div className="hidden md:flex items-center justify-end gap-1 px-2 py-1 border-b border-border bg-surface shrink-0">
+        {/* Layout toggle (desktop) — hidden while a panel is expanded */}
+        <div
+          className={`hidden md:flex items-center justify-end gap-1 px-2 py-1 border-b border-border bg-surface shrink-0 transition-opacity ${
+            panelMode !== "split" ? "md:hidden" : ""
+          }`}
+        >
           <div className="flex items-center gap-0.5 bg-surface-2 rounded-lg p-0.5">
             <button
               onClick={() => setPanelsLayout("side")}
@@ -1381,7 +1414,9 @@ export default function Workspace() {
         {/* Ask panel */}
         <div
           className={`flex flex-col min-h-0 min-w-0 border-b border-border ${
-            panelsLayout === "side" ? "md:border-b-0 md:border-r" : ""
+            panelsLayout === "side" && panelMode !== "ask-full"
+              ? "md:border-b-0 md:border-r"
+              : ""
           } ${
             panelMode === "agent-full"
               ? "hidden md:hidden"
