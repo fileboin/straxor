@@ -71,12 +71,16 @@ router.post("/send", async (req: Request, res: Response) => {
     let buffer = "";
     let sessionStarted = false;
     let finished = false;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
-    const finish = (flushBuffer = true) => {
+    const finish = (opts: { flush?: boolean; abort?: boolean } = {}) => {
       if (finished) return;
       finished = true;
 
-      if (flushBuffer && buffer.trim()) {
+      const flush = opts.flush !== false;
+      const abort = opts.abort === true;
+
+      if (flush && buffer.trim()) {
         try {
           res.write(`data: ${JSON.stringify({
             type: "text",
@@ -85,7 +89,14 @@ router.post("/send", async (req: Request, res: Response) => {
         } catch {}
       }
 
-      clearTimeout(timeoutHandle);
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+
+      // Abort the remote opencode process so it stops consuming resources —
+      // only on interrupted flows (timeout, error, disconnect), never on clean idle.
+      // Aborting an already-idle session is harmless (opencode errors are swallowed).
+      if (abort) {
+        adapter.abortSession(machineId, activeSessionId).catch(() => {});
+      }
 
       try { stream.destroy(); } catch {}
       try {
@@ -94,8 +105,11 @@ router.post("/send", async (req: Request, res: Response) => {
       } catch {}
     };
 
-    const timeoutHandle = setTimeout(() => {
-      finish();
+    timeoutHandle = setTimeout(() => {
+      try {
+        res.write(`data: ${JSON.stringify({ type: "error", content: "Connection timed out after 30 minutes" })}\n\n`);
+      } catch {}
+      finish({ abort: true });
     }, CONNECTION_TIMEOUT_MS);
 
     stream.on("data", (chunk: Buffer) => {
@@ -119,7 +133,7 @@ router.post("/send", async (req: Request, res: Response) => {
 
           if (eventType === "session.error") {
             res.write(`data: ${JSON.stringify({ type: "error", content: event.properties?.properties?.error || "Agent error" })}\n\n`);
-            finish();
+            finish({ abort: true });
             return;
           }
 
@@ -144,21 +158,20 @@ router.post("/send", async (req: Request, res: Response) => {
           }
 
           if (eventType === "session.idle" && sessionStarted) {
-            finish(false);
+            finish({ flush: false });
             return;
           }
         } catch {}
       }
     });
 
-    stream.on("error", () => finish());
-    stream.on("close", () => finish());
+    stream.on("error", () => finish({ abort: true }));
+    stream.on("close", () => finish({ abort: true }));
 
-    // Client disconnect → abort remote process
+    // Client disconnect → stop streaming and abort remote process
     req.on("close", () => {
       if (!finished) {
-        finish();
-        adapter.abortSession(machineId, activeSessionId).catch(() => {});
+        finish({ abort: true });
       }
     });
   } catch (error) {

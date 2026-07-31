@@ -5,6 +5,9 @@ import { isOnboardingComplete } from "./lib/onboarding.js";
 import Layout from "./components/Layout.js";
 import Login from "./pages/Login.js";
 import Register from "./pages/Register.js";
+import ForgotPassword from "./pages/ForgotPassword.js";
+import ResetPassword from "./pages/ResetPassword.js";
+import VerifyEmail from "./pages/VerifyEmail.js";
 import Dashboard from "./pages/Dashboard.js";
 import Workspace from "./pages/Workspace.js";
 import OnboardingPage from "./pages/Onboarding.js";
@@ -67,6 +70,30 @@ export default function App() {
               element={
                 <GuestRoute>
                   <Register />
+                </GuestRoute>
+              }
+            />
+            <Route
+              path="/forgot-password"
+              element={
+                <GuestRoute>
+                  <ForgotPassword />
+                </GuestRoute>
+              }
+            />
+            <Route
+              path="/reset-password"
+              element={
+                <GuestRoute>
+                  <ResetPassword />
+                </GuestRoute>
+              }
+            />
+            <Route
+              path="/verify-email"
+              element={
+                <GuestRoute>
+                  <VerifyEmail />
                 </GuestRoute>
               }
             />

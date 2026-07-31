@@ -10,6 +10,7 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [registered, setRegistered] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -17,6 +18,7 @@ export default function Register() {
     setLoading(true);
     try {
       await register(email, password);
+      setRegistered(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Greška");
     } finally {
@@ -88,6 +90,12 @@ export default function Register() {
             {loading ? "Registracija..." : "Registruj se"}
           </button>
         </form>
+        {registered && (
+          <div className="mt-4 bg-surface-2 border border-border rounded-xl p-4 text-[13px] text-text-muted leading-relaxed">
+            📬 Poslali smo vam <strong className="text-text-secondary">verifikacioni email</strong>.
+            Potvrdite email adresu iz inboxa da aktivirate račun.
+          </div>
+        )}
       </div>
     </div>
   );

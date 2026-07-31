@@ -17,9 +17,14 @@ export interface SSHClient {
   close: () => void;
 }
 
+const CONNECT_TIMEOUT_MS = 15_000;
+const KEEPALIVE_INTERVAL_MS = 10_000;
+const KEEPALIVE_COUNT_MAX = 3;
+
 export function connectSSH(config: SSHConfig): Promise<SSHClient> {
   return new Promise((resolve, reject) => {
     const client = new Client();
+    let settled = false;
 
     const connectConfig: ConnectConfig = {
       host: config.host,
@@ -27,14 +32,46 @@ export function connectSSH(config: SSHConfig): Promise<SSHClient> {
       username: config.username,
       ...(config.password && { password: config.password }),
       ...(config.privateKey && { privateKey: config.privateKey }),
+      readyTimeout: CONNECT_TIMEOUT_MS,
+      keepaliveInterval: KEEPALIVE_INTERVAL_MS,
+      keepaliveCountMax: KEEPALIVE_COUNT_MAX,
+    };
+
+    const fail = (err: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(connectTimeout);
+      try { client.end(); } catch {}
+      reject(err);
     };
 
     client.on("ready", () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(connectTimeout);
+
       const exec = (command: string): Promise<{ stdout: string; stderr: string; code: number }> => {
         return new Promise((execResolve, execReject) => {
+          let settled = false;
+          const cleanup = () => {
+            client.removeListener("error", onClientError);
+            client.removeListener("close", onClientClose);
+          };
+          const settleReject = (err: Error) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            execReject(err);
+          };
+          const onClientError = (err: Error) => settleReject(err);
+          const onClientClose = () => settleReject(new Error("SSH connection closed before command completed"));
+
+          client.on("error", onClientError);
+          client.on("close", onClientClose);
+
           client.exec(command, (err, stream) => {
             if (err) {
-              execReject(err);
+              settleReject(err);
               return;
             }
 
@@ -49,7 +86,12 @@ export function connectSSH(config: SSHConfig): Promise<SSHClient> {
               stderr += data.toString();
             });
 
+            stream.on("error", (streamErr: Error) => settleReject(streamErr));
+
             stream.on("close", (code: number) => {
+              if (settled) return;
+              settled = true;
+              cleanup();
               execResolve({ stdout, stderr, code });
             });
           });
@@ -58,11 +100,34 @@ export function connectSSH(config: SSHConfig): Promise<SSHClient> {
 
       const execStream = (command: string): Promise<Duplex> => {
         return new Promise((execResolve, execReject) => {
+          let settled = false;
+          const cleanup = () => {
+            client.removeListener("error", onClientError);
+            client.removeListener("close", onClientClose);
+          };
+          const settleReject = (err: Error) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            execReject(err);
+          };
+          const onClientError = (err: Error) => settleReject(err);
+          const onClientClose = () => settleReject(new Error("SSH connection closed before command started"));
+
+          client.on("error", onClientError);
+          client.on("close", onClientClose);
+
           client.exec(command, (err, stream) => {
             if (err) {
-              execReject(err);
+              settleReject(err);
               return;
             }
+
+            // Keep client error/close listeners until the stream closes so a
+            // mid-command SSH drop surfaces as stream close/error on the caller.
+            stream.on("error", () => cleanup());
+            stream.on("close", () => cleanup());
+
             execResolve(stream);
           });
         });
@@ -76,9 +141,11 @@ export function connectSSH(config: SSHConfig): Promise<SSHClient> {
       });
     });
 
-    client.on("error", (err) => {
-      reject(err);
-    });
+    client.on("error", fail);
+
+    const connectTimeout = setTimeout(() => {
+      fail(new Error(`SSH connection to ${config.host}:${config.port} timed out after ${CONNECT_TIMEOUT_MS / 1000}s`));
+    }, CONNECT_TIMEOUT_MS + 5_000);
 
     client.connect(connectConfig);
   });

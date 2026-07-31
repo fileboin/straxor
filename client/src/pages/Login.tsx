@@ -79,6 +79,11 @@ export default function Login() {
             />
           </div>
           {error && <p className="text-danger text-sm">{error}</p>}
+          <div className="flex justify-end">
+            <Link to="/forgot-password" className="text-[13px] text-text-muted hover:text-accent transition-colors">
+              Zaboravili ste lozinku?
+            </Link>
+          </div>
           <button
             type="submit"
             disabled={loading}
