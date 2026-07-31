@@ -72,6 +72,23 @@ router.post("/send", async (req: Request, res: Response) => {
     let sessionStarted = false;
     let finished = false;
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    let heartbeat: ReturnType<typeof setInterval> | undefined;
+
+    // Guarded SSE write — never throws, silently no-ops once the response is gone.
+    const send = (payload: unknown) => {
+      if (finished || res.writableEnded || res.destroyed) return;
+      try {
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      } catch {}
+    };
+
+    // Only react to events for OUR session. The shared /event stream emits
+    // events for every session on the machine, so an unrelated session going
+    // idle must not cut this response short.
+    const isOurEvent = (event: unknown): boolean => {
+      const sid = (event as any)?.properties?.sessionID;
+      return !sid || sid === activeSessionId;
+    };
 
     const finish = (opts: { flush?: boolean; abort?: boolean } = {}) => {
       if (finished) return;
@@ -81,15 +98,14 @@ router.post("/send", async (req: Request, res: Response) => {
       const abort = opts.abort === true;
 
       if (flush && buffer.trim()) {
-        try {
-          res.write(`data: ${JSON.stringify({
-            type: "text",
-            content: `[partial data flushed: ${buffer.trim().slice(0, 200)}]`,
-          })}\n\n`);
-        } catch {}
+        send({
+          type: "text",
+          content: `[partial data flushed: ${buffer.trim().slice(0, 200)}]`,
+        });
       }
 
       if (timeoutHandle) clearTimeout(timeoutHandle);
+      if (heartbeat) clearInterval(heartbeat);
 
       // Abort the remote opencode process so it stops consuming resources —
       // only on interrupted flows (timeout, error, disconnect), never on clean idle.
@@ -106,11 +122,16 @@ router.post("/send", async (req: Request, res: Response) => {
     };
 
     timeoutHandle = setTimeout(() => {
-      try {
-        res.write(`data: ${JSON.stringify({ type: "error", content: "Connection timed out after 30 minutes" })}\n\n`);
-      } catch {}
+      send({ type: "error", content: "Connection timed out after 30 minutes" });
       finish({ abort: true });
     }, CONNECTION_TIMEOUT_MS);
+
+    // SSE comment heartbeat — keeps the stream alive through proxies/load
+    // balancers that close idle connections.
+    heartbeat = setInterval(() => {
+      if (finished || res.writableEnded || res.destroyed) return;
+      try { res.write(": ping\n\n"); } catch {}
+    }, 15_000);
 
     stream.on("data", (chunk: Buffer) => {
       if (finished) return;
@@ -127,37 +148,38 @@ router.post("/send", async (req: Request, res: Response) => {
           const event = JSON.parse(data);
           const eventType = event.properties?.type || event.type;
 
-          if (eventType === "session.idle") {
+          if (eventType === "session.idle" && isOurEvent(event)) {
             sessionStarted = true;
           }
 
-          if (eventType === "session.error") {
-            res.write(`data: ${JSON.stringify({ type: "error", content: event.properties?.properties?.error || "Agent error" })}\n\n`);
+          if (eventType === "session.error" && isOurEvent(event)) {
+            send({ type: "error", content: event.properties?.properties?.error || "Agent error" });
             finish({ abort: true });
             return;
           }
 
           if (eventType === "message.updated" || eventType === "part.updated") {
+            if (!isOurEvent(event)) continue;
             const part = event.properties?.properties;
             if (part?.type === "text" && part?.content) {
-              res.write(`data: ${JSON.stringify({ type: "text", content: part.content })}\n\n`);
+              send({ type: "text", content: part.content });
             } else if (part?.type === "tool-call") {
-              res.write(`data: ${JSON.stringify({
+              send({
                 type: "tool_call",
                 id: part.callID,
                 name: part.state?.tool || part.name,
                 args: part.state?.params,
-              })}\n\n`);
+              });
             } else if (part?.type === "tool-result") {
-              res.write(`data: ${JSON.stringify({
+              send({
                 type: "tool_result",
                 id: part.callID,
                 content: part.content,
-              })}\n\n`);
+              });
             }
           }
 
-          if (eventType === "session.idle" && sessionStarted) {
+          if (eventType === "session.idle" && sessionStarted && isOurEvent(event)) {
             finish({ flush: false });
             return;
           }

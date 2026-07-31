@@ -1,36 +1,30 @@
 # Tech Debt
 
-## 🔴 SSH disconnect — agent streaming
+## ✅ SSH disconnect — agent streaming (FIXED)
 
 **Pronađeno:** Block 11 (live SSE streaming)
 **Fajlovi:** `server/src/routes/agent.ts`, `server/src/runtime/opencode-adapter/ssh.ts`
 
-### Problemi
+### Riješeni problemi
 
-#### 1. sseStream error handler prazan (agent.ts:244)
-`error` event ne poziva `finish()`. Ako stream emituje error bez kasnijeg `close`, konekcija visi zauvijek — resource leak.
+#### 1. sseStream error handler prazan (agent.ts)
+`stream.on("error")` → `finish({ abort: true })`. Stream `error`/`close` uvijek završava odgovor i aborta remote opencode.
 
-#### 2. ssh.client error/close eventi nisu handleani (agent.ts:134-140)
-Ako TCP padne (half-open, network timeout), ssh.client emituje `error`/`close` ali naš kod to ne čuje. sseStream možda nikad ne emituje `close`. Rezultat: beskonačno visanje.
+#### 2. ssh.client error/close eventi nisu handleani
+`execStream` u `ssh.ts` nakon rezolucije unistava channel na client `error`/`close` (mid-command drop → stream `error`/`close` kod pozivaoca). `openEventStream` u `opencode.ts` ima dodatne client `error`/`close` listenere koji čiste i SSH i stream.
 
-#### 3. Partial SSE buffer se gubi (agent.ts:174-180)
-Ako SSH padne usred SSE chunka, `sseBuffer` sadrži nedovršeni event. `finish()` ga nikad ne parsira — zadnji događaj se tiho gubi.
+#### 3. Partial SSE buffer se gubi
+`finish({ flush: true })` (default) izbacuje nedovršeni `buffer` kao `[partial data flushed: ...]` event pri zatvaranju.
 
 #### 4. Nema timeout-a
-Ako SSH konekcija tiho umre (nema error/close eventa), konekcija visi zauvijek. Nema keepalive-a, nema heartbeat-a.
+- SSH: `readyTimeout: 15s`, keepalive interval 10s (max 3 propuštena), connect timeout 20s.
+- SSE: 30-min hard timeout na cijelu konekciju + 15s comment heartbeat (proxy keep-alive).
 
-#### 5. Client disconnect ne prekida remote poruku (agent.ts:302-304)
-`req.on("close")` zatvara SSH, ali opencode na remote serveru nastavlja obrađivati poruku. Nema abort poziva ka opencode instanci.
+#### 5. Client disconnect ne prekida remote poruku
+`req.on("close")` → `finish({ abort: true })` → `POST /session/:id/abort` na remote opencode.
 
-### Prioritet
-- **#1 i #2:** Prije javnog lansiranja — resource leak + hang
-- **#3:** UX problem — gubitak zadnjeg eventa
-- **#4:** Infra problem — resource leak u produkciji
-- **#5:** Niski prioritet — opencode će sam završiti, samo troši resurse
-
-### Planirano rješenje
-- `sseStream.on("error")` → pozovi `finish()`
-- `ssh.client.on("error"/"close")` → pozovi `finish()`
-- Flush `sseBuffer` pri zatvaranju (parsiraj šta se može)
-- 30-min timeout na cijelu konekciju
-- `POST /session/:id/abort` pri client disconnect
+### Dodatno za pouzdanost (100%)
+- **Sve `res.write` pozive** pokriva `send()` — no-op nakon što je response zatvoren (nema crash-a pri mid-write disconnect).
+- **`session.idle` filtriran po `sessionID`** — event drugog sessiona na istom opencode serveru ne prekida naš streaming rano.
+- **SSE heartbeat komentari** (`: ping`) svakih 15s — proxy/load-balancer ne zatvara idle konekciju.
+- `exec` u `ssh.ts` odbija promise na client `error`/`close` tokom komande.

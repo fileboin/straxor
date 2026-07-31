@@ -101,18 +101,37 @@ export function connectSSH(config: SSHConfig): Promise<SSHClient> {
       const execStream = (command: string): Promise<Duplex> => {
         return new Promise((execResolve, execReject) => {
           let settled = false;
+          let channel: Duplex | undefined;
+
           const cleanup = () => {
             client.removeListener("error", onClientError);
             client.removeListener("close", onClientClose);
           };
+
           const settleReject = (err: Error) => {
             if (settled) return;
             settled = true;
             cleanup();
             execReject(err);
           };
-          const onClientError = (err: Error) => settleReject(err);
-          const onClientClose = () => settleReject(new Error("SSH connection closed before command started"));
+
+          const onClientError = (err: Error) => {
+            // Before the command channel is handed to the caller → reject.
+            if (!settled) {
+              settleReject(err);
+              return;
+            }
+            // Mid-command SSH drop → surface it as stream error/close on the caller.
+            if (channel) channel.destroy(new Error("SSH connection dropped during command"));
+          };
+
+          const onClientClose = () => {
+            if (!settled) {
+              settleReject(new Error("SSH connection closed before command started"));
+              return;
+            }
+            if (channel) channel.destroy();
+          };
 
           client.on("error", onClientError);
           client.on("close", onClientClose);
@@ -123,11 +142,19 @@ export function connectSSH(config: SSHConfig): Promise<SSHClient> {
               return;
             }
 
-            // Keep client error/close listeners until the stream closes so a
-            // mid-command SSH drop surfaces as stream close/error on the caller.
-            stream.on("error", () => cleanup());
-            stream.on("close", () => cleanup());
+            channel = stream;
 
+            // Swallow transport-level errors so `destroy(err)` can never throw
+            // as an unhandled 'error'; callers attach their own handlers.
+            stream.on("error", () => {});
+
+            // Drop client-level listeners once the command channel is closed.
+            stream.on("close", () => {
+              channel = undefined;
+              cleanup();
+            });
+
+            settled = true;
             execResolve(stream);
           });
         });
