@@ -1,7 +1,7 @@
 # Session Summary
 
 ## Objective
-Production‑deploy STRAXOR frontend+backend as single Render service; fix white screen; fix SSH disconnect bug; add password reset + email verification; fix TECH_DEBT SSH bugs (P1), layout toggle (P2), complete provider model catalogs + dedicated per-panel model picker (P3), expand/fullscreen per-panel UI (P4).
+Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot.
 
 ## Important Details
 - **Render deploy**: Single Web Service serves both API and client. `server/package.json` builds `client/` then compiles server. Express serves `client/dist/` static files with SPA fallback.
@@ -10,28 +10,28 @@ Production‑deploy STRAXOR frontend+backend as single Render service; fix white
 - **`client/.env`**: `VITE_API_URL=` empty → same‑origin `/api/*` calls. File is now tracked in git.
 - **Email**: Auth emails go through Resend HTTP API (`RESEND_API_KEY`) with console-log fallback in dev (`server/src/lib/mail.ts`). `server/.env` is gitignored; `.env.example` is tracked.
 - **Note**: Client `tsc --noEmit` still reports many pre‑existing errors (unused vars, implicit any in enterprise/scale/marketplace libs). Vite build (esbuild) does NOT type‑check, so `npm run build` passes — these are not blockers.
+- **Lokalni engine**: `opencode-ai` npm paket (NE `opencode`) — provisioner koristi pogrešan `npm i -g opencode`. Instaliran globalno u dev (verzija 1.18.11). Za Render treba dodati `npm i -g opencode-ai` u build skriptu.
+- **OpenCode server eventi (≥1.16)**: streaming teksta = `message.part.delta` sa `properties.{messageID, field:"text", delta}`; puni snapshot = `message.part.updated` sa `properties.part`; tool parts na `part.type==="tool-call"/"tool-result"`; tačno JEDAN `session.idle` po turn-u (stara logika dva-idle visi); sessionID na `properties.sessionID`. Agent.ts parser je ažuriran na ovaj format.
+- **agent.ts auth bug**: rute su čitale `(req as any).userId` (uvijek undefined); sada `router.use(requireAuth)` + `req.user!.userId`.
+- **Spawn opencode na dev (win32)**: resolveBin → `%APPDATA%\npm\opencode.cmd`. Moj vlastiti opencode ACP sesija sluša na portu 4096 (NE ubijati). Test-engine procesi su portovi 4100+.
+- **sandbox dir**: `server/.straxor-workspaces/<userId>/<owner>__<name>` (gitignored). Token u klon URL: `https://x-access-token:TOKEN@github.com/...`.
+- Build komande: server `npx.cmd tsc --noEmit`, client `npm.cmd run build`. Restart servera: Stop-Process na portu 3001 pa Start-Process node + tsx.
 
 ## Work State
 ### Completed
-- All pre‑existing server TS errors fixed (0 errors `tsc --noEmit`). Client build passes (`npm run build`).
-- Render‑ready single‑service deploy: Express serves client dist + SPA fallback + `/api/health` endpoint with DB ping.
-- **White screen root cause fixed**: 15 lib files + FileExplorer.tsx (x2) changed `|| "http://localhost:3001"` → `|| ""`. Build is clean.
-- **SSH disconnect bug fixed** (`server/src/runtime/opencode-adapter/ssh.ts` + `server/src/routes/agent.ts`): 15s readyTimeout, 10s keepalives (max 3 missed), 20s connect timeout, client error/close → promise rejection/stream close; `finish({ abort })` aborts remote opencode on timeout/error/client-disconnect; buffer flushed on close.
-- **Password reset + email verification done**: 4 new `users` columns (migration `0002_absurd_thunderbolt.sql` applied to Neon), 4 new auth endpoints (verify-email, resend-verification, forgot-password, reset-password), `RESET_TOKEN_TTL_MS`=1h, new pages (`VerifyEmail`, `ForgotPassword`, `ResetPassword`), routes in `App.tsx`, forgot-password link in `Login.tsx`, verification notice in `Register.tsx`, `User.emailVerified` in client auth.
-- **DB Migrations**: `0001_pretty_havok.sql` (9 tables), `0002_absurd_thunderbolt.sql` (users auth columns).
-- Docs updated: `PROJECT_EXPORT/BUGS.md` (#1 SSH and #4 email/verification marked FIXED), `TODO.md`, `ROADMAP.md`, `BLOCKS.md`.
-- Committed + pushed (`19ef7f1`).
-- **P1 SSH fixes done** (commit `d285f3c`): `server/src/runtime/opencode-adapter/ssh.ts` readyTimeout 15s, keepalive 10s×3, connect timeout 20s, client error/close → stream destroy; `server/src/routes/agent.ts` guarded `send()`, sessionID filter, 30-min hard timeout, `finish({ flush, abort })`.
-- **P2 layout toggle done** (commit `27d6c29`): `Workspace.tsx` `panelsLayout` state ("side"|"stack"), persisted in `localStorage` under `straxor.panelsLayout`, desktop-only toggle (▤ side-by-side | ▥ stacked), stacked mode = Ask above Agent.
-- **P3 provider catalogs + model picker done**: new `server/src/routes/models.ts` (`GET /api/models`, 13 providers static catalog, live OpenRouter fetch with 8s abort + 10-min cache), mounted in `server/src/index.ts`; client `useModelCatalog()`/`fetchModelCatalog()` in `client/src/lib/models.ts` (falls back to static `PROVIDERS`); new `client/src/components/workspace/ModelPickerModal.tsx` (searchable two-column modal with provider status, API-key setup, thinking budget); per-panel ✦ button in `ChatPanel.tsx` header opens it (separate from InputToolbar attachment "+"); `ProviderModelDropdown.tsx` now uses the live catalog. Server `tsc` 0 errors; client `npm run build` passes; `/api/models` verified returning 13 providers (OpenRouter 364 models live).
-
-- **P4 expand/fullscreen per-panel UI done**: `panelMode` ("split"|"ask-full"|"agent-full") now persisted in `localStorage` under `straxor.panelMode`; Escape exits expanded mode; layout-toggle bar (▤/▥) hidden while a panel is expanded so the panel fills the whole workspace; switching mobile tabs resets to split; stray `border-r` on expanded Ask panel removed; `⊞/⊟` button tooltips updated (Esc hint). Plays nicely with both side-by-side and stacked layouts (other panel hidden via `hidden md:hidden`, expanded panel `flex-1`).
+- **FAZA 1** (commit `6103ff6`): `git_connections` + `repo_connections` tabele (migracija `0003_happy_gorilla_man.sql` primijenjena na Neon); `setGitRemoteConfig`/`hydrateGitRemoteConfig`/`getGitRemoteToken` perzistiraju u DB (AES-256-GCM); `/api/repos` connect/active/disconnect/list; klijent repo picker "Poveži za agenta" + "Aktivni repo"; auth-token fix u `lib/git-remote.ts`.
+- **FAZA 2** (commit `c78c60c`): `server/src/runtime/local/workspace.ts` — klonira/pull aktivni repo u sandbox preko tokenizovanog URL-a, git binary + isomorphic-git fallback, git config user; `/api/repos/prepare` + `/api/repos/workspace`. Verifikovano: stvarni clone fileboin/straxor (lastCommit 6103ff6).
+- **FAZA 3** (commit `80a339d`): `server/src/runtime/local/engine.ts` — spawn `opencode serve` kao child process u workspace diru, machineId konvencija `local:<engine>`, registry per user+repo, free-port, health wait, cleanup na shutdown; `opencode.ts` BoundAdapter refaktorisan na pluggable transport SSH|Localhost (`withTransport`/`httpCall`/`localEventStream`); `agent.ts` requireAuth fix + version-aware SSE parser (delta streaming, finish na prvom session.idle); `repos.ts` gasi engine na switch/disconnect. **Verifikovano end-to-end**: agent bez VPS-a streamuje pravi tekst (202 znaka, 45 delta chunk-ova) preko `message.part.delta` i završava `[DONE]`.
+- Svi prethodni radovi: Render single-service deploy, white screen fix, SSH disconnect fix (P1), layout toggle (P2), model catalogs + picker (P3), expand/fullscreen (P4), password reset + email verification.
 
 ### Active
-- None. All four priorities (P1 SSH, P2 layout toggle, P3 catalogs + model picker, P4 expand/fullscreen) are implemented, committed, and pushed.
+- **FAZA 4 (NISAM ZAVRŠIO)**: povezati klijent da koristi lokalni engine — u `Workspace.tsx`, kada je povezan repo a NEMA VPS-a, postaviti `agentMachineId = "local:opencode"` (i `vpsStatus="ready"`) umjesto fallback na čist chat (`:653`); engine picker po panelu (RuntimeSelector/RuntimeManager na `:1941`); ukloniti VPS blokade.
 
 ### Blocked
-- None
+- **(none)** — nema blokera; pravi GitHub connect + agent commit/push test na kraju (treba korisnikov pravi token).
 
 ## Next Move
-Report P4 status to user. Per user's rule: do NOT touch tests or Swagger until password reset + email verification are confirmed working.
+1. **FAZA 4**: klijent — kad je aktivan repo i nema VPS mašine, `agentMachineId="local:opencode"`; per-panel engine picker; provjeriti da `/api/agent/send` prima `local:opencode`.
+2. **FAZA 5**: per-panel engine dropdown spojen na RuntimeManager; ukloniti VPS blokade iz UI.
+3. Finalni test: poveži GitHub repo (korisnikov token) → engine OpenCode u Agent 1 → zadatak → potvrditi čitanje/pisanje/commit/push bez VPS-a + screenshot.
+4. Per user's rule: do NOT touch tests or Swagger until password reset + email verification are confirmed working.
