@@ -68,19 +68,7 @@ import {
 } from "../lib/sessions.js";
 import type { Command } from "../lib/commands.js";
 
-const INITIAL_ASK_MESSAGES: ChatMessage[] = [
-  {
-    id: "a1",
-    role: "user",
-    content: "Koji je najbolji način da napravim responsive navbar sa Tailwind-om?",
-  },
-  {
-    id: "a2",
-    role: "assistant",
-    label: "Claude Sonnet 4",
-    content: 'Za responsive navbar koristi hidden md:flex za desktop linkove i hamburger meni za mobile.\n\nZa kompleksniji meni, razmotri @headlessui/react za accessible dropdown-ove.',
-  },
-];
+const INITIAL_ASK_MESSAGES: ChatMessage[] = [];
 
 export default function Workspace() {
   const navigate = useNavigate();
@@ -1473,7 +1461,7 @@ export default function Workspace() {
         {/* Panels row */}
         <div
           ref={panelsRef}
-          className={`flex-1 flex flex-col min-h-0 min-w-0 gap-2 sm:gap-3 ${
+          className={`flex-1 flex flex-col min-h-0 min-w-0 gap-3 sm:gap-4 ${
             panelsLayout === "side" ? "md:flex-row" : ""
           }`}
         >

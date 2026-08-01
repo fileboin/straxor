@@ -123,6 +123,38 @@ const DICT: Record<string, { en: string; bs: string }> = {
     bs: "Slanje instrukcije agentu nije uspjelo.",
   },
 
+  // ── Welcome / prompt hero ──
+  "welcome.title": {
+    en: "What will you build today?",
+    bs: "Šta ćete danas napraviti?",
+  },
+  "welcome.subtitle": {
+    en: "Describe what you want to create and Straxor will build it for you.",
+    bs: "Opišite šta želite da napravite, a Straxor će to izgraditi za vas.",
+  },
+  "welcome.placeholder": {
+    en: "e.g. Build a responsive landing page with a booking form...",
+    bs: "npr. Napravi responzivnu landing stranicu sa formom za rezervacije...",
+  },
+  "welcome.startFrom": {
+    en: "or start from",
+    bs: "ili počni od",
+  },
+  "welcome.pillFigma": { en: "Figma", bs: "Figma" },
+  "welcome.pillTemplate": {
+    en: "Team template",
+    bs: "Timski šablon",
+  },
+  "welcome.model": {
+    en: "Choose model",
+    bs: "Izaberi model",
+  },
+  "welcome.ideas": {
+    en: "Ideas & templates",
+    bs: "Ideje i šabloni",
+  },
+  "welcome.send": { en: "Send", bs: "Pošalji" },
+
   // ── Model picker ──
   "models.title": { en: "Select Model", bs: "Odaberi model" },
   "models.search": { en: "Search models...", bs: "Pretraži modele..." },

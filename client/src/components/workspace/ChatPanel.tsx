@@ -3,6 +3,7 @@ import ProviderModelDropdown from "./ProviderModelDropdown.js";
 import ModelPickerModal from "./ModelPickerModal.js";
 import InputToolbar from "./InputToolbar.js";
 import InfoTip from "./InfoTip.js";
+import WelcomeHero from "./WelcomeHero.js";
 import { useModelCatalog, type ThinkingBudget } from "../../lib/models.js";
 import { t, useLang } from "../../lib/i18n.js";
 import { estimatePlan, formatCost, formatTokens } from "../../lib/plan-preview.js";
@@ -529,8 +530,118 @@ export default function ChatPanel({
   const budgetText = input.trim() || lastUserContent();
   const budgetEstimate = budgetText ? estimatePlan(budgetText, providerId, modelId, thinking) : null;
 
+  const isEmpty = messages.length === 0;
+
+  const budgetPopover = budgetOpen && (
+    <div ref={budgetRef} className="mb-2 rounded-xl border border-border bg-surface-2 overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+        <span className="text-[12px] font-semibold text-text">💰 {t("budget.title")}</span>
+        <div className="flex items-center gap-2">
+          <InfoTip text={t("toolbar.budgetInfo")} placement="bottom" />
+          <button
+            type="button"
+            onClick={() => setBudgetOpen(false)}
+            className="text-[10px] text-text-muted hover:text-text"
+          >
+            {t("budget.close")} ✕
+          </button>
+        </div>
+      </div>
+      {budgetEstimate ? (
+        <>
+          <div className="px-3 py-2.5">
+            <p className="text-[11px] text-text-muted mb-2">{t("budget.desc")}</p>
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded-lg border border-border bg-surface px-2.5 py-1.5">
+                <div className="text-[10px] text-text-muted uppercase tracking-wider">{t("budget.cost")}</div>
+                <div className="font-semibold text-accent">{formatCost(budgetEstimate.costUSD)}</div>
+              </div>
+              <div className="rounded-lg border border-border bg-surface px-2.5 py-1.5">
+                <div className="text-[10px] text-text-muted uppercase tracking-wider">{t("budget.tokens")}</div>
+                <div className="font-semibold">{formatTokens(budgetEstimate.totalTokens)}</div>
+              </div>
+              <div className="rounded-lg border border-border bg-surface px-2.5 py-1.5">
+                <div className="text-[10px] text-text-muted uppercase tracking-wider">{t("budget.steps")}</div>
+                <div className="font-semibold">{budgetEstimate.estimatedSteps}</div>
+              </div>
+              <div className="rounded-lg border border-border bg-surface px-2.5 py-1.5">
+                <div className="text-[10px] text-text-muted uppercase tracking-wider">{t("budget.duration")}</div>
+                <div className="font-semibold">{budgetEstimate.estimatedDuration}</div>
+              </div>
+            </div>
+          </div>
+          <div className="px-3 pb-2.5">
+            <button
+              type="button"
+              onClick={handleSendBudget}
+              disabled={loading}
+              className="w-full py-1.5 text-[11px] font-medium rounded-lg bg-accent text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
+            >
+              {t("budget.send")}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="px-3 py-3 text-[12px] text-text-muted">{t("budget.empty")}</div>
+      )}
+    </div>
+  );
+
+  const micStatusBar = (micState === "recording" || micState === "processing") && (
+    <div className="mb-2 flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-[11px] text-red-500">
+      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+      <span className="flex-1 min-w-0 truncate">
+        {micState === "processing" ? t("toolbar.mic.processing") : t("toolbar.mic.recording")}
+      </span>
+      <button type="button" onClick={stopMic} className="shrink-0 hover:opacity-70">
+        ■ {t("toolbar.mic.stop")}
+      </button>
+    </div>
+  );
+
+  const errorBar = (micError || uploadError) && (
+    <div className="mb-2 px-2.5 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-[11px] text-red-500">
+      {micError || uploadError}
+    </div>
+  );
+
+  const attachmentChips = (
+    <AttachmentChips
+      attachments={pendingAttachments}
+      uploadingCount={uploadingCount}
+      onRemove={(id) =>
+        setPendingAttachments((prev) => prev.filter((a) => a.id !== id))
+      }
+    />
+  );
+
   return (
-    <div className="flex flex-col h-full min-h-0 rounded-2xl border border-border bg-surface shadow-lg shadow-black/30 overflow-hidden">
+    <div className={`flex flex-col h-full min-h-0 overflow-hidden rounded-2xl ${isEmpty ? "border border-white/10" : "border border-border bg-surface shadow-lg shadow-black/30"}`}>
+      {isEmpty ? (
+        <WelcomeHero
+          icon={icon}
+          iconColor={iconColor}
+          title={t("welcome.title")}
+          subtitle={t("welcome.subtitle")}
+          placeholder={inputPlaceholder}
+          input={input}
+          onInputChange={setInput}
+          loading={loading}
+          isSteerable={isSteerable}
+          canSend={!!input.trim() || pendingAttachments.length > 0}
+          onSubmit={handleSubmit}
+          onOpenModelPicker={() => setShowModelPicker(true)}
+          onOpenPromptLibrary={() => onOpenPromptLibrary?.()}
+          onToolbarAction={handleToolbarAction}
+          roleSelector={headerLeft}
+          micState={micState}
+          budgetPopover={budgetPopover}
+          micStatusBar={micStatusBar}
+          errorBar={errorBar}
+          attachmentChips={attachmentChips}
+        />
+      ) : (
+        <>
       {/* Header — title bar */}
       <div className="flex items-center justify-between px-2 py-2 border-b border-border bg-surface-2 shrink-0 gap-2 sm:px-3">
         <div className="flex items-center gap-1.5 min-w-0 sm:gap-2">
@@ -588,22 +699,6 @@ export default function ChatPanel({
           />
         </div>
       </div>
-
-      {/* Model picker modal */}
-      <ModelPickerModal
-        open={showModelPicker}
-        title={t("models.modalTitle", { title })}
-        providerId={providerId}
-        modelId={modelId}
-        thinking={thinking}
-        providers={catalogProviders}
-        loading={catalogLoading}
-        onProviderChange={onProviderChange}
-        onModelChange={onModelChange}
-        onThinkingChange={onThinkingChange}
-        onApiKeyChange={onApiKeyChange}
-        onClose={() => setShowModelPicker(false)}
-      />
 
       {/* Optional header content (e.g. TodoList) */}
       {headerContent}
@@ -674,90 +769,10 @@ export default function ChatPanel({
 
       {/* Input */}
       <div className="px-2 py-2 border-t border-border bg-surface shrink-0 sm:px-3 sm:py-2.5">
-        {/* Budget estimate — optional, manual, non-blocking */}
-        {budgetOpen && (
-          <div ref={budgetRef} className="mb-2 rounded-xl border border-border bg-surface-2 overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-              <span className="text-[12px] font-semibold text-text">💰 {t("budget.title")}</span>
-              <div className="flex items-center gap-2">
-                <InfoTip text={t("toolbar.budgetInfo")} placement="bottom" />
-                <button
-                  type="button"
-                  onClick={() => setBudgetOpen(false)}
-                  className="text-[10px] text-text-muted hover:text-text"
-                >
-                  {t("budget.close")} ✕
-                </button>
-              </div>
-            </div>
-            {budgetEstimate ? (
-              <>
-                <div className="px-3 py-2.5">
-                  <p className="text-[11px] text-text-muted mb-2">{t("budget.desc")}</p>
-                  <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    <div className="rounded-lg border border-border bg-surface px-2.5 py-1.5">
-                      <div className="text-[10px] text-text-muted uppercase tracking-wider">{t("budget.cost")}</div>
-                      <div className="font-semibold text-accent">{formatCost(budgetEstimate.costUSD)}</div>
-                    </div>
-                    <div className="rounded-lg border border-border bg-surface px-2.5 py-1.5">
-                      <div className="text-[10px] text-text-muted uppercase tracking-wider">{t("budget.tokens")}</div>
-                      <div className="font-semibold">{formatTokens(budgetEstimate.totalTokens)}</div>
-                    </div>
-                    <div className="rounded-lg border border-border bg-surface px-2.5 py-1.5">
-                      <div className="text-[10px] text-text-muted uppercase tracking-wider">{t("budget.steps")}</div>
-                      <div className="font-semibold">{budgetEstimate.estimatedSteps}</div>
-                    </div>
-                    <div className="rounded-lg border border-border bg-surface px-2.5 py-1.5">
-                      <div className="text-[10px] text-text-muted uppercase tracking-wider">{t("budget.duration")}</div>
-                      <div className="font-semibold">{budgetEstimate.estimatedDuration}</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="px-3 pb-2.5">
-                  <button
-                    type="button"
-                    onClick={handleSendBudget}
-                    disabled={loading}
-                    className="w-full py-1.5 text-[11px] font-medium rounded-lg bg-accent text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
-                  >
-                    {t("budget.send")}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="px-3 py-3 text-[12px] text-text-muted">{t("budget.empty")}</div>
-            )}
-          </div>
-        )}
-
-        {/* Mic status */}
-        {(micState === "recording" || micState === "processing") && (
-          <div className="mb-2 flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-[11px] text-red-500">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-            <span className="flex-1 min-w-0 truncate">
-              {micState === "processing" ? t("toolbar.mic.processing") : t("toolbar.mic.recording")}
-            </span>
-            <button type="button" onClick={stopMic} className="shrink-0 hover:opacity-70">
-              ■ {t("toolbar.mic.stop")}
-            </button>
-          </div>
-        )}
-
-        {/* Errors */}
-        {(micError || uploadError) && (
-          <div className="mb-2 px-2.5 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-[11px] text-red-500">
-            {micError || uploadError}
-          </div>
-        )}
-
-        {/* Pending attachments */}
-        <AttachmentChips
-          attachments={pendingAttachments}
-          uploadingCount={uploadingCount}
-          onRemove={(id) =>
-            setPendingAttachments((prev) => prev.filter((a) => a.id !== id))
-          }
-        />
+        {budgetPopover}
+        {micStatusBar}
+        {errorBar}
+        {attachmentChips}
 
         <form
           onSubmit={handleSubmit}
@@ -806,6 +821,24 @@ export default function ChatPanel({
           onChange={handleFilesSelected}
         />
       </div>
+        </>
+      )}
+
+      {/* Model picker modal */}
+      <ModelPickerModal
+        open={showModelPicker}
+        title={t("models.modalTitle", { title })}
+        providerId={providerId}
+        modelId={modelId}
+        thinking={thinking}
+        providers={catalogProviders}
+        loading={catalogLoading}
+        onProviderChange={onProviderChange}
+        onModelChange={onModelChange}
+        onThinkingChange={onThinkingChange}
+        onApiKeyChange={onApiKeyChange}
+        onClose={() => setShowModelPicker(false)}
+      />
 
       {/* Camera overlay */}
       {cameraOpen && (
