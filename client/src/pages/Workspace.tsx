@@ -606,19 +606,72 @@ export default function Workspace() {
   );
 
   const handleAgentSend = useCallback(async (msg: string, attachments?: Attachment[]) => {
+    const roleConfig = getRoleById(agentRole);
+    const activePrompts = savedPrompts.filter((p) => activePromptIds.has(p.id));
+
+    const userMsg: ChatMessage = {
+      id: `g-${Date.now()}`,
+      role: "user",
+      content: msg,
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
+    };
+    const assistantMsg: ChatMessage = {
+      id: `g-${Date.now() + 1}`,
+      role: "assistant",
+      content: "",
+      label: agentModel,
+      toolCalls: [],
+    };
+
+    setAgentMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setAgentStreamingId(assistantMsg.id);
+    setAgentLoading(true);
+    setAgentPrefill("");
+
+    // No VPS connected — fall back to plain model chat (works exactly like the Ask panel).
     if (!agentMachineId) {
-      setAgentMessages((prev) => [
-        ...prev,
-        {
-          id: `g-err-${Date.now()}`,
-          role: "assistant",
-          content: "⚠ Nema povezanog VPS-a. Klikni 'Connect VPS' za povezivanje.",
-          label: "System",
+      const systemParts: string[] = [];
+      systemParts.push(`[SISTEMSKA ULOGA: ${roleConfig.label}]\n${roleConfig.systemPrompt}`);
+      for (const p of activePrompts) {
+        systemParts.push(`[${p.name}]\n${p.content}`);
+      }
+      const history: { role: "user" | "assistant" | "system"; content: string }[] = [
+        { role: "system", content: systemParts.join("\n\n") },
+        ...agentMessages.map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })),
+        userMsg,
+      ];
+
+      streamChat(agentProvider, agentModel, history, agentThinking, {
+        onToken: (token) => {
+          setAgentMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsg.id ? { ...m, content: m.content + token } : m
+            )
+          );
         },
-      ]);
+        onDone: () => {
+          setAgentStreamingId(null);
+          setAgentLoading(false);
+        },
+        onError: (error) => {
+          setAgentMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsg.id
+                ? { ...m, content: `[Greška: ${error}]` }
+                : m
+            )
+          );
+          setAgentStreamingId(null);
+          setAgentLoading(false);
+        },
+      });
       return;
     }
 
+    // VPS connected — full agent flow.
     // Auto-create DB session on first message
     let activeDbSessionId = dbSessionId;
     if (!activeDbSessionId) {
@@ -646,8 +699,6 @@ export default function Workspace() {
     }
 
     // Build system context from role + active prompts
-    const roleConfig = getRoleById(agentRole);
-    const activePrompts = savedPrompts.filter((p) => activePromptIds.has(p.id));
     const systemParts: string[] = [];
     systemParts.push(`[SISTEMSKA ULOGA: ${roleConfig.label}]\n${roleConfig.systemPrompt}`);
     for (const p of activePrompts) {
@@ -657,25 +708,6 @@ export default function Workspace() {
       systemParts.length > 0
         ? `${systemParts.join("\n\n")}\n\n---\n\n${msg}`
         : msg;
-
-    const userMsg: ChatMessage = {
-      id: `g-${Date.now()}`,
-      role: "user",
-      content: msg,
-      ...(attachments && attachments.length > 0 ? { attachments } : {}),
-    };
-    const assistantMsg: ChatMessage = {
-      id: `g-${Date.now() + 1}`,
-      role: "assistant",
-      content: "",
-      label: agentModel,
-      toolCalls: [],
-    };
-
-    setAgentMessages((prev) => [...prev, userMsg, assistantMsg]);
-    setAgentStreamingId(assistantMsg.id);
-    setAgentLoading(true);
-    setAgentPrefill("");
 
     streamAgentMessage(agentMachineId, fullMsg, agentSessionId, {
       onSession: (sessionId) => {
@@ -838,7 +870,7 @@ export default function Workspace() {
         setAgentLoading(false);
       },
     });
-  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking]);
+  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages]);
 
   // Confirm a step — send message to agent to continue
   const handleConfirmStep = useCallback(
@@ -1506,6 +1538,7 @@ export default function Workspace() {
             onSend={handleAskSend}
             loading={askLoading}
             streamingMessageId={askStreamingId}
+            onConnectVps={() => setShowSshModal(true)}
             copyLabel={`\u2192 ${t("agent.panel2")}`}
             onCopyTo={(content) => setAgentPrefill(content)}
             prefill={askPrefill}
@@ -1556,14 +1589,11 @@ export default function Workspace() {
             onModelChange={setAgentModel}
             onThinkingChange={setAgentThinking}
             messages={agentMessages}
-            inputPlaceholder={
-              agentMachineId
-                ? t("chat.agent.command")
-                : t("chat.agent.connect")
-            }
+            inputPlaceholder={t("chat.agent.command")}
             onSend={handleAgentSend}
             loading={agentLoading}
             streamingMessageId={agentStreamingId}
+            onConnectVps={() => setShowSshModal(true)}
             copyLabel={`\u2190 ${t("agent.panel1")}`}
             onCopyTo={(content) => setAskPrefill(content)}
             prefill={agentPrefill}

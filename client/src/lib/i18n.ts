@@ -28,6 +28,11 @@ const DICT: Record<string, { en: string; bs: string }> = {
 
   // ── Chat input / toolbar ──
   "toolbar.attach": { en: "Add attachment", bs: "Dodaj prilog" },
+  "toolbar.connectVps": { en: "Connect VPS", bs: "Poveži VPS" },
+  "toolbar.connectVpsInfo": {
+    en: "Optional — connect a VPS server to unlock the full agent (files, deploy, todos). Not required to chat.",
+    bs: "Opcionalno — poveži VPS server za puni agent (fajlovi, deploy, zadaci). Nije potrebno za čet.",
+  },
   "toolbar.mic": { en: "Microphone", bs: "Mikrofon" },
   "toolbar.mic.stop": { en: "Stop recording", bs: "Zaustavi snimanje" },
   "toolbar.mic.recording": { en: "Recording…", bs: "Snimanje…" },

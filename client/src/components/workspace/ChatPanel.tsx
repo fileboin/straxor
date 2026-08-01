@@ -55,6 +55,7 @@ interface Props {
   messages: ChatMessage[];
   inputPlaceholder: string;
   onSend: (message: string, attachments?: Attachment[]) => void;
+  onConnectVps?: () => void;
   loading?: boolean;
   streamingMessageId?: string | null;
   onApiKeyChange?: () => void;
@@ -203,6 +204,7 @@ export default function ChatPanel({
   messages,
   inputPlaceholder,
   onSend,
+  onConnectVps,
   loading,
   streamingMessageId,
   onApiKeyChange,
@@ -434,6 +436,10 @@ export default function ChatPanel({
   };
 
   const handleToolbarAction = (actionId: string) => {
+    if (actionId === "connect-vps") {
+      onConnectVps?.();
+      return;
+    }
     if (actionId === "mic") {
       handleMicToggle();
       return;

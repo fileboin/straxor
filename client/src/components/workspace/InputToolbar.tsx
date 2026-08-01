@@ -20,6 +20,7 @@ export default function InputToolbar({ onAction, micState = "idle" }: Props) {
   useLang();
 
   const ACTIONS: ToolbarAction[] = [
+    { id: "connect-vps", label: t("toolbar.connectVps"), icon: "⏻", info: t("toolbar.connectVpsInfo") },
     { id: "model", label: t("toolbar.model"), icon: "🤖", info: t("toolbar.modelInfo") },
     { id: "prompts", label: t("toolbar.prompts"), icon: "📋", info: t("toolbar.promptsInfo") },
     { id: "camera", label: t("toolbar.camera"), icon: "📷", info: t("toolbar.cameraInfo") },
