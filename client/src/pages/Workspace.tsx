@@ -13,7 +13,6 @@ import PermissionsPanel from "../components/workspace/PermissionsPanel.js";
 import ToolConfirmDialog from "../components/workspace/ToolConfirmDialog.js";
 import type { ChatMessage, ToolCall } from "../components/workspace/ChatPanel.js";
 import type { Attachment } from "../lib/attachments.js";
-import type { PlanActMode } from "../components/workspace/PlanActToggle.js";
 import type { ThinkingBudget } from "../lib/models.js";
 import { streamChat, hasApiKey } from "../lib/chat.js";
 import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges, sendSteerInstruction } from "../lib/agent.js";
@@ -93,12 +92,10 @@ export default function Workspace() {
   const [askProvider, setAskProvider] = useState("anthropic");
   const [askModel, setAskModel] = useState("claude-sonnet-4");
   const [askThinking, setAskThinking] = useState<ThinkingBudget>("medium");
-  const [askPlanAct, setAskPlanAct] = useState<PlanActMode>("plan");
 
   const [agentProvider, setAgentProvider] = useState("anthropic");
   const [agentModel, setAgentModel] = useState("claude-opus-4-6");
   const [agentThinking, setAgentThinking] = useState<ThinkingBudget>("high");
-  const [agentPlanAct, setAgentPlanAct] = useState<PlanActMode>("act");
 
   const [askMessages, setAskMessages] = useState<ChatMessage[]>(INITIAL_ASK_MESSAGES);
   const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([]);
@@ -289,7 +286,6 @@ export default function Workspace() {
           if (cfg.model) setAgentModel(cfg.model);
           if (cfg.thinking) setAgentThinking(cfg.thinking);
           if (cfg.role) setAgentRole(cfg.role);
-          if (cfg.planAct) setAgentPlanAct(cfg.planAct);
         } catch {}
       }
 
@@ -300,7 +296,6 @@ export default function Workspace() {
           if (cfg.provider) setAskProvider(cfg.provider);
           if (cfg.model) setAskModel(cfg.model);
           if (cfg.thinking) setAskThinking(cfg.thinking);
-          if (cfg.planAct) setAskPlanAct(cfg.planAct);
         } catch {}
       }
 
@@ -596,8 +591,8 @@ export default function Workspace() {
           PROJECT_ID,
           agentMachineId,
           msg.slice(0, 100),
-          { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, planAct: agentPlanAct },
-          { provider: askProvider, model: askModel, thinking: askThinking, planAct: askPlanAct }
+          { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole },
+          { provider: askProvider, model: askModel, thinking: askThinking }
         );
         activeDbSessionId = sess.id;
         setDbSessionId(sess.id);
@@ -789,7 +784,7 @@ export default function Workspace() {
           // Save session metadata
           updateSession(dbSessionId, {
             lastTask: msg.slice(0, 500),
-            agentConfig: JSON.stringify({ provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, planAct: agentPlanAct }),
+            agentConfig: JSON.stringify({ provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole }),
             activePromptIds: JSON.stringify(Array.from(activePromptIds)),
           }).catch(() => {});
         }
@@ -806,7 +801,7 @@ export default function Workspace() {
         setAgentLoading(false);
       },
     });
-  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, agentPlanAct, askProvider, askModel, askThinking, askPlanAct]);
+  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking]);
 
   // Confirm a step — send message to agent to continue
   const handleConfirmStep = useCallback(
@@ -1448,11 +1443,9 @@ export default function Workspace() {
             providerId={askProvider}
             modelId={askModel}
             thinking={askThinking}
-            planActMode={askPlanAct}
             onProviderChange={setAskProvider}
             onModelChange={setAskModel}
             onThinkingChange={setAskThinking}
-            onPlanActChange={setAskPlanAct}
             messages={askMessages}
             inputPlaceholder={
               askHasKey ? t("chat.ask.any") : t("chat.ask.noKey")
@@ -1465,7 +1458,6 @@ export default function Workspace() {
             prefill={askPrefill}
             isExpanded={panelMode === "ask-full"}
             onToggleExpand={toggleAskExpand}
-            enablePlanPreview
             onOpenPromptLibrary={() => setShowPromptLibrary(true)}
             isSteerable={isAgentSteerable}
             onSteerSend={handleSteerSend}
@@ -1493,11 +1485,9 @@ export default function Workspace() {
             providerId={agentProvider}
             modelId={agentModel}
             thinking={agentThinking}
-            planActMode={agentPlanAct}
             onProviderChange={setAgentProvider}
             onModelChange={setAgentModel}
             onThinkingChange={setAgentThinking}
-            onPlanActChange={setAgentPlanAct}
             messages={agentMessages}
             inputPlaceholder={
               agentMachineId
@@ -1512,7 +1502,6 @@ export default function Workspace() {
             prefill={agentPrefill}
             isExpanded={panelMode === "agent-full"}
             onToggleExpand={toggleAgentExpand}
-            enablePlanPreview
             onOpenPromptLibrary={() => setShowPromptLibrary(true)}
             headerLeft={
               <RoleSelector role={agentRole} onChange={setAgentRole} />

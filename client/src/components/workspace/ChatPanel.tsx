@@ -3,8 +3,6 @@ import ProviderModelDropdown from "./ProviderModelDropdown.js";
 import ModelPickerModal from "./ModelPickerModal.js";
 import InputToolbar from "./InputToolbar.js";
 import InfoTip from "./InfoTip.js";
-import PlanActToggle, { type PlanActMode } from "./PlanActToggle.js";
-import PlanPreview from "./PlanPreview.js";
 import { useModelCatalog, type ThinkingBudget } from "../../lib/models.js";
 import { t, useLang } from "../../lib/i18n.js";
 import { estimatePlan, formatCost, formatTokens } from "../../lib/plan-preview.js";
@@ -50,11 +48,9 @@ interface Props {
   providerId: string;
   modelId: string;
   thinking: ThinkingBudget;
-  planActMode: PlanActMode;
   onProviderChange: (providerId: string) => void;
   onModelChange: (modelId: string) => void;
   onThinkingChange: (budget: ThinkingBudget) => void;
-  onPlanActChange: (mode: PlanActMode) => void;
   messages: ChatMessage[];
   inputPlaceholder: string;
   onSend: (message: string, attachments?: Attachment[]) => void;
@@ -68,7 +64,6 @@ interface Props {
   prefill?: string;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
-  enablePlanPreview?: boolean;
   onOpenPromptLibrary?: () => void;
   isSteerable?: boolean;
   onSteerSend?: (message: string) => void;
@@ -201,11 +196,9 @@ export default function ChatPanel({
   providerId,
   modelId,
   thinking,
-  planActMode,
   onProviderChange,
   onModelChange,
   onThinkingChange,
-  onPlanActChange,
   messages,
   inputPlaceholder,
   onSend,
@@ -219,16 +212,13 @@ export default function ChatPanel({
   prefill,
   isExpanded,
   onToggleExpand,
-  enablePlanPreview,
   onOpenPromptLibrary,
   isSteerable,
   onSteerSend,
   steerStatusText,
 }: Props) {
   const [input, setInput] = useState("");
-  const [showPlanPreview, setShowPlanPreview] = useState(false);
   useLang();
-  const [pendingMessage, setPendingMessage] = useState("");
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
@@ -531,28 +521,9 @@ export default function ChatPanel({
 
     if (loading) return;
 
-    if (enablePlanPreview) {
-      setPendingMessage(trimmed);
-      setShowPlanPreview(true);
-      return;
-    }
-
     onSend(trimmed, pendingAttachments);
     setInput("");
     setPendingAttachments([]);
-  };
-
-  const handlePlanConfirm = () => {
-    setShowPlanPreview(false);
-    onSend(pendingMessage, pendingAttachments);
-    setInput("");
-    setPendingMessage("");
-    setPendingAttachments([]);
-  };
-
-  const handlePlanCancel = () => {
-    setShowPlanPreview(false);
-    setPendingMessage("");
   };
 
   const budgetText = input.trim() || lastUserContent();
@@ -597,7 +568,6 @@ export default function ChatPanel({
               <InfoTip text={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")} placement="bottom" />
             </div>
           )}
-          <PlanActToggle mode={planActMode} onChange={onPlanActChange} />
           <button
             onClick={() => setShowModelPicker(true)}
             className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
@@ -704,22 +674,6 @@ export default function ChatPanel({
 
       {/* Input */}
       <div className="px-2 py-2 border-t border-border bg-surface shrink-0 sm:px-3 sm:py-2.5">
-        {/* Plan Preview */}
-        {showPlanPreview && (
-          <div className="mb-2">
-            <PlanPreview
-              prompt={pendingMessage}
-              providerId={providerId}
-              modelId={modelId}
-              thinking={thinking}
-              onConfirm={handlePlanConfirm}
-              onCancel={handlePlanCancel}
-              onModelChange={(pId, mId) => { onProviderChange(pId); onModelChange(mId); }}
-              loading={loading}
-            />
-          </div>
-        )}
-
         {/* Budget estimate — optional, manual, non-blocking */}
         {budgetOpen && (
           <div ref={budgetRef} className="mb-2 rounded-xl border border-border bg-surface-2 overflow-hidden">
