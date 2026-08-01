@@ -1365,8 +1365,8 @@ export default function Workspace() {
               : "text-text-muted border-transparent"
           }`}
         >
-          <span className="w-2 h-2 rounded-full bg-accent-blue shrink-0" />
-          Ask
+          <span className="w-2 h-2 rounded-full bg-accent shrink-0" />
+          {t("agent.panel1")}
         </button>
         <button
           onClick={() => {
@@ -1380,19 +1380,19 @@ export default function Workspace() {
           }`}
         >
           <span className="w-2 h-2 rounded-full bg-accent shrink-0" />
-          Agent
+          {t("agent.panel2")}
         </button>
       </div>
 
       {/* Panels */}
       <div
-        className={`flex-1 flex flex-col min-h-0 overflow-hidden ${
+        className={`flex-1 flex flex-col min-h-0 overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3 ${
           panelsLayout === "side" ? "md:flex-row" : ""
         }`}
       >
         {/* Layout toggle — visible on all screens; stacked stays automatic on mobile */}
         <div
-          className={`flex items-center justify-end gap-1 px-2 py-1 border-b border-border bg-surface shrink-0 transition-opacity ${
+          className={`flex items-center justify-end gap-1 px-2 py-1 rounded-xl border border-border bg-surface-2 shrink-0 transition-opacity ${
             panelMode !== "split" ? "hidden" : ""
           }`}
         >
@@ -1427,13 +1427,9 @@ export default function Workspace() {
           </span>
         </div>
 
-        {/* Ask panel */}
+        {/* Agent 1 panel */}
         <div
-          className={`flex flex-col min-h-0 min-w-0 border-b border-border ${
-            panelsLayout === "side" && panelMode !== "ask-full"
-              ? "md:border-b-0 md:border-r"
-              : ""
-          } ${
+          className={`flex flex-col min-h-0 min-w-0 ${
             panelMode === "agent-full"
               ? "hidden md:hidden"
               : panelMode === "ask-full"
@@ -1444,11 +1440,11 @@ export default function Workspace() {
           }`}
         >
           <ChatPanel
-            title="Ask"
-            icon="?"
-            iconColor="blue"
-            badge="chat"
-            badgeColor="blue"
+            title={t("agent.panel1")}
+            icon="⚡"
+            iconColor="accent"
+            badge="build"
+            badgeColor="accent"
             providerId={askProvider}
             modelId={askModel}
             thinking={askThinking}
@@ -1464,18 +1460,20 @@ export default function Workspace() {
             onSend={handleAskSend}
             loading={askLoading}
             streamingMessageId={askStreamingId}
-            copyLabel={`\u2192 ${t("chat.copy.agent")}`}
+            copyLabel={`\u2192 ${t("agent.panel2")}`}
             onCopyTo={(content) => setAgentPrefill(content)}
             prefill={askPrefill}
             isExpanded={panelMode === "ask-full"}
             onToggleExpand={toggleAskExpand}
+            enablePlanPreview
+            onOpenPromptLibrary={() => setShowPromptLibrary(true)}
             isSteerable={isAgentSteerable}
             onSteerSend={handleSteerSend}
             steerStatusText={agentTodos.length > 0 ? t("chat.steer.steps", { n: agentTodos.filter(t => t.status !== "completed").length }) : undefined}
           />
         </div>
 
-        {/* Agent panel */}
+        {/* Agent 2 panel */}
         <div
           className={`flex flex-col min-h-0 min-w-0 ${
             panelMode === "ask-full"
@@ -1488,7 +1486,7 @@ export default function Workspace() {
           }`}
         >
           <ChatPanel
-            title="Agent"
+            title={t("agent.panel2")}
             icon="⚡"
             iconColor="accent"
             badge="build"
@@ -1509,12 +1507,13 @@ export default function Workspace() {
             onSend={handleAgentSend}
             loading={agentLoading}
             streamingMessageId={agentStreamingId}
-            copyLabel={`\u2190 ${t("chat.copy.ask")}`}
+            copyLabel={`\u2190 ${t("agent.panel1")}`}
             onCopyTo={(content) => setAskPrefill(content)}
             prefill={agentPrefill}
             isExpanded={panelMode === "agent-full"}
             onToggleExpand={toggleAgentExpand}
             enablePlanPreview
+            onOpenPromptLibrary={() => setShowPromptLibrary(true)}
             headerLeft={
               <RoleSelector role={agentRole} onChange={setAgentRole} />
             }

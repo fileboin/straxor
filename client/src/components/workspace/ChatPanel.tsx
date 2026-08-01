@@ -2,10 +2,12 @@ import { useState, useRef, useEffect, type FormEvent, type ChangeEvent } from "r
 import ProviderModelDropdown from "./ProviderModelDropdown.js";
 import ModelPickerModal from "./ModelPickerModal.js";
 import InputToolbar from "./InputToolbar.js";
+import InfoTip from "./InfoTip.js";
 import PlanActToggle, { type PlanActMode } from "./PlanActToggle.js";
 import PlanPreview from "./PlanPreview.js";
 import { useModelCatalog, type ThinkingBudget } from "../../lib/models.js";
 import { t, useLang } from "../../lib/i18n.js";
+import { estimatePlan, formatCost, formatTokens } from "../../lib/plan-preview.js";
 import {
   type Attachment,
   type UploadResponse,
@@ -67,6 +69,7 @@ interface Props {
   isExpanded?: boolean;
   onToggleExpand?: () => void;
   enablePlanPreview?: boolean;
+  onOpenPromptLibrary?: () => void;
   isSteerable?: boolean;
   onSteerSend?: (message: string) => void;
   steerStatusText?: string;
@@ -217,6 +220,7 @@ export default function ChatPanel({
   isExpanded,
   onToggleExpand,
   enablePlanPreview,
+  onOpenPromptLibrary,
   isSteerable,
   onSteerSend,
   steerStatusText,
@@ -226,6 +230,7 @@ export default function ChatPanel({
   useLang();
   const [pendingMessage, setPendingMessage] = useState("");
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [budgetOpen, setBudgetOpen] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const [uploadingCount, setUploadingCount] = useState(0);
   const [micState, setMicState] = useState<"idle" | "recording" | "processing">("idle");
@@ -291,6 +296,26 @@ export default function ChatPanel({
       cameraCleanupRef.current?.();
     };
   }, []);
+
+  // Close the budget popover on Escape / outside click (non-blocking)
+  const budgetRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!budgetOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (budgetRef.current && !budgetRef.current.contains(e.target as Node)) {
+        setBudgetOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setBudgetOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [budgetOpen]);
 
   const addAttachment = (up: UploadResponse) => {
     setPendingAttachments((prev) => [
@@ -434,6 +459,44 @@ export default function ChatPanel({
       imageInputRef.current?.click();
       return;
     }
+    if (actionId === "model") {
+      setShowModelPicker(true);
+      return;
+    }
+    if (actionId === "prompts") {
+      onOpenPromptLibrary?.();
+      return;
+    }
+    if (actionId === "budget") {
+      setBudgetOpen((b) => !b);
+      return;
+    }
+  };
+
+  const handleSendBudget = () => {
+    const text = input.trim() || lastUserContent();
+    if (!text) return;
+    setBudgetOpen(false);
+    const request =
+      `Napravi detaljan proračun i budžet za ovaj projekat na osnovu sljedećeg zadatka. ` +
+      `Daj procjenu troškova (tokens/cijena), koraka i vremena, te prijedlog modela.\n\n---\n\n${text}`;
+    handleSubmitForBudget(request);
+  };
+
+  // Best available text for the budget estimate: current input, else last user message.
+  const lastUserContent = () => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role === "user" && m.content.trim()) return m.content.trim();
+    }
+    return "";
+  };
+
+  const handleSubmitForBudget = (msg: string) => {
+    if (loading) return;
+    onSend(msg);
+    setInput("");
+    setPendingAttachments([]);
   };
 
   const handleCameraClose = () => setCameraOpen(false);
@@ -492,10 +555,13 @@ export default function ChatPanel({
     setPendingMessage("");
   };
 
+  const budgetText = input.trim() || lastUserContent();
+  const budgetEstimate = budgetText ? estimatePlan(budgetText, providerId, modelId, thinking) : null;
+
   return (
-    <div className="flex flex-col h-full min-h-0">
-      {/* Header */}
-      <div className="flex items-center justify-between px-2 py-2 border-b border-border bg-surface shrink-0 gap-2 sm:px-3">
+    <div className="flex flex-col h-full min-h-0 rounded-2xl border border-border bg-surface shadow-lg shadow-black/30 overflow-hidden">
+      {/* Header — title bar */}
+      <div className="flex items-center justify-between px-2 py-2 border-b border-border bg-surface-2 shrink-0 gap-2 sm:px-3">
         <div className="flex items-center gap-1.5 min-w-0 sm:gap-2">
           <div
             className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0 ${
@@ -520,13 +586,16 @@ export default function ChatPanel({
         </div>
         <div className="flex items-center gap-1 shrink-0 sm:gap-2">
           {onToggleExpand && (
-            <button
-              onClick={onToggleExpand}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
-              title={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")}
-            >
-              {isExpanded ? "⊟" : "⊞"}
-            </button>
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={onToggleExpand}
+                className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
+                title={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")}
+              >
+                {isExpanded ? "⊟" : "⊞"}
+              </button>
+              <InfoTip text={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")} placement="bottom" />
+            </div>
           )}
           <PlanActToggle mode={planActMode} onChange={onPlanActChange} />
           <button
@@ -537,6 +606,7 @@ export default function ChatPanel({
           >
             ✦
           </button>
+          <InfoTip text={t("toolbar.modelInfo")} placement="bottom" />
           <ProviderModelDropdown
             providerId={providerId}
             modelId={modelId}
@@ -650,6 +720,62 @@ export default function ChatPanel({
           </div>
         )}
 
+        {/* Budget estimate — optional, manual, non-blocking */}
+        {budgetOpen && (
+          <div ref={budgetRef} className="mb-2 rounded-xl border border-border bg-surface-2 overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+              <span className="text-[12px] font-semibold text-text">💰 {t("budget.title")}</span>
+              <div className="flex items-center gap-2">
+                <InfoTip text={t("toolbar.budgetInfo")} placement="bottom" />
+                <button
+                  type="button"
+                  onClick={() => setBudgetOpen(false)}
+                  className="text-[10px] text-text-muted hover:text-text"
+                >
+                  {t("budget.close")} ✕
+                </button>
+              </div>
+            </div>
+            {budgetEstimate ? (
+              <>
+                <div className="px-3 py-2.5">
+                  <p className="text-[11px] text-text-muted mb-2">{t("budget.desc")}</p>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="rounded-lg border border-border bg-surface px-2.5 py-1.5">
+                      <div className="text-[10px] text-text-muted uppercase tracking-wider">{t("budget.cost")}</div>
+                      <div className="font-semibold text-accent">{formatCost(budgetEstimate.costUSD)}</div>
+                    </div>
+                    <div className="rounded-lg border border-border bg-surface px-2.5 py-1.5">
+                      <div className="text-[10px] text-text-muted uppercase tracking-wider">{t("budget.tokens")}</div>
+                      <div className="font-semibold">{formatTokens(budgetEstimate.totalTokens)}</div>
+                    </div>
+                    <div className="rounded-lg border border-border bg-surface px-2.5 py-1.5">
+                      <div className="text-[10px] text-text-muted uppercase tracking-wider">{t("budget.steps")}</div>
+                      <div className="font-semibold">{budgetEstimate.estimatedSteps}</div>
+                    </div>
+                    <div className="rounded-lg border border-border bg-surface px-2.5 py-1.5">
+                      <div className="text-[10px] text-text-muted uppercase tracking-wider">{t("budget.duration")}</div>
+                      <div className="font-semibold">{budgetEstimate.estimatedDuration}</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-3 pb-2.5">
+                  <button
+                    type="button"
+                    onClick={handleSendBudget}
+                    disabled={loading}
+                    className="w-full py-1.5 text-[11px] font-medium rounded-lg bg-accent text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
+                  >
+                    {t("budget.send")}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="px-3 py-3 text-[12px] text-text-muted">{t("budget.empty")}</div>
+            )}
+          </div>
+        )}
+
         {/* Mic status */}
         {(micState === "recording" || micState === "processing") && (
           <div className="mb-2 flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-[11px] text-red-500">
@@ -688,7 +814,6 @@ export default function ChatPanel({
           <InputToolbar
             onAction={handleToolbarAction}
             micState={micState}
-            onMicToggle={handleMicToggle}
           />
           <input
             type="text"
