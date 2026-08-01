@@ -4,5 +4,6 @@ dist/
 server/.env
 server/uploads/
 server/image-data/
+server/.straxor-workspaces/
 *.log
 .DS_Store

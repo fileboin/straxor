@@ -6,8 +6,10 @@ import { eq, and } from "drizzle-orm";
 import {
   getGitRemoteAdapter,
   hydrateGitRemoteConfig,
+  getGitRemoteToken,
 } from "../adapters/git/remote/registry.js";
 import type { GitPlatformId } from "../adapters/git/remote/adapter.js";
+import { ensureWorkspace, getRepoWorkspaceDir, hasGitBinary } from "../runtime/local/workspace.js";
 
 const router = Router();
 
@@ -170,6 +172,81 @@ router.post("/disconnect", async (req, res) => {
       .where(and(eq(repoConnections.userId, userId), eq(repoConnections.platform, platform), eq(repoConnections.fullName, fullName)));
 
     res.json({ success: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/repos/prepare — clone/pull the active repo into the local sandbox
+router.post("/prepare", async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const active = await db
+      .select()
+      .from(repoConnections)
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+      .limit(1);
+
+    if (active.length === 0) {
+      res.status(404).json({ error: "No active repo — connect one first" });
+      return;
+    }
+
+    const conn = active[0];
+    const token = await getGitRemoteToken(userId, conn.platform as GitPlatformId);
+    if (!token) {
+      res.status(401).json({ error: "Platform token missing — save a token first" });
+      return;
+    }
+
+    const info = await ensureWorkspace({
+      userId,
+      platform: conn.platform,
+      owner: conn.owner,
+      name: conn.name,
+      fullName: conn.fullName,
+      cloneUrl: conn.cloneUrl,
+      defaultBranch: conn.defaultBranch,
+      token,
+    });
+
+    res.json({ success: true, ...info });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+// GET /api/repos/workspace — report local sandbox status for the active repo
+router.get("/workspace", async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const active = await db
+      .select()
+      .from(repoConnections)
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+      .limit(1);
+
+    if (active.length === 0) {
+      res.json({ success: false, connected: false });
+      return;
+    }
+
+    const conn = active[0];
+    const dir = getRepoWorkspaceDir(userId, conn.owner, conn.name);
+    const fs = await import("fs");
+    const path = await import("path");
+    const ready = fs.existsSync(dir) && fs.existsSync(path.join(dir, ".git"));
+    res.json({
+      success: true,
+      connected: true,
+      repo: conn.fullName,
+      branch: conn.defaultBranch,
+      sandboxDir: dir,
+      cloned: ready,
+      gitBinary: await hasGitBinary(),
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({ error: message });
