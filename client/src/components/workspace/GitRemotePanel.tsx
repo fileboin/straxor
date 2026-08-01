@@ -13,16 +13,17 @@ import {
   createIssue,
 } from "../../lib/git-remote";
 import type { GitPlatformId } from "../../lib/git-remote";
-import { listRepoConnections, connectRepo, disconnectRepo } from "../../lib/repos";
+import { listRepoConnections, connectRepo, setActiveRepo, disconnectRepo } from "../../lib/repos";
 import type { RepoConnection } from "../../lib/repos";
 
 interface Props {
   onClose: () => void;
+  onRepoChanged?: () => void;
 }
 
 type Tab = "repos" | "prs" | "issues";
 
-export default function GitRemotePanel({ onClose }: Props) {
+export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
   const [platform, setPlatform] = useState<GitPlatformId>("github");
   const [configured, setConfigured] = useState(false);
   const [token, setToken] = useState("");
@@ -94,10 +95,22 @@ export default function GitRemotePanel({ onClose }: Props) {
       await connectRepo(platform, fullName);
       setActionMsg("Povezan za agenta: " + fullName);
       await loadConnections();
+      onRepoChanged?.();
     } catch (e: any) {
       setActionMsg(e.message);
     }
     setConnecting("");
+  }
+
+  async function handleMakeActive(fullName: string) {
+    try {
+      await setActiveRepo(platform, fullName);
+      setActionMsg("Aktivni repo: " + fullName);
+      await loadConnections();
+      onRepoChanged?.();
+    } catch (e: any) {
+      setActionMsg(e.message);
+    }
   }
 
   async function handleDisconnect(fullName: string) {
@@ -105,6 +118,7 @@ export default function GitRemotePanel({ onClose }: Props) {
       await disconnectRepo(platform, fullName);
       setActionMsg("Prekinut: " + fullName);
       await loadConnections();
+      onRepoChanged?.();
     } catch (e: any) {
       setActionMsg(e.message);
     }
@@ -304,13 +318,24 @@ export default function GitRemotePanel({ onClose }: Props) {
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-400 ml-2">
                       {conn ? (
-                        <button
-                          className="btn btn-xs px-2 py-0.5 bg-green-600/30 text-green-400 rounded hover:bg-green-600/50"
-                          onClick={(e) => { e.stopPropagation(); handleDisconnect(r.fullName); }}
-                          title="Prekini vezu"
-                        >
-                          {"\u2713"} Povezan
-                        </button>
+                        <>
+                          {!isActive && (
+                            <button
+                              className="btn btn-xs px-2 py-0.5 border border-blue-500/40 text-blue-400 rounded hover:bg-blue-500/20"
+                              onClick={(e) => { e.stopPropagation(); handleMakeActive(r.fullName); }}
+                              title="Postavi kao aktivni repo za agenta"
+                            >
+                              Postavi aktivni
+                            </button>
+                          )}
+                          <button
+                            className="btn btn-xs px-2 py-0.5 bg-green-600/30 text-green-400 rounded hover:bg-green-600/50"
+                            onClick={(e) => { e.stopPropagation(); handleDisconnect(r.fullName); }}
+                            title="Prekini vezu"
+                          >
+                            {"\u2713"} Povezan
+                          </button>
+                        </>
                       ) : (
                         <button
                           className="btn btn-primary btn-xs px-2 py-0.5"

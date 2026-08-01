@@ -134,7 +134,7 @@ export default function RollbackPanel({ machineId, projectPath, onClose }: Props
         <div className="flex-1 overflow-y-auto p-3">
           {!machineId && (
             <div className="text-center py-12 text-text-muted text-[11px]">
-              Poveži VPS za korištenje historije verzija
+              Poveži GitHub repo ili VPS za korištenje historije verzija
             </div>
           )}
 

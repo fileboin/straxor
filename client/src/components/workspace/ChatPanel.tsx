@@ -76,6 +76,7 @@ interface Props {
   isSteerable?: boolean;
   onSteerSend?: (message: string) => void;
   steerStatusText?: string;
+  runtimeControl?: React.ReactNode;
 }
 
 const ACCEPTED_EXT_RE = /\.(jpe?g|png|webp|gif|avif|mp3|wav|ogg|webm|m4a|pdf|txt|md|csv|json)$/i;
@@ -228,6 +229,7 @@ export default function ChatPanel({
   isSteerable,
   onSteerSend,
   steerStatusText,
+  runtimeControl,
 }: Props) {
   const [input, setInput] = useState("");
   useLang();
@@ -689,6 +691,7 @@ export default function ChatPanel({
           {headerLeft}
         </div>
         <div className="flex items-center gap-1 shrink-0 sm:gap-2">
+          {runtimeControl}
           {onToggleExpand && (
             <div className="flex items-center gap-0.5">
               <button

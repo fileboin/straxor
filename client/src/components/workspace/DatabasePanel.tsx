@@ -122,7 +122,7 @@ export default function DatabasePanel({ machineId }: Props) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 text-text-muted">
         <div className="text-3xl opacity-20">🐘</div>
-        <div className="text-[12px]">Poveži VPS za pristup bazi podataka</div>
+        <div className="text-[12px]">Poveži GitHub repo ili VPS za pristup bazi podataka</div>
       </div>
     );
   }

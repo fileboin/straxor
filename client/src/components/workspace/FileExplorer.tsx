@@ -180,7 +180,7 @@ export default function FileExplorer({ machineId, rootPath = ".", onFileSelect, 
   if (!machineId) {
     return (
       <div className="h-full flex items-center justify-center text-[11px] text-text-muted p-3">
-        Poveži VPS za pregled datoteka
+        Poveži GitHub repo ili VPS za pregled datoteka
       </div>
     );
   }

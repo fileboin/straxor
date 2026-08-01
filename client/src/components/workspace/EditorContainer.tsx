@@ -293,7 +293,7 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 text-text-muted">
         <div className="text-3xl opacity-30">📝</div>
-        <div className="text-[12px]">Poveži VPS za uređivanje datoteka</div>
+        <div className="text-[12px]">Poveži GitHub repo ili VPS za uređivanje datoteka</div>
       </div>
     );
   }

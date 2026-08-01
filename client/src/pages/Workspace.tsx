@@ -16,6 +16,7 @@ import type { Attachment } from "../lib/attachments.js";
 import type { ThinkingBudget } from "../lib/models.js";
 import { streamChat, hasApiKey } from "../lib/chat.js";
 import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges, sendSteerInstruction } from "../lib/agent.js";
+import { listRepoConnections, type RepoConnection } from "../lib/repos.js";
 import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
 import { type AgentRole, getRoleById, fetchPrompts, type SavedPrompt } from "../lib/roles.js";
 import { t, useLang } from "../lib/i18n.js";
@@ -40,6 +41,7 @@ import DesignAssetsPanel from "../components/workspace/DesignAssetsPanel.js";
 import DesignStudio from "../components/workspace/DesignStudio.js";
 import WebResearchPanel from "../components/workspace/WebResearchPanel.js";
 import GitRemotePanel from "../components/workspace/GitRemotePanel.js";
+import EnginePicker from "../components/workspace/EnginePicker.js";
 import UsagePanel from "../components/workspace/UsagePanel.js";
 import RuntimeSelector from "../components/workspace/RuntimeSelector.js";
 import QuickStartPanel from "../components/workspace/QuickStartPanel.js";
@@ -158,6 +160,36 @@ export default function Workspace() {
   // Agent session state
   const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
   const [agentMachineId, setAgentMachineId] = useState<string | null>(null);
+
+  // Active repo connection — when set and no VPS machine is configured, the
+  // agent runs on the LOCAL engine inside the cloned repo (no VPS needed).
+  const [activeRepo, setActiveRepo] = useState<RepoConnection | null>(null);
+
+  const loadActiveRepo = useCallback(async () => {
+    try {
+      const conns = await listRepoConnections();
+      const active = conns.find((c) => c.isActive) || null;
+      setActiveRepo(active);
+      return active;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Load the active repo on mount.
+  useEffect(() => {
+    loadActiveRepo();
+  }, [loadActiveRepo]);
+
+  // When an active repo exists, point the agent at the local engine unless a
+  // VPS machine is already selected. When the repo goes away, drop local.
+  useEffect(() => {
+    if (activeRepo) {
+      setAgentMachineId((prev) => (prev && !prev.startsWith("local:") ? prev : "local:opencode"));
+    } else {
+      setAgentMachineId((prev) => (prev && prev.startsWith("local:") ? null : prev));
+    }
+  }, [activeRepo]);
 
   // Resume system state
   const [dbSessionId, setDbSessionId] = useState<string | null>(null);
@@ -1637,6 +1669,17 @@ export default function Workspace() {
             headerLeft={
               <RoleSelector role={agentRole} onChange={setAgentRole} />
             }
+            runtimeControl={
+              <EnginePicker
+                machineId={agentMachineId}
+                hasRepo={!!activeRepo}
+                repoName={activeRepo?.fullName}
+                onSelectLocal={() => setAgentMachineId("local:opencode")}
+                onConnectVps={() => setShowSshModal(true)}
+                onOpenGitRemote={() => setShowGitRemote(true)}
+                onOpenRuntimeManager={() => setShowRuntimeManager(true)}
+              />
+            }
             headerContent={
               <>
                 <TodoList
@@ -1926,7 +1969,7 @@ export default function Workspace() {
       )}
 
       {showGitRemote && (
-        <GitRemotePanel onClose={() => setShowGitRemote(false)} />
+        <GitRemotePanel onClose={() => setShowGitRemote(false)} onRepoChanged={() => loadActiveRepo()} />
       )}
 
       {showWebResearch && (
