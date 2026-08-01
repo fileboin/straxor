@@ -22,16 +22,15 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
 - **FAZA 1** (commit `6103ff6`): `git_connections` + `repo_connections` tabele (migracija `0003_happy_gorilla_man.sql` primijenjena na Neon); `setGitRemoteConfig`/`hydrateGitRemoteConfig`/`getGitRemoteToken` perzistiraju u DB (AES-256-GCM); `/api/repos` connect/active/disconnect/list; klijent repo picker "Poveži za agenta" + "Aktivni repo"; auth-token fix u `lib/git-remote.ts`.
 - **FAZA 2** (commit `c78c60c`): `server/src/runtime/local/workspace.ts` — klonira/pull aktivni repo u sandbox preko tokenizovanog URL-a, git binary + isomorphic-git fallback, git config user; `/api/repos/prepare` + `/api/repos/workspace`. Verifikovano: stvarni clone fileboin/straxor (lastCommit 6103ff6).
 - **FAZA 3** (commit `80a339d`): `server/src/runtime/local/engine.ts` — spawn `opencode serve` kao child process u workspace diru, machineId konvencija `local:<engine>`, registry per user+repo, free-port, health wait, cleanup na shutdown; `opencode.ts` BoundAdapter refaktorisan na pluggable transport SSH|Localhost (`withTransport`/`httpCall`/`localEventStream`); `agent.ts` requireAuth fix + version-aware SSE parser (delta streaming, finish na prvom session.idle); `repos.ts` gasi engine na switch/disconnect. **Verifikovano end-to-end**: agent bez VPS-a streamuje pravi tekst (202 znaka, 45 delta chunk-ova) preko `message.part.delta` i završava `[DONE]`.
+- **FAZE 4–5** (commit `9ccf4d8`): `Workspace.tsx` učitava activeRepo iz baze, kada postoji a VPS nije spojen — postavlja `agentMachineId="local:opencode"` (agent radi na lokalnom klonu repa, bez fallback na čist chat na `:653`). `EnginePicker.tsx` (novi) — per-panel dropdown u headeru Agent panela koji prikazuje trenutni engine (Lokalno · OpenCode / VPS / nema) sa opcijama prebacivanja, otvaranja SSH modala, GitHub repa ili Runtime Managera. `ChatPanel.tsx` novi `runtimeControl` slot. `GitRemotePanel.tsx` — "Postavi aktivni" dugme + `onRepoChanged` callback. VPS-blokade u FileExplorer/Editor/Preview/Rollback/Database komponentama ažurirane (umesto "Poveži VPS" sada "Poveži GitHub repo ili VPS").
 - Svi prethodni radovi: Render single-service deploy, white screen fix, SSH disconnect fix (P1), layout toggle (P2), model catalogs + picker (P3), expand/fullscreen (P4), password reset + email verification.
 
 ### Active
-- **FAZA 4 (NISAM ZAVRŠIO)**: povezati klijent da koristi lokalni engine — u `Workspace.tsx`, kada je povezan repo a NEMA VPS-a, postaviti `agentMachineId = "local:opencode"` (i `vpsStatus="ready"`) umjesto fallback na čist chat (`:653`); engine picker po panelu (RuntimeSelector/RuntimeManager na `:1941`); ukloniti VPS blokade.
+- **FAZA 6**: Finalni end-to-end test — spojiti pravi GitHub repo (korisnikov token, ne dummy) u dev, otvoriti Agent panel, poslati zadatak, potvrditi da agent čita/pisne u kloniranom repou i da `git push` radi. Ovo je poslednja stvar prije screenshot-a.
 
 ### Blocked
 - **(none)** — nema blokera; pravi GitHub connect + agent commit/push test na kraju (treba korisnikov pravi token).
 
 ## Next Move
-1. **FAZA 4**: klijent — kad je aktivan repo i nema VPS mašine, `agentMachineId="local:opencode"`; per-panel engine picker; provjeriti da `/api/agent/send` prima `local:opencode`.
-2. **FAZA 5**: per-panel engine dropdown spojen na RuntimeManager; ukloniti VPS blokade iz UI.
-3. Finalni test: poveži GitHub repo (korisnikov token) → engine OpenCode u Agent 1 → zadatak → potvrditi čitanje/pisanje/commit/push bez VPS-a + screenshot.
-4. Per user's rule: do NOT touch tests or Swagger until password reset + email verification are confirmed working.
+1. **FAZA 6**: Korisnik spoji svoj GitHub repo (pravi token) → otvori Agent panel → pošalje zadatak (npr. "Napravi TODO.md sa 3 stavke") → potvrditi čitanje/pisanje/commit/push u kloniranom repou + screenshot.
+2. Per user's rule: do NOT touch tests or Swagger until password reset + email verification are confirmed working.
