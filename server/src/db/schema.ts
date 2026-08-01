@@ -98,6 +98,42 @@ export const userApiKeysRelations = relations(userApiKeys, ({ one }) => ({
   user: one(users, { fields: [userApiKeys.userId], references: [users.id] }),
 }));
 
+export const gitConnections = pgTable("git_connections", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  platform: varchar("platform", { length: 50 }).notNull(),
+  encryptedToken: text("encrypted_token").notNull(),
+  baseUrl: text("base_url"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const gitConnectionsRelations = relations(gitConnections, ({ one }) => ({
+  user: one(users, { fields: [gitConnections.userId], references: [users.id] }),
+}));
+
+export const repoConnections = pgTable("repo_connections", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  platform: varchar("platform", { length: 50 }).notNull(),
+  owner: varchar("owner", { length: 255 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  fullName: varchar("full_name", { length: 511 }).notNull(),
+  cloneUrl: text("clone_url").notNull(),
+  defaultBranch: varchar("default_branch", { length: 255 }).notNull().default("main"),
+  isActive: boolean("is_active").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const repoConnectionsRelations = relations(repoConnections, ({ one }) => ({
+  user: one(users, { fields: [repoConnections.userId], references: [users.id] }),
+}));
+
 export const logs = pgTable("logs", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")

@@ -51,10 +51,16 @@ export interface GitIssue {
 const BASE = "/api/git-remote";
 
 async function api<T>(path: string, opts?: RequestInit): Promise<T> {
+  const token = localStorage.getItem("token");
   const res = await fetch(`${BASE}${path}`, {
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...opts?.headers,
+    },
     ...opts,
+    body: opts?.body,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));

@@ -4,6 +4,7 @@ import {
   getGitRemoteAdapter,
   setGitRemoteConfig,
   getGitRemoteConfig,
+  hydrateGitRemoteConfig,
 } from "../adapters/git/remote/registry.js";
 import type { GitPlatformId } from "../adapters/git/remote/adapter.js";
 
@@ -14,8 +15,9 @@ const router = Router();
 // GET /api/git-remote/config/:platform — get platform config
 router.get("/config/:platform", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user!.userId;
     const platform = req.params.platform as GitPlatformId;
+    await hydrateGitRemoteConfig(userId);
     const config = getGitRemoteConfig(userId, platform);
     res.json({ platform, configured: !!config?.token, baseUrl: config?.baseUrl });
   } catch (error) {
@@ -26,11 +28,11 @@ router.get("/config/:platform", requireAuth, async (req: any, res) => {
 // POST /api/git-remote/config/:platform — set platform config (token, baseUrl)
 router.post("/config/:platform", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user!.userId;
     const platform = req.params.platform as GitPlatformId;
     const { token, baseUrl } = req.body;
 
-    setGitRemoteConfig(userId, platform, { token, baseUrl });
+    await setGitRemoteConfig(userId, platform, { token, baseUrl });
 
     // Verify by checking auth
     const adapter = getGitRemoteAdapter(userId, platform);
@@ -47,7 +49,7 @@ router.post("/config/:platform", requireAuth, async (req: any, res) => {
 // GET /api/git-remote/:platform/repos — list repos
 router.get("/:platform/repos", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user!.userId;
     const platform = req.params.platform as GitPlatformId;
     const adapter = getGitRemoteAdapter(userId, platform);
     const repos = await adapter.listRepos();
@@ -60,7 +62,7 @@ router.get("/:platform/repos", requireAuth, async (req: any, res) => {
 // GET /api/git-remote/:platform/repo/:owner/:repo — get single repo
 router.get("/:platform/repo/:owner/:repo", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user!.userId;
     const platform = req.params.platform as GitPlatformId;
     const { owner, repo } = req.params;
     const adapter = getGitRemoteAdapter(userId, platform);
@@ -74,7 +76,7 @@ router.get("/:platform/repo/:owner/:repo", requireAuth, async (req: any, res) =>
 // POST /api/git-remote/:platform/repo/:owner/:repo/fork — fork repo
 router.post("/:platform/repo/:owner/:repo/fork", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user!.userId;
     const platform = req.params.platform as GitPlatformId;
     const { owner, repo } = req.params;
     const adapter = getGitRemoteAdapter(userId, platform);
@@ -88,7 +90,7 @@ router.post("/:platform/repo/:owner/:repo/fork", requireAuth, async (req: any, r
 // POST /api/git-remote/:platform/repos — create new repo
 router.post("/:platform/repos", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user!.userId;
     const platform = req.params.platform as GitPlatformId;
     const { name, description, private: isPrivate } = req.body;
     const adapter = getGitRemoteAdapter(userId, platform);
@@ -104,7 +106,7 @@ router.post("/:platform/repos", requireAuth, async (req: any, res) => {
 // GET /api/git-remote/:platform/repo/:owner/:repo/branches
 router.get("/:platform/repo/:owner/:repo/branches", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user!.userId;
     const platform = req.params.platform as GitPlatformId;
     const { owner, repo } = req.params;
     const adapter = getGitRemoteAdapter(userId, platform);
@@ -118,7 +120,7 @@ router.get("/:platform/repo/:owner/:repo/branches", requireAuth, async (req: any
 // POST /api/git-remote/:platform/repo/:owner/:repo/branches — create branch
 router.post("/:platform/repo/:owner/:repo/branches", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user!.userId;
     const platform = req.params.platform as GitPlatformId;
     const { owner, repo } = req.params;
     const { name, fromSha } = req.body;
@@ -135,7 +137,7 @@ router.post("/:platform/repo/:owner/:repo/branches", requireAuth, async (req: an
 // GET /api/git-remote/:platform/repo/:owner/:repo/pulls
 router.get("/:platform/repo/:owner/:repo/pulls", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user!.userId;
     const platform = req.params.platform as GitPlatformId;
     const { owner, repo } = req.params;
     const state = req.query.state as string | undefined;
@@ -150,7 +152,7 @@ router.get("/:platform/repo/:owner/:repo/pulls", requireAuth, async (req: any, r
 // POST /api/git-remote/:platform/repo/:owner/:repo/pulls — create PR
 router.post("/:platform/repo/:owner/:repo/pulls", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user!.userId;
     const platform = req.params.platform as GitPlatformId;
     const { owner, repo } = req.params;
     const { title, description, sourceBranch, targetBranch } = req.body;
@@ -165,7 +167,7 @@ router.post("/:platform/repo/:owner/:repo/pulls", requireAuth, async (req: any, 
 // POST /api/git-remote/:platform/repo/:owner/:repo/pulls/:prId/merge
 router.post("/:platform/repo/:owner/:repo/pulls/:prId/merge", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user!.userId;
     const platform = req.params.platform as GitPlatformId;
     const { owner, repo, prId } = req.params;
     const adapter = getGitRemoteAdapter(userId, platform);
@@ -181,7 +183,7 @@ router.post("/:platform/repo/:owner/:repo/pulls/:prId/merge", requireAuth, async
 // GET /api/git-remote/:platform/repo/:owner/:repo/issues
 router.get("/:platform/repo/:owner/:repo/issues", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user!.userId;
     const platform = req.params.platform as GitPlatformId;
     const { owner, repo } = req.params;
     const state = req.query.state as string | undefined;
@@ -196,7 +198,7 @@ router.get("/:platform/repo/:owner/:repo/issues", requireAuth, async (req: any, 
 // POST /api/git-remote/:platform/repo/:owner/:repo/issues — create issue
 router.post("/:platform/repo/:owner/:repo/issues", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.user!.userId;
     const platform = req.params.platform as GitPlatformId;
     const { owner, repo } = req.params;
     const { title, description, labels } = req.body;

@@ -13,6 +13,8 @@ import {
   createIssue,
 } from "../../lib/git-remote";
 import type { GitPlatformId } from "../../lib/git-remote";
+import { listRepoConnections, connectRepo, disconnectRepo } from "../../lib/repos";
+import type { RepoConnection } from "../../lib/repos";
 
 interface Props {
   onClose: () => void;
@@ -33,8 +35,22 @@ export default function GitRemotePanel({ onClose }: Props) {
   const [actionMsg, setActionMsg] = useState("");
   const [selectedOwner, setSelectedOwner] = useState("");
   const [selectedRepo, setSelectedRepo] = useState("");
+  const [connections, setConnections] = useState<RepoConnection[]>([]);
+  const [connecting, setConnecting] = useState("");
 
   const meta = GIT_PLATFORMS.find((p) => p.id === platform)!;
+
+  async function loadConnections() {
+    try {
+      setConnections(await listRepoConnections());
+    } catch {
+      setConnections([]);
+    }
+  }
+
+  useEffect(() => {
+    loadConnections();
+  }, []);
 
   useEffect(() => {
     getGitConfig(platform).then((c) => {
@@ -67,6 +83,28 @@ export default function GitRemotePanel({ onClose }: Props) {
       await createRepo(platform, name);
       setActionMsg('Repo "' + name + '" kreiran');
       loadRepos();
+    } catch (e: any) {
+      setActionMsg(e.message);
+    }
+  }
+
+  async function handleConnect(fullName: string) {
+    setConnecting(fullName);
+    try {
+      await connectRepo(platform, fullName);
+      setActionMsg("Povezan za agenta: " + fullName);
+      await loadConnections();
+    } catch (e: any) {
+      setActionMsg(e.message);
+    }
+    setConnecting("");
+  }
+
+  async function handleDisconnect(fullName: string) {
+    try {
+      await disconnectRepo(platform, fullName);
+      setActionMsg("Prekinut: " + fullName);
+      await loadConnections();
     } catch (e: any) {
       setActionMsg(e.message);
     }
@@ -239,31 +277,63 @@ export default function GitRemotePanel({ onClose }: Props) {
               <button className="btn btn-secondary btn-sm" onClick={handleCreateRepo}>
                 + Novi repo
               </button>
+              <div className="ml-auto text-xs text-gray-400 self-center">
+                Povezani: {connections.filter((c) => c.platform === platform).length}
+              </div>
             </div>
             <div className="space-y-1 max-h-96 overflow-y-auto">
-              {repos.map((r) => (
-                <div
-                  key={r.id}
-                  className="flex items-center justify-between p-2 bg-gray-800/50 rounded hover:bg-gray-700/50 cursor-pointer"
-                  onClick={() => selectRepo(r.fullName)}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{r.fullName}</div>
-                    <div className="text-xs text-gray-400 truncate">{r.description}</div>
+              {repos.map((r) => {
+                const conn = connections.find((c) => c.platform === platform && c.fullName === r.fullName);
+                const isActive = conn?.isActive;
+                const isConnecting = connecting === r.fullName;
+                return (
+                  <div
+                    key={r.id}
+                    className={
+                      "flex items-center justify-between p-2 rounded cursor-pointer " +
+                      (isActive ? "bg-blue-600/20 border border-blue-500/40" : "bg-gray-800/50 hover:bg-gray-700/50")
+                    }
+                    onClick={() => selectRepo(r.fullName)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {r.fullName}
+                        {isActive && <span className="ml-2 text-[10px] uppercase text-blue-400 bg-blue-500/20 px-1.5 py-0.5 rounded">Aktivni repo</span>}
+                      </div>
+                      <div className="text-xs text-gray-400 truncate">{r.description}</div>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-400 ml-2">
+                      {conn ? (
+                        <button
+                          className="btn btn-xs px-2 py-0.5 bg-green-600/30 text-green-400 rounded hover:bg-green-600/50"
+                          onClick={(e) => { e.stopPropagation(); handleDisconnect(r.fullName); }}
+                          title="Prekini vezu"
+                        >
+                          {"\u2713"} Povezan
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-primary btn-xs px-2 py-0.5"
+                          disabled={isConnecting}
+                          onClick={(e) => { e.stopPropagation(); handleConnect(r.fullName); }}
+                          title="Poveži za agenta"
+                        >
+                          {isConnecting ? "..." : "Poveži za agenta"}
+                        </button>
+                      )}
+                      <span>{'\u2B50'} {r.stars}</span>
+                      <span>{'\u2442'} {r.forks}</span>
+                      <button
+                        className="btn btn-ghost btn-xs"
+                        onClick={(e) => { e.stopPropagation(); handleFork(r.fullName); }}
+                        title="Fork"
+                      >
+                        {'\u2386'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-gray-400 ml-2">
-                    <span>{'\u2B50'} {r.stars}</span>
-                    <span>{'\u2442'} {r.forks}</span>
-                    <button
-                      className="btn btn-ghost btn-xs"
-                      onClick={(e) => { e.stopPropagation(); handleFork(r.fullName); }}
-                      title="Fork"
-                    >
-                      {'\u2386'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {!loading && repos.length === 0 && (
                 <div className="text-gray-500 text-sm text-center py-4">
                   Nema repozitorijuma. Klikni "Osve\u017Ei" ili dodaj token.
