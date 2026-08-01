@@ -1,6 +1,9 @@
 import type { Duplex } from "stream";
+import { Readable } from "stream";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { db } from "../../db/index.js";
-import { machines } from "../../db/schema.js";
+import { machines, repoConnections } from "../../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import { connectSSH } from "../../runtime/opencode-adapter/ssh.js";
 import { decrypt, isEncrypted } from "../../lib/crypto.js";
@@ -14,7 +17,18 @@ import {
   startOpenCodeServe,
   updateOpenCode,
 } from "../../runtime/opencode-adapter/provisioner.js";
+import {
+  ensureLocalEngine,
+  engineFromMachineId,
+  isLocalMachineId,
+  getLocalEngineLog,
+  resolveBin,
+  stopLocalEngine,
+} from "../../runtime/local/engine.js";
+import { getRepoWorkspaceDir } from "../../runtime/local/workspace.js";
 import type { RuntimeAdapter, TodoItem, FileDiff, RuntimeHealth, RuntimeChannel } from "./adapter.js";
+
+const execFileP = promisify(execFile);
 
 interface MachineRow {
   id: string;
@@ -122,6 +136,76 @@ async function curlExec(
   return { status: httpCode, data };
 }
 
+// ── Local (Localhost) transport ──
+// Reaches an engine spawned inside the user's local workspace sandbox.
+// machineId format: "local:<engine>".
+
+async function localHttp(
+  port: number,
+  method: string,
+  path: string,
+  body?: unknown
+): Promise<{ status: number; data: string }> {
+  const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+    method,
+    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  return { status: res.status, data: await res.text() };
+}
+
+async function httpCall(
+  port: number,
+  ssh: SSHClient | null,
+  method: string,
+  path: string,
+  body?: unknown
+): Promise<{ status: number; data: string }> {
+  if (ssh) return curlExec(ssh, port, method, path, body);
+  return localHttp(port, method, path, body);
+}
+
+async function withTransport<T>(
+  machineId: string,
+  userId: string,
+  fn: (port: number, ssh: SSHClient | null) => Promise<T>
+): Promise<T> {
+  if (isLocalMachineId(machineId)) {
+    const handle = await ensureLocalEngine(userId, engineFromMachineId(machineId));
+    return fn(handle.port, null);
+  }
+  return withSSH(machineId, userId, async (ssh, port) => fn(port, ssh));
+}
+
+function localEventStream(port: number): Readable {
+  const stream = new Readable({ read() {} });
+  (async () => {
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/event`);
+      if (!res.body) {
+        stream.destroy(new Error("No event stream body"));
+        return;
+      }
+      const reader = (res.body as any).getReader();
+      const decoder = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value, { stream: true });
+        if (stream.destroyed) {
+          reader.cancel().catch(() => {});
+          return;
+        }
+        stream.push(text);
+      }
+      stream.push(null);
+    } catch (err) {
+      if (!stream.destroyed) stream.destroy(err as Error);
+    }
+  })();
+  return stream;
+}
+
 export function createOpenCodeAdapter(): RuntimeAdapter {
   return {
     async createSession(machineId, title) {
@@ -177,21 +261,58 @@ export function createOpenCodeAdapter(): RuntimeAdapter {
 }
 
 export function createBoundAdapter(userId: string) {
+  async function localHealth(engine: string) {
+    const handle = await ensureLocalEngine(userId, engine);
+    const version = await execFileP(resolveBin("opencode"), ["--version"], { shell: true, timeout: 10000, windowsHide: true })
+      .then((r) => r.stdout.trim().replace(/^v/, ""))
+      .catch(() => "");
+    const uptime = Math.round((Date.now() - handle.startedAt) / 1000);
+    return {
+      running: true,
+      sshConnected: false,
+      local: true,
+      opencodePort: handle.port,
+      version: version || undefined,
+      pid: handle.process.pid,
+      uptime: `${uptime}s`,
+      cwd: handle.cwd,
+      log: getLocalEngineLog(handle.key).slice(-2000),
+    };
+  }
+
+  async function localExecCommand(command: string): Promise<string> {
+    const repo = await db
+      .select()
+      .from(repoConnections)
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+      .limit(1);
+    if (repo.length === 0) throw new Error("No active repo");
+    const cwd = getRepoWorkspaceDir(userId, repo[0].owner, repo[0].name);
+    const { stdout } = await execFileP(command, {
+      cwd,
+      shell: true,
+      timeout: 30000,
+      maxBuffer: 16 * 1024 * 1024,
+      windowsHide: true,
+    });
+    return stdout;
+  }
+
   return {
     async createSession(machineId: string, title: string) {
-      return withSSH(machineId, userId, async (ssh, port) => {
-        const res = await curlExec(ssh, port, "POST", "/session", { title });
+      return withTransport(machineId, userId, async (port, ssh) => {
+        const res = await httpCall(port, ssh, "POST", "/session", { title });
         if (res.status !== 200) throw new Error(`Failed to create session: ${res.data}`);
         return JSON.parse(res.data) as { id: string };
       });
     },
 
     async sendMessage(machineId: string, sessionId: string, text: string, mode: "sync" | "async" = "async") {
-      return withSSH(machineId, userId, async (ssh, port) => {
+      return withTransport(machineId, userId, async (port, ssh) => {
         const endpoint = mode === "async"
           ? `/session/${sessionId}/prompt_async`
           : `/session/${sessionId}/message`;
-        const res = await curlExec(ssh, port, "POST", endpoint, {
+        const res = await httpCall(port, ssh, "POST", endpoint, {
           parts: [{ type: "text", text }],
         });
         if (res.status !== 200 && res.status !== 204) {
@@ -209,30 +330,35 @@ export function createBoundAdapter(userId: string) {
     },
 
     async listSessions(machineId: string) {
-      return withSSH(machineId, userId, async (ssh, port) => {
-        const res = await curlExec(ssh, port, "GET", "/session");
+      return withTransport(machineId, userId, async (port, ssh) => {
+        const res = await httpCall(port, ssh, "GET", "/session");
         if (res.status !== 200) throw new Error("Failed to fetch sessions");
         return JSON.parse(res.data) as unknown[];
       });
     },
 
     async getTodos(machineId: string, sessionId: string) {
-      return withSSH(machineId, userId, async (ssh, port) => {
-        const res = await curlExec(ssh, port, "GET", `/session/${sessionId}/todo`);
+      return withTransport(machineId, userId, async (port, ssh) => {
+        const res = await httpCall(port, ssh, "GET", `/session/${sessionId}/todo`);
         if (res.status !== 200) throw new Error("Failed to fetch todos");
         return JSON.parse(res.data) as TodoItem[];
       });
     },
 
     async getDiff(machineId: string, sessionId: string) {
-      return withSSH(machineId, userId, async (ssh, port) => {
-        const res = await curlExec(ssh, port, "GET", `/session/${sessionId}/diff`);
+      return withTransport(machineId, userId, async (port, ssh) => {
+        const res = await httpCall(port, ssh, "GET", `/session/${sessionId}/diff`);
         if (res.status !== 200) throw new Error("Failed to fetch diff");
         return JSON.parse(res.data) as FileDiff[];
       });
     },
 
     async openEventStream(machineId: string) {
+      if (isLocalMachineId(machineId)) {
+        const handle = await ensureLocalEngine(userId, engineFromMachineId(machineId));
+        return localEventStream(handle.port);
+      }
+
       const machine = await getMachine(machineId, userId);
       const creds = decryptCreds(machine);
       const ssh = await connectSSH({
@@ -265,13 +391,16 @@ export function createBoundAdapter(userId: string) {
     },
 
     async abortSession(machineId: string, sessionId: string) {
-      return withSSH(machineId, userId, async (ssh, port) => {
-        const res = await curlExec(ssh, port, "POST", `/session/${sessionId}/abort`);
+      return withTransport(machineId, userId, async (port, ssh) => {
+        const res = await httpCall(port, ssh, "POST", `/session/${sessionId}/abort`);
         return res.status === 200;
       });
     },
 
     async healthCheck(machineId: string) {
+      if (isLocalMachineId(machineId)) {
+        return localHealth(engineFromMachineId(machineId)) as unknown as RuntimeHealth;
+      }
       return withSSHRaw(machineId, userId, async (ssh) => {
         const running = await checkOpenCodeRunning(ssh);
         const port = running ? await getOpenCodePort(ssh) : null;
@@ -291,6 +420,10 @@ export function createBoundAdapter(userId: string) {
     },
 
     async restart(machineId: string) {
+      if (isLocalMachineId(machineId)) {
+        await stopLocalEngine(userId, engineFromMachineId(machineId));
+        return localHealth(engineFromMachineId(machineId)) as unknown as RuntimeHealth;
+      }
       return withSSHRaw(machineId, userId, async (ssh) => {
         // Stop existing
         await ssh.exec("pkill -f 'opencode serve' 2>/dev/null || true");
@@ -324,6 +457,9 @@ export function createBoundAdapter(userId: string) {
     },
 
     async reconnect(machineId: string) {
+      if (isLocalMachineId(machineId)) {
+        return localHealth(engineFromMachineId(machineId)) as unknown as RuntimeHealth;
+      }
       return withSSHRaw(machineId, userId, async (ssh) => {
         const running = await checkOpenCodeRunning(ssh);
         let port: number | null = null;
@@ -359,6 +495,10 @@ export function createBoundAdapter(userId: string) {
     },
 
     async updateRuntime(machineId: string, channel: RuntimeChannel, version?: string) {
+      if (isLocalMachineId(machineId)) {
+        // Local engine: no remote install — report current health only.
+        return localHealth(engineFromMachineId(machineId)) as unknown as RuntimeHealth;
+      }
       return withSSHRaw(machineId, userId, async (ssh) => {
         // Update the package
         await updateOpenCode(ssh, channel, version);
@@ -406,6 +546,9 @@ export function createBoundAdapter(userId: string) {
     },
 
     async executeCommand(machineId: string, command: string) {
+      if (isLocalMachineId(machineId)) {
+        return localExecCommand(command);
+      }
       return withSSHRaw(machineId, userId, async (ssh) => {
         const { stdout } = await ssh.exec(command);
         return stdout;

@@ -1,13 +1,16 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { getAdapters } from "../adapters/registry.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const CONNECTION_TIMEOUT_MS = 30 * 60 * 1000; // 30 min hard timeout
 const router = Router();
 
+router.use(requireAuth);
+
 // POST /api/agent/send — send message to OpenCode via adapter
 router.post("/send", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.user!.userId;
   const { machineId, sessionId, text, message, mode } = req.body as {
     machineId: string;
     sessionId?: string;
@@ -69,7 +72,7 @@ router.post("/send", async (req: Request, res: Response) => {
     // Now open event stream to capture ongoing events
     const stream = await adapter.openEventStream(machineId);
     let buffer = "";
-    let sessionStarted = false;
+    let sawDelta = false;
     let finished = false;
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
@@ -146,23 +149,40 @@ router.post("/send", async (req: Request, res: Response) => {
         const data = trimmed.slice(6);
         try {
           const event = JSON.parse(data);
-          const eventType = event.properties?.type || event.type;
-
-          if (eventType === "session.idle" && isOurEvent(event)) {
-            sessionStarted = true;
-          }
+          const eventType = event.type || event.properties?.type;
 
           if (eventType === "session.error" && isOurEvent(event)) {
-            send({ type: "error", content: event.properties?.properties?.error || "Agent error" });
+            const err =
+              event.properties?.properties?.error ||
+              event.properties?.error?.message ||
+              event.properties?.error ||
+              "Agent error";
+            send({ type: "error", content: typeof err === "string" ? err : JSON.stringify(err) });
             finish({ abort: true });
             return;
           }
 
-          if (eventType === "message.updated" || eventType === "part.updated") {
+          // Current opencode (>=1.16): streaming text arrives as message.part.delta
+          // with properties.{ field: "text", delta }. Send each chunk as-is.
+          if (eventType === "message.part.delta") {
             if (!isOurEvent(event)) continue;
-            const part = event.properties?.properties;
-            if (part?.type === "text" && part?.content) {
-              send({ type: "text", content: part.content });
+            const p = event.properties || {};
+            if (p.field === "text" && typeof p.delta === "string" && p.delta.length > 0) {
+              sawDelta = true;
+              send({ type: "text", content: p.delta });
+            }
+            continue;
+          }
+
+          if (eventType === "message.part.updated" || eventType === "part.updated") {
+            if (!isOurEvent(event)) continue;
+            const part = event.properties?.part || event.properties?.properties;
+            if (!part) continue;
+
+            if (part?.type === "text" && part?.text) {
+              // Full snapshot — only use as fallback when this session never
+              // emitted a delta (older opencode versions stream via part.updated).
+              if (!sawDelta) send({ type: "text", content: part.text });
             } else if (part?.type === "tool-call") {
               send({
                 type: "tool_call",
@@ -179,7 +199,9 @@ router.post("/send", async (req: Request, res: Response) => {
             }
           }
 
-          if (eventType === "session.idle" && sessionStarted && isOurEvent(event)) {
+          // The engine emits exactly one session.idle per turn (after the
+          // model finishes), so end the response on the first one for our session.
+          if (eventType === "session.idle" && isOurEvent(event)) {
             finish({ flush: false });
             return;
           }
@@ -209,7 +231,7 @@ router.post("/send", async (req: Request, res: Response) => {
 
 // POST /api/agent/steer — send mid-task instruction to an active session
 router.post("/steer", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.user!.userId as string;
   const { machineId, sessionId, text, message } = req.body as {
     machineId: string;
     sessionId: string;
@@ -237,7 +259,7 @@ router.post("/steer", async (req: Request, res: Response) => {
 
 // GET /api/agent/sessions/:machineId — list OpenCode sessions
 router.get("/sessions/:machineId", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.user!.userId as string;
   const machineId = req.params.machineId as string;
 
   try {
@@ -252,7 +274,7 @@ router.get("/sessions/:machineId", async (req: Request, res: Response) => {
 
 // GET /api/agent/todos/:machineId/:sessionId — get session todos
 router.get("/todos/:machineId/:sessionId", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.user!.userId as string;
   const machineId = req.params.machineId as string;
   const sessionId = req.params.sessionId as string;
 
@@ -268,7 +290,7 @@ router.get("/todos/:machineId/:sessionId", async (req: Request, res: Response) =
 
 // GET /api/agent/diff/:machineId/:sessionId — get session file changes
 router.get("/diff/:machineId/:sessionId", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.user!.userId as string;
   const machineId = req.params.machineId as string;
   const sessionId = req.params.sessionId as string;
 
@@ -284,7 +306,7 @@ router.get("/diff/:machineId/:sessionId", async (req: Request, res: Response) =>
 
 // POST /api/agent/approve — approve selected file changes
 router.post("/approve", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.user!.userId as string;
   const { machineId, sessionId, paths } = req.body as {
     machineId: string;
     sessionId: string;
@@ -310,7 +332,7 @@ router.post("/approve", async (req: Request, res: Response) => {
 
 // POST /api/agent/reject — reject selected file changes
 router.post("/reject", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.user!.userId as string;
   const { machineId, sessionId, paths } = req.body as {
     machineId: string;
     sessionId: string;
@@ -336,7 +358,7 @@ router.post("/reject", async (req: Request, res: Response) => {
 
 // GET /api/agent/file/:machineId/:sessionId/:path — get file content (before/after)
 router.get("/file/:machineId/:sessionId/:encodedPath", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.user!.userId as string;
   const machineId = req.params.machineId as string;
   const sessionId = req.params.sessionId as string;
   const path = decodeURIComponent(req.params.encodedPath as string);

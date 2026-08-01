@@ -221,3 +221,12 @@ if (fs.existsSync(clientDist)) {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+// ── Graceful shutdown: kill spawned local engine processes ──
+import { stopAllLocalEngines } from "./runtime/local/engine.js";
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+  process.on(signal, () => {
+    stopAllLocalEngines();
+    process.exit(0);
+  });
+}

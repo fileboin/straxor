@@ -10,6 +10,7 @@ import {
 } from "../adapters/git/remote/registry.js";
 import type { GitPlatformId } from "../adapters/git/remote/adapter.js";
 import { ensureWorkspace, getRepoWorkspaceDir, hasGitBinary } from "../runtime/local/workspace.js";
+import { stopLocalEnginesForUser } from "../runtime/local/engine.js";
 
 const router = Router();
 
@@ -146,6 +147,8 @@ router.post("/active", async (req, res) => {
       .set({ isActive: true })
       .where(eq(repoConnections.id, found[0].id));
 
+    await stopLocalEnginesForUser(userId);
+
     res.json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -170,6 +173,8 @@ router.post("/disconnect", async (req, res) => {
     await db
       .delete(repoConnections)
       .where(and(eq(repoConnections.userId, userId), eq(repoConnections.platform, platform), eq(repoConnections.fullName, fullName)));
+
+    await stopLocalEnginesForUser(userId);
 
     res.json({ success: true });
   } catch (error) {
