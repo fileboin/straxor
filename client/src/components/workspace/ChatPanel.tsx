@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect, type FormEvent, type ChangeEvent } from "react";
+import { createPortal } from "react-dom";
 import ProviderModelDropdown from "./ProviderModelDropdown.js";
 import ModelPickerModal from "./ModelPickerModal.js";
 import InputToolbar from "./InputToolbar.js";
 import InfoTip from "./InfoTip.js";
 import WelcomeHero from "./WelcomeHero.js";
+import ZoomControl from "./ZoomControl.js";
+import InlineApiKeyForm from "./InlineApiKeyForm.js";
 import { useModelCatalog, type ThinkingBudget } from "../../lib/models.js";
 import { t, useLang } from "../../lib/i18n.js";
 import { estimatePlan, formatCost, formatTokens } from "../../lib/plan-preview.js";
@@ -56,6 +59,7 @@ interface Props {
   inputPlaceholder: string;
   onSend: (message: string, attachments?: Attachment[]) => void;
   onConnectVps?: () => void;
+  onOpenGitRemote?: () => void;
   loading?: boolean;
   streamingMessageId?: string | null;
   onApiKeyChange?: () => void;
@@ -66,6 +70,8 @@ interface Props {
   prefill?: string;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  zoom?: number;
+  onZoomChange?: (z: number) => void;
   onOpenPromptLibrary?: () => void;
   isSteerable?: boolean;
   onSteerSend?: (message: string) => void;
@@ -205,6 +211,7 @@ export default function ChatPanel({
   inputPlaceholder,
   onSend,
   onConnectVps,
+  onOpenGitRemote,
   loading,
   streamingMessageId,
   onApiKeyChange,
@@ -215,6 +222,8 @@ export default function ChatPanel({
   prefill,
   isExpanded,
   onToggleExpand,
+  zoom = 1,
+  onZoomChange,
   onOpenPromptLibrary,
   isSteerable,
   onSteerSend,
@@ -231,8 +240,11 @@ export default function ChatPanel({
   const [uploadError, setUploadError] = useState("");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [showKeyErrorForm, setShowKeyErrorForm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { providers: catalogProviders, loading: catalogLoading } = useModelCatalog();
+  const providerName =
+    catalogProviders.find((p) => p.id === providerId)?.name || providerId;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -438,6 +450,10 @@ export default function ChatPanel({
   const handleToolbarAction = (actionId: string) => {
     if (actionId === "connect-vps") {
       onConnectVps?.();
+      return;
+    }
+    if (actionId === "github") {
+      onOpenGitRemote?.();
       return;
     }
     if (actionId === "mic") {
@@ -685,6 +701,9 @@ export default function ChatPanel({
               <InfoTip text={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")} placement="bottom" />
             </div>
           )}
+          {onZoomChange && (
+            <ZoomControl zoom={zoom} onZoomChange={onZoomChange} />
+          )}
           <button
             onClick={() => setShowModelPicker(true)}
             className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
@@ -733,6 +752,29 @@ export default function ChatPanel({
                 <span className="inline-block w-2 h-4 ml-0.5 bg-accent animate-pulse" />
               )}
             </div>
+            {/* Missing API key error → inline "Add key" action */}
+            {msg.role === "assistant" &&
+              msg.content.includes("API key not configured") && (
+                <div className="mt-1.5">
+                  <button
+                    onClick={() => setShowKeyErrorForm((v) => !v)}
+                    className="text-[11px] font-medium px-2 py-1 rounded-lg border border-yellow-500/40 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 transition-colors"
+                  >
+                    {showKeyErrorForm ? t("common.cancel") : t("models.addApiKey")}
+                  </button>
+                  {showKeyErrorForm && (
+                    <InlineApiKeyForm
+                      providerId={providerId}
+                      providerName={providerName}
+                      autoFocus
+                      onSaved={() => {
+                        setShowKeyErrorForm(false);
+                        onApiKeyChange?.();
+                      }}
+                    />
+                  )}
+                </div>
+              )}
             {/* Message attachments */}
             {msg.attachments && msg.attachments.length > 0 && (
               <MessageAttachments attachments={msg.attachments} />
@@ -831,63 +873,68 @@ export default function ChatPanel({
       )}
 
       {/* Model picker modal */}
-      <ModelPickerModal
-        open={showModelPicker}
-        title={t("models.modalTitle", { title })}
-        providerId={providerId}
-        modelId={modelId}
-        thinking={thinking}
-        providers={catalogProviders}
-        loading={catalogLoading}
-        onProviderChange={onProviderChange}
-        onModelChange={onModelChange}
-        onThinkingChange={onThinkingChange}
-        onApiKeyChange={onApiKeyChange}
-        onClose={() => setShowModelPicker(false)}
-      />
+      {createPortal(
+        <ModelPickerModal
+          open={showModelPicker}
+          title={t("models.modalTitle", { title })}
+          providerId={providerId}
+          modelId={modelId}
+          thinking={thinking}
+          providers={catalogProviders}
+          loading={catalogLoading}
+          onProviderChange={onProviderChange}
+          onModelChange={onModelChange}
+          onThinkingChange={onThinkingChange}
+          onApiKeyChange={onApiKeyChange}
+          onClose={() => setShowModelPicker(false)}
+        />,
+        document.body
+      )}
 
       {/* Camera overlay */}
-      {cameraOpen && (
-        <div className="fixed inset-0 z-[100] flex flex-col bg-black/90 p-4">
-          <div className="flex items-center justify-between mb-3 shrink-0">
-            <span className="text-[13px] font-semibold text-white">
-              {t("toolbar.camera.alt")}
-            </span>
-            <button
-              type="button"
-              onClick={handleCameraClose}
-              className="w-8 h-8 rounded-full bg-white/10 text-white hover:bg-white/20 flex items-center justify-center transition-colors"
-              title={t("toolbar.camera.close")}
-              aria-label={t("toolbar.camera.close")}
-            >
-              ✕
-            </button>
-          </div>
-          <div className="flex-1 flex items-center justify-center min-h-0">
-            <video
-              ref={cameraVideoRef}
-              playsInline
-              muted
-              autoPlay
-              className="max-w-full max-h-full rounded-xl object-contain"
-            />
-          </div>
-          {cameraError && (
-            <div className="text-red-400 text-[12px] text-center py-2 shrink-0">
-              {cameraError}
+      {cameraOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex flex-col bg-black/90 p-4">
+            <div className="flex items-center justify-between mb-3 shrink-0">
+              <span className="text-[13px] font-semibold text-white">
+                {t("toolbar.camera.alt")}
+              </span>
+              <button
+                type="button"
+                onClick={handleCameraClose}
+                className="w-8 h-8 rounded-full bg-white/10 text-white hover:bg-white/20 flex items-center justify-center transition-colors"
+                title={t("toolbar.camera.close")}
+                aria-label={t("toolbar.camera.close")}
+              >
+                ✕
+              </button>
             </div>
-          )}
-          <div className="flex items-center justify-center py-4 shrink-0">
-            <button
-              type="button"
-              onClick={handleCameraCapture}
-              className="w-14 h-14 rounded-full border-4 border-white bg-white/20 hover:bg-white/30 transition-colors"
-              title={t("toolbar.camera.take")}
-              aria-label={t("toolbar.camera.take")}
-            />
-          </div>
-        </div>
-      )}
+            <div className="flex-1 flex items-center justify-center min-h-0">
+              <video
+                ref={cameraVideoRef}
+                playsInline
+                muted
+                autoPlay
+                className="max-w-full max-h-full rounded-xl object-contain"
+              />
+            </div>
+            {cameraError && (
+              <div className="text-red-400 text-[12px] text-center py-2 shrink-0">
+                {cameraError}
+              </div>
+            )}
+            <div className="flex items-center justify-center py-4 shrink-0">
+              <button
+                type="button"
+                onClick={handleCameraCapture}
+                className="w-14 h-14 rounded-full border-4 border-white bg-white/20 hover:bg-white/30 transition-colors"
+                title={t("toolbar.camera.take")}
+                aria-label={t("toolbar.camera.take")}
+              />
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

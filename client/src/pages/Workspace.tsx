@@ -207,6 +207,20 @@ export default function Workspace() {
   });
   const panelsRef = useRef<HTMLDivElement>(null);
 
+  // Global panel zoom (applies to both panels) — persisted
+  const [panelZoom, setPanelZoom] = useState<number>(() => {
+    try {
+      const saved = parseFloat(localStorage.getItem("straxor.panelZoom") || "");
+      return Number.isFinite(saved) ? Math.max(0.6, Math.min(1.25, saved)) : 1;
+    } catch {
+      return 1;
+    }
+  });
+
+  const handleZoomChange = (z: number) => {
+    setPanelZoom(Math.max(0.6, Math.min(1.25, Math.round(z * 20) / 20)));
+  };
+
   const startPanelResize = (e: React.MouseEvent) => {
     e.preventDefault();
     const container = panelsRef.current;
@@ -251,6 +265,13 @@ export default function Workspace() {
       localStorage.setItem("straxor.panelWidth", String(panelWidthPct));
     } catch {}
   }, [panelWidthPct]);
+
+  // Persist panel zoom
+  useEffect(() => {
+    try {
+      localStorage.setItem("straxor.panelZoom", String(panelZoom));
+    } catch {}
+  }, [panelZoom]);
 
   // Persist panel mode (expand/fullscreen)
   useEffect(() => {
@@ -1496,6 +1517,11 @@ export default function Workspace() {
           className={`flex-1 flex flex-col min-h-0 min-w-0 gap-3 sm:gap-4 ${
             panelsLayout === "side" ? "md:flex-row" : ""
           }`}
+          style={
+            panelZoom !== 1
+              ? { transform: `scale(${panelZoom})`, transformOrigin: "top center" }
+              : undefined
+          }
         >
 
         {/* Agent 1 panel */}
@@ -1538,7 +1564,11 @@ export default function Workspace() {
             onSend={handleAskSend}
             loading={askLoading}
             streamingMessageId={askStreamingId}
+            onApiKeyChange={() => hasApiKey(askProvider).then(setAskHasKey)}
             onConnectVps={() => setShowSshModal(true)}
+            onOpenGitRemote={() => setShowGitRemote(true)}
+            zoom={panelZoom}
+            onZoomChange={handleZoomChange}
             copyLabel={`\u2192 ${t("agent.panel2")}`}
             onCopyTo={(content) => setAgentPrefill(content)}
             prefill={askPrefill}
@@ -1593,7 +1623,11 @@ export default function Workspace() {
             onSend={handleAgentSend}
             loading={agentLoading}
             streamingMessageId={agentStreamingId}
+            onApiKeyChange={() => hasApiKey(askProvider).then(setAskHasKey)}
             onConnectVps={() => setShowSshModal(true)}
+            onOpenGitRemote={() => setShowGitRemote(true)}
+            zoom={panelZoom}
+            onZoomChange={handleZoomChange}
             copyLabel={`\u2190 ${t("agent.panel1")}`}
             onCopyTo={(content) => setAskPrefill(content)}
             prefill={agentPrefill}
