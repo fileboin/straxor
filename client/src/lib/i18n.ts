@@ -168,6 +168,10 @@ const DICT: Record<string, { en: string; bs: string }> = {
     en: "stacked",
     bs: "jedan ispod drugog",
   },
+  "layout.resize": {
+    en: "Drag to resize panels",
+    bs: "Povuci za promjenu širine panela",
+  },
 
   // ── Auth pages ──
   "auth.login": { en: "Log in", bs: "Prijava" },

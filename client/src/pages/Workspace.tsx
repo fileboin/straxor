@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar.js";
 import { useTheme } from "../lib/theme.js";
@@ -157,6 +157,7 @@ export default function Workspace() {
 
   // Agent role & prompts state
   const [agentRole, setAgentRole] = useState<AgentRole>("developer");
+  const [askRole, setAskRole] = useState<AgentRole>("developer");
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
   const [activePromptIds, setActivePromptIds] = useState<Set<string>>(new Set());
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
@@ -207,6 +208,38 @@ export default function Workspace() {
     }
   });
 
+  // Ask panel width (side-by-side layout, resizable divider) — persisted
+  const [panelWidthPct, setPanelWidthPct] = useState<number>(() => {
+    try {
+      const saved = parseInt(localStorage.getItem("straxor.panelWidth") || "", 10);
+      return Number.isFinite(saved) ? Math.max(25, Math.min(75, saved)) : 50;
+    } catch {
+      return 50;
+    }
+  });
+  const panelsRef = useRef<HTMLDivElement>(null);
+
+  const startPanelResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const container = panelsRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const onMove = (ev: MouseEvent) => {
+      const pct = ((ev.clientX - rect.left) / rect.width) * 100;
+      setPanelWidthPct(Math.max(25, Math.min(75, pct)));
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+
   // Diff review modal
   const [showDiffReview, setShowDiffReview] = useState(false);
   const [diffFiles, setDiffFiles] = useState<DiffFile[]>([]);
@@ -223,6 +256,13 @@ export default function Workspace() {
       localStorage.setItem("straxor.panelsLayout", panelsLayout);
     } catch {}
   }, [panelsLayout]);
+
+  // Persist resized panel width
+  useEffect(() => {
+    try {
+      localStorage.setItem("straxor.panelWidth", String(panelWidthPct));
+    } catch {}
+  }, [panelWidthPct]);
 
   // Persist panel mode (expand/fullscreen)
   useEffect(() => {
@@ -296,6 +336,7 @@ export default function Workspace() {
           if (cfg.provider) setAskProvider(cfg.provider);
           if (cfg.model) setAskModel(cfg.model);
           if (cfg.thinking) setAskThinking(cfg.thinking);
+          if (cfg.role) setAskRole(cfg.role);
         } catch {}
       }
 
@@ -515,10 +556,18 @@ export default function Workspace() {
     setAskLoading(true);
     setAskPrefill("");
 
-    const history = [...askMessages, userMsg].map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    }));
+    const roleConfig = getRoleById(askRole);
+    const history: { role: "user" | "assistant" | "system"; content: string }[] = [
+      {
+        role: "system",
+        content: `[SISTEMSKA ULOGA: ${roleConfig.label}]\n${roleConfig.systemPrompt}`,
+      },
+      ...askMessages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+      userMsg,
+    ];
 
     streamChat(askProvider, askModel, history, askThinking, {
       onToken: (token) => {
@@ -544,7 +593,7 @@ export default function Workspace() {
         setAskLoading(false);
       },
     });
-  }, [askProvider, askModel, askThinking, askMessages]);
+  }, [askProvider, askModel, askThinking, askRole, askMessages]);
 
   // Helper: proceed with tool allow after permission/security check
   const proceedToolAllow = useCallback(
@@ -592,7 +641,7 @@ export default function Workspace() {
           agentMachineId,
           msg.slice(0, 100),
           { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole },
-          { provider: askProvider, model: askModel, thinking: askThinking }
+          { provider: askProvider, model: askModel, thinking: askThinking, role: askRole }
         );
         activeDbSessionId = sess.id;
         setDbSessionId(sess.id);
@@ -1381,9 +1430,8 @@ export default function Workspace() {
 
       {/* Panels */}
       <div
-        className={`flex-1 flex flex-col min-h-0 overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3 ${
-          panelsLayout === "side" ? "md:flex-row" : ""
-        }`}
+        ref={panelsRef}
+        className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3"
       >
         {/* Layout toggle — visible on all screens; stacked stays automatic on mobile */}
         <div
@@ -1422,6 +1470,14 @@ export default function Workspace() {
           </span>
         </div>
 
+        {/* Panels row */}
+        <div
+          ref={panelsRef}
+          className={`flex-1 flex flex-col min-h-0 min-w-0 gap-2 sm:gap-3 ${
+            panelsLayout === "side" ? "md:flex-row" : ""
+          }`}
+        >
+
         {/* Agent 1 panel */}
         <div
           className={`flex flex-col min-h-0 min-w-0 ${
@@ -1429,10 +1485,19 @@ export default function Workspace() {
               ? "hidden md:hidden"
               : panelMode === "ask-full"
               ? "flex-1"
+              : panelsLayout === "side"
+              ? mobileTab !== "ask"
+                ? "hidden md:flex md:grow-0 md:shrink-0"
+                : "flex-1 md:grow-0 md:shrink-0"
               : mobileTab !== "ask"
               ? "hidden md:flex md:flex-1"
               : "flex-1"
           }`}
+          style={
+            panelsLayout === "side" && panelMode === "split"
+              ? { flexBasis: `${panelWidthPct}%` }
+              : undefined
+          }
         >
           <ChatPanel
             title={t("agent.panel1")}
@@ -1459,11 +1524,25 @@ export default function Workspace() {
             isExpanded={panelMode === "ask-full"}
             onToggleExpand={toggleAskExpand}
             onOpenPromptLibrary={() => setShowPromptLibrary(true)}
+            headerLeft={
+              <RoleSelector role={askRole} onChange={setAskRole} />
+            }
             isSteerable={isAgentSteerable}
             onSteerSend={handleSteerSend}
-            steerStatusText={agentTodos.length > 0 ? t("chat.steer.steps", { n: agentTodos.filter(t => t.status !== "completed").length }) : undefined}
+            steerStatusText={agentTodos.length > 0 ? t("chat.steer.steps", { n: agentTodos.filter(t => t.status !== "completed").length }) : undefined            }
           />
         </div>
+
+        {/* Resize handle — side-by-side layout, desktop only */}
+        {panelsLayout === "side" && panelMode === "split" && (
+          <div
+            className="hidden md:flex items-center justify-center w-2.5 cursor-col-resize shrink-0 select-none group"
+            onMouseDown={startPanelResize}
+            title={t("layout.resize")}
+          >
+            <div className="w-1 h-14 rounded-full bg-border group-hover:bg-accent transition-colors" />
+          </div>
+        )}
 
         {/* Agent 2 panel */}
         <div
@@ -1527,17 +1606,10 @@ export default function Workspace() {
                     </button>
                   </div>
                 )}
-                <div className="px-2 py-1.5 border-b border-border bg-surface">
-                  <button
-                    onClick={() => setShowPromptLibrary(true)}
-                    className="w-full py-1.5 text-[11px] font-medium rounded-lg border border-border bg-surface-2 text-text-secondary hover:bg-surface-2/80 transition-colors"
-                  >
-                    📋 Prompt Library ({activePromptIds.size} aktivnih)
-                  </button>
-                </div>
               </>
             }
           />
+        </div>
         </div>
       </div>
 
