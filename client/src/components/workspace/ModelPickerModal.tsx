@@ -6,6 +6,7 @@ import {
 } from "../../lib/models.js";
 import InlineApiKeyForm from "./InlineApiKeyForm.js";
 import { hasApiKey } from "../../lib/chat.js";
+import { needsApiKey } from "../../lib/models.js";
 import { t, useLang } from "../../lib/i18n.js";
 
 interface Props {
@@ -126,7 +127,7 @@ export default function ModelPickerModal({
           {/* Provider sidebar */}
           <div className="w-52 shrink-0 border-r border-border overflow-y-auto bg-surface">
             {filteredProviders.map((p) => {
-              const hasKey = providerKeys[p.id] || false;
+              const hasKey = !needsApiKey(p.id) || providerKeys[p.id] || false;
               return (
                 <div key={p.id}>
                   <div
@@ -209,7 +210,7 @@ export default function ModelPickerModal({
                     {selectedProvider.name}
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
-                    {!providerKeys[selectedProvider.id] && (
+                    {!needsApiKey(selectedProvider.id) && !providerKeys[selectedProvider.id] && (
                       <button
                         onClick={() => setShowKeyInput((v) => !v)}
                         className={`text-[10px] px-2 py-1 rounded-md transition-colors ${
@@ -258,7 +259,7 @@ export default function ModelPickerModal({
                     <button
                       key={m.id}
                       onClick={() => {
-                        if (!providerKeys[selectedProvider.id]) {
+                        if (needsApiKey(selectedProvider.id) && !providerKeys[selectedProvider.id]) {
                           setPendingModelId(m.id);
                           setShowKeyInput(true);
                           return;
@@ -268,12 +269,12 @@ export default function ModelPickerModal({
                         onClose();
                       }}
                       title={
-                        providerKeys[selectedProvider.id]
-                          ? undefined
-                          : t("models.keyNeeded")
+                        needsApiKey(selectedProvider.id) && !providerKeys[selectedProvider.id]
+                          ? t("models.keyNeeded")
+                          : undefined
                       }
                       className={`w-full flex items-center justify-between gap-2 px-4 py-2 text-left hover:bg-surface-2 transition-colors ${
-                        providerKeys[selectedProvider.id] ? "" : "opacity-40 cursor-not-allowed"
+                        needsApiKey(selectedProvider.id) && !providerKeys[selectedProvider.id] ? "opacity-40 cursor-not-allowed" : ""
                       } ${
                         m.id === modelId && selectedProvider.id === providerId
                           ? "bg-surface-2"

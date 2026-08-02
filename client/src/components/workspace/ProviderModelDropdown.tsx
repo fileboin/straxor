@@ -9,6 +9,7 @@ import {
 } from "../../lib/models.js";
 import InlineApiKeyForm from "./InlineApiKeyForm.js";
 import { hasApiKey } from "../../lib/chat.js";
+import { needsApiKey } from "../../lib/models.js";
 
 interface Props {
   providerId: string;
@@ -112,7 +113,7 @@ export default function ProviderModelDropdown({
     setSelectedProvider(null);
   };
 
-  const selectedHasKey = selectedProvider ? providerKeys[selectedProvider.id] || false : true;
+  const selectedHasKey = selectedProvider ? !needsApiKey(selectedProvider.id) || providerKeys[selectedProvider.id] || false : true;
 
   return (
     <div className="relative" ref={rootRef}>
@@ -176,7 +177,7 @@ export default function ProviderModelDropdown({
             {view === "providers" && (
               <div className="overflow-y-auto flex-1">
                 {providers.map((p) => {
-                  const hasKey = providerKeys[p.id] || false;
+                  const hasKey = !needsApiKey(p.id) || providerKeys[p.id] || false;
                   return (
                     <button
                       key={p.id}

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { createCipheriv } from "crypto";
 import { encrypt, decrypt, isEncrypted } from "./crypto";
 
 const KEY_64HEX = "0a".repeat(32);
@@ -57,5 +58,33 @@ describe("crypto (AES-256-GCM)", () => {
   it("baca grešku kada ENCRYPTION_KEY nedostaje", () => {
     delete process.env.ENCRYPTION_KEY;
     expect(() => encrypt("x")).toThrow(/ENCRYPTION_KEY/);
+  });
+
+  it("ne baca 'Invalid key length' sa proizvoljnim ENCRYPTION_KEY (fix proizvodnje)", () => {
+    process.env.ENCRYPTION_KEY = "straxor-prod-secret-not-valid-base64-32b";
+    const secret = "sk-or-v1-abcdef1234567890ABCDEF1234567890";
+    const cipher = encrypt(secret);
+    expect(decrypt(cipher)).toBe(secret);
+  });
+
+  it("radi sa kratkim/plain ENCRYPTION_KEY (SHA-256 derivacija)", () => {
+    process.env.ENCRYPTION_KEY = "kratki-kljuc";
+    const secret = "token-123";
+    expect(decrypt(encrypt(secret))).toBe(secret);
+  });
+
+  it("decrypt fallback čita legacy base64 (32B) šifrovane vrijednosti", () => {
+    const legacySeed = Buffer.alloc(32, 7).toString("base64");
+    process.env.ENCRYPTION_KEY = legacySeed;
+
+    // Simulate a row encrypted under the OLD derivation (naive base64 decode).
+    const legacyKey = Buffer.from(legacySeed, "base64");
+    const iv = Buffer.alloc(16, 3);
+    const cipher = createCipheriv("aes-256-gcm", legacyKey, iv);
+    const enc = Buffer.concat([cipher.update("legacy-secret", "utf8"), cipher.final()]);
+    const ciphertext = `${iv.toString("base64")}:${cipher.getAuthTag().toString("base64")}:${enc.toString("base64")}`;
+
+    // New derivation = sha256(seed) ≠ legacyKey, so decrypt must fall back.
+    expect(decrypt(ciphertext)).toBe("legacy-secret");
   });
 });

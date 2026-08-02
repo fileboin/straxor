@@ -3,6 +3,14 @@ import { useEffect, useState } from "react";
 
 export type ProviderStatus = "ready" | "needs-setup";
 
+// Providers that work without an API key (e.g. local Ollama). The picker must
+// not gate model selection on a stored key, and chat must not require one.
+export const KEYLESS_PROVIDERS: ReadonlySet<string> = new Set(["ollama"]);
+
+export function needsApiKey(providerId: string): boolean {
+  return !KEYLESS_PROVIDERS.has(providerId);
+}
+
 export interface Provider {
   id: string;
   name: string;

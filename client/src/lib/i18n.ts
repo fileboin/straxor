@@ -178,6 +178,14 @@ const DICT: Record<string, { en: string; bs: string }> = {
   "models.addApiKey": { en: "Add API key", bs: "Dodaj API ključ" },
   "models.keyReady": { en: "Key configured", bs: "Ključ konfigurisan" },
   "models.keyNeeded": { en: "API key required", bs: "API ključ je potreban" },
+  "models.keyOpenRouterPrefix": {
+    en: "OpenRouter keys start with sk-or-v1-",
+    bs: "OpenRouter ključevi počinju sa sk-or-v1-",
+  },
+  "models.keyTooShort": {
+    en: "Key is too short",
+    bs: "Ključ je prekratak",
+  },
   "models.keyPlaceholder": {
     en: "Paste {provider} API key...",
     bs: "Zalijepi {provider} API ključ...",

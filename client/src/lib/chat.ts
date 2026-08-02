@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { needsApiKey } from "./models.js";
 
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -52,7 +53,7 @@ export async function streamChat(
 ): Promise<void> {
   // First check if we have an API key for this provider
   const key = await getApiKey(providerId);
-  if (!key) {
+  if (!key && needsApiKey(providerId)) {
     callbacks.onError("API key not configured for this provider");
     return;
   }
@@ -69,7 +70,7 @@ export async function streamChat(
         providerId,
         modelId,
         messages,
-        apiKey: key,
+        apiKey: key || "",
         thinking,
       }),
     });

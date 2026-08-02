@@ -59,7 +59,10 @@ router.post("/", async (req: Request, res: Response) => {
     thinking?: string;
   };
 
-  if (!providerId || !modelId || !messages || !apiKey) {
+  // Providers that work without an API key (e.g. local Ollama).
+  const KEYLESS_PROVIDERS = new Set<string>(["ollama"]);
+
+  if (!providerId || !modelId || !messages || (!apiKey && !KEYLESS_PROVIDERS.has(providerId))) {
     res.status(400).json({ error: "Missing required fields" });
     return;
   }
