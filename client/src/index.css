@@ -11,26 +11,31 @@
 :root {
   --accent-burnt: #ff4d2e;
   --accent-burnt-hover: #e63f24;
+  --accent-burnt-light: #ff6b50;
   --accent-burnt-dim: rgba(255, 77, 46, 0.12);
   --accent-burnt-border: rgba(255, 77, 46, 0.3);
 
   --accent-blue: #3b82f6;
   --accent-blue-hover: #2563eb;
+  --accent-blue-light: #60a5fa;
   --accent-blue-dim: rgba(59, 130, 246, 0.12);
   --accent-blue-border: rgba(59, 130, 246, 0.3);
 
   --accent-yellow: #eab308;
   --accent-yellow-hover: #ca8a04;
+  --accent-yellow-light: #facc15;
   --accent-yellow-dim: rgba(234, 179, 8, 0.12);
   --accent-yellow-border: rgba(234, 179, 8, 0.3);
 
   --accent-orange: #f97316;
   --accent-orange-hover: #ea580c;
+  --accent-orange-light: #fb923c;
   --accent-orange-dim: rgba(249, 115, 22, 0.12);
   --accent-orange-border: rgba(249, 115, 22, 0.3);
 
   --accent-red: #ef4444;
   --accent-red-hover: #dc2626;
+  --accent-red-light: #f87171;
   --accent-red-dim: rgba(239, 68, 68, 0.12);
   --accent-red-border: rgba(239, 68, 68, 0.3);
 }
@@ -41,6 +46,7 @@
   --surface: #141824;
   --surface-2: #1a2130;
   --surface-3: #232b3f;
+  --surface-dim: rgba(255, 255, 255, 0.05);
   --border: #202838;
   --border-light: #2d3750;
   --text: #e8ecf4;
@@ -50,22 +56,24 @@
 
   /* Suptilan grid pattern preko cijele pozadine */
   --bg-grid:
-    linear-gradient(to right, rgba(148, 163, 184, 0.045) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(148, 163, 184, 0.045) 1px, transparent 1px);
+    linear-gradient(to right, rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
 
   /* Aktivni accent — token varijabla, ne hardkodovana boja */
   --accent: var(--accent-burnt);
   --accent-hover: var(--accent-burnt-hover);
+  --accent-light: var(--accent-burnt-light);
   --accent-dim: var(--accent-burnt-dim);
   --accent-border: var(--accent-burnt-border);
 }
 
 /* ── Light tema ── */
 [data-theme="light"] {
-  --bg: #f5f6fb;
+  --bg: #fafbfc;
   --surface: #ffffff;
   --surface-2: #eef0f7;
   --surface-3: #e4e7f0;
+  --surface-dim: rgba(15, 23, 42, 0.04);
   --border: #dfe3ef;
   --border-light: #cfd5e5;
   --text: #12141d;
@@ -74,11 +82,12 @@
   --danger: #d8352f;
 
   --bg-grid:
-    linear-gradient(to right, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
+    linear-gradient(to right, rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
 
   --accent: var(--accent-burnt);
   --accent-hover: var(--accent-burnt-hover);
+  --accent-light: var(--accent-burnt-light);
   --accent-dim: var(--accent-burnt-dim);
   --accent-border: var(--accent-burnt-border);
 }
@@ -87,6 +96,7 @@
 [data-accent="burnt"] {
   --accent: var(--accent-burnt);
   --accent-hover: var(--accent-burnt-hover);
+  --accent-light: var(--accent-burnt-light);
   --accent-dim: var(--accent-burnt-dim);
   --accent-border: var(--accent-burnt-border);
 }
@@ -94,32 +104,43 @@
 [data-accent="olive"] {
   --accent: var(--accent-burnt);
   --accent-hover: var(--accent-burnt-hover);
+  --accent-light: var(--accent-burnt-light);
   --accent-dim: var(--accent-burnt-dim);
   --accent-border: var(--accent-burnt-border);
 }
 [data-accent="blue"] {
   --accent: var(--accent-blue);
   --accent-hover: var(--accent-blue-hover);
+  --accent-light: var(--accent-blue-light);
   --accent-dim: var(--accent-blue-dim);
   --accent-border: var(--accent-blue-border);
 }
 [data-accent="yellow"] {
   --accent: var(--accent-yellow);
   --accent-hover: var(--accent-yellow-hover);
+  --accent-light: var(--accent-yellow-light);
   --accent-dim: var(--accent-yellow-dim);
   --accent-border: var(--accent-yellow-border);
 }
 [data-accent="orange"] {
   --accent: var(--accent-orange);
   --accent-hover: var(--accent-orange-hover);
+  --accent-light: var(--accent-orange-light);
   --accent-dim: var(--accent-orange-dim);
   --accent-border: var(--accent-orange-border);
 }
 [data-accent="red"] {
   --accent: var(--accent-red);
   --accent-hover: var(--accent-red-hover);
+  --accent-light: var(--accent-red-light);
   --accent-dim: var(--accent-red-dim);
   --accent-border: var(--accent-red-border);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
 }
 
 body {
@@ -127,6 +148,12 @@ body {
   background-image: var(--bg-grid);
   background-size: 34px 34px;
   color: var(--text);
+}
+
+#root {
+  background-color: var(--bg);
+  background-image: var(--bg-grid);
+  background-size: 34px 34px;
 }
 
 /* ── Scrollbar ── */

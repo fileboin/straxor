@@ -143,7 +143,7 @@ export default function PreviewPanel({ machineId }: Props) {
         <div className="flex-1" />
 
         {/* Device toggle */}
-        <div className="flex items-center bg-[#111] rounded border border-[#2d3750] overflow-hidden">
+        <div className="flex items-center bg-[#0e1422] rounded border border-[#2d3750] overflow-hidden">
           {DEVICE_PRESETS.map((d) => (
             <button
               key={d.id}

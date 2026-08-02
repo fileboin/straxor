@@ -120,7 +120,7 @@ export default function HistoryPanel({ open, onClose, onJump }: Props) {
         {Object.entries(groups).map(([date, dateEntries]) => (
           <div key={date}>
             {/* Date header */}
-            <div className="px-3 py-1.5 text-[9px] text-text-muted/40 uppercase tracking-wider bg-[#060606] sticky top-0 z-10">
+            <div className="px-3 py-1.5 text-[9px] text-text-muted/40 uppercase tracking-wider bg-[#0a0e1a] sticky top-0 z-10">
               {date}
             </div>
 
@@ -134,7 +134,7 @@ export default function HistoryPanel({ open, onClose, onJump }: Props) {
               return (
                 <div
                   key={entry.id}
-                  className={`border-b border-[#111] transition-colors ${
+                  className={`border-b border-[#202838] transition-colors ${
                     isCurrent ? "bg-accent/5 border-l-2 border-l-accent" : ""
                   } ${isFuture ? "opacity-30" : ""}`}
                 >
@@ -145,7 +145,7 @@ export default function HistoryPanel({ open, onClose, onJump }: Props) {
                     {/* Timeline dot */}
                     <div className="shrink-0 mt-1">
                       <div className={`w-2 h-2 rounded-full ${
-                        isCurrent ? "bg-accent" : isFuture ? "bg-[#333]" : "bg-[#555]"
+                        isCurrent ? "bg-accent" : isFuture ? "bg-[#2d3750]" : "bg-[#4a5878]"
                       }`} />
                     </div>
 

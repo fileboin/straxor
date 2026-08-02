@@ -160,19 +160,19 @@ export default function DatabasePanel({ machineId }: Props) {
           <div className="grid grid-cols-2 gap-2">
             <label className="space-y-0.5">
               <span className="text-[9px] text-text-muted">Host</span>
-              <input value={host} onChange={(e) => setHost(e.target.value)} className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
+              <input value={host} onChange={(e) => setHost(e.target.value)} className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" />
             </label>
             <label className="space-y-0.5">
               <span className="text-[9px] text-text-muted">Port</span>
-              <input value={port} onChange={(e) => setPort(e.target.value)} className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
+              <input value={port} onChange={(e) => setPort(e.target.value)} className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" />
             </label>
             <label className="space-y-0.5">
               <span className="text-[9px] text-text-muted">Korisnik</span>
-              <input value={username} onChange={(e) => setUsername(e.target.value)} className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
+              <input value={username} onChange={(e) => setUsername(e.target.value)} className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" />
             </label>
             <label className="space-y-0.5">
               <span className="text-[9px] text-text-muted">Lozinka</span>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" />
             </label>
           </div>
           <label className="space-y-0.5">
@@ -181,12 +181,12 @@ export default function DatabasePanel({ machineId }: Props) {
               <button onClick={handleLoadDatabases} className="text-[9px] text-accent/60 hover:text-accent">Učitaj liste</button>
             </div>
             {databases.length > 0 ? (
-              <select value={database} onChange={(e) => setDatabase(e.target.value)} className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none">
+              <select value={database} onChange={(e) => setDatabase(e.target.value)} className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none">
                 <option value="">Odaberi bazu…</option>
                 {databases.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             ) : (
-              <input value={database} onChange={(e) => setDatabase(e.target.value)} placeholder="ime_baze" className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
+              <input value={database} onChange={(e) => setDatabase(e.target.value)} placeholder="ime_baze" className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" />
             )}
           </label>
           {connError && <div className="text-[10px] text-red-400">{connError}</div>}
@@ -308,7 +308,7 @@ export default function DatabasePanel({ machineId }: Props) {
             <textarea
               value={sql}
               onChange={(e) => setSql(e.target.value)}
-              className="w-full h-20 px-2 py-1 bg-[#111] text-text text-[11px] font-mono rounded border border-[#333] focus:border-accent outline-none resize-none"
+              className="w-full h-20 px-2 py-1 bg-[#0e1422] text-text text-[11px] font-mono rounded border border-[#202838] focus:border-accent outline-none resize-none"
               placeholder="SELECT * FROM table_name LIMIT 100;"
               spellCheck={false}
             />
@@ -328,9 +328,9 @@ export default function DatabasePanel({ machineId }: Props) {
                 <div className="bg-[#141824] rounded border border-[#2d3750] overflow-auto max-h-[300px]">
                   <table className="text-[10px] w-full">
                     <thead>
-                      <tr className="border-b border-[#333]">
+                      <tr className="border-b border-[#202838]">
                         {queryResult.columns.map((col) => (
-                          <th key={col} className="px-2 py-1 text-left text-text-muted font-medium sticky top-0 bg-[#111]">{col}</th>
+                          <th key={col} className="px-2 py-1 text-left text-text-muted font-medium sticky top-0 bg-[#0e1422]">{col}</th>
                         ))}
                       </tr>
                     </thead>

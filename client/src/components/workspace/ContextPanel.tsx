@@ -181,11 +181,11 @@ export default function ContextPanel({ projectId, machineId, projectPath, onClos
 
               {showNewRule && (
                 <div className="bg-[#141824] rounded-lg border border-[#2d3750] p-3 space-y-2">
-                  <input value={newRuleName} onChange={(e) => setNewRuleName(e.target.value)} placeholder="Naziv pravila" className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
-                  <textarea value={newRuleContent} onChange={(e) => setNewRuleContent(e.target.value)} placeholder="Sadržaj pravila…" className="w-full h-16 px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none resize-none" />
+                  <input value={newRuleName} onChange={(e) => setNewRuleName(e.target.value)} placeholder="Naziv pravila" className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" />
+                  <textarea value={newRuleContent} onChange={(e) => setNewRuleContent(e.target.value)} placeholder="Sadržaj pravila…" className="w-full h-16 px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none resize-none" />
                   <div className="flex items-center gap-1 flex-wrap">
                     {RULE_CATEGORIES.map((c) => (
-                      <button key={c.id} onClick={() => setNewRuleCategory(c.id)} className={`px-1.5 py-0.5 text-[8px] rounded border transition-colors ${newRuleCategory === c.id ? "border-accent bg-accent/10 text-accent" : "border-[#333] text-text-muted"}`}>
+                      <button key={c.id} onClick={() => setNewRuleCategory(c.id)} className={`px-1.5 py-0.5 text-[8px] rounded border transition-colors ${newRuleCategory === c.id ? "border-accent bg-accent/10 text-accent" : "border-[#202838] text-text-muted"}`}>
                         {c.icon} {c.label}
                       </button>
                     ))}
@@ -234,12 +234,12 @@ export default function ContextPanel({ projectId, machineId, projectPath, onClos
 
               {showNewMemory && (
                 <div className="bg-[#141824] rounded-lg border border-[#2d3750] p-3 space-y-2">
-                  <input value={newMemKey} onChange={(e) => setNewMemKey(e.target.value)} placeholder="Ključ (npr. 'preferirani_stil')" className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
-                  <textarea value={newMemContent} onChange={(e) => setNewMemContent(e.target.value)} placeholder="Sadržaj sjećanja…" className="w-full h-16 px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none resize-none" />
+                  <input value={newMemKey} onChange={(e) => setNewMemKey(e.target.value)} placeholder="Ključ (npr. 'preferirani_stil')" className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" />
+                  <textarea value={newMemContent} onChange={(e) => setNewMemContent(e.target.value)} placeholder="Sadržaj sjećanja…" className="w-full h-16 px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none resize-none" />
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1 flex-wrap flex-1">
                       {MEMORY_CATEGORIES.map((c) => (
-                        <button key={c.id} onClick={() => setNewMemCategory(c.id)} className={`px-1.5 py-0.5 text-[8px] rounded border transition-colors ${newMemCategory === c.id ? "border-accent bg-accent/10 text-accent" : "border-[#333] text-text-muted"}`}>
+                        <button key={c.id} onClick={() => setNewMemCategory(c.id)} className={`px-1.5 py-0.5 text-[8px] rounded border transition-colors ${newMemCategory === c.id ? "border-accent bg-accent/10 text-accent" : "border-[#202838] text-text-muted"}`}>
                           {c.icon} {c.label}
                         </button>
                       ))}
@@ -285,13 +285,13 @@ export default function ContextPanel({ projectId, machineId, projectPath, onClos
 
               {/* URL fetch */}
               <div className="flex gap-1.5">
-                <input value={webUrl} onChange={(e) => setWebUrl(e.target.value)} placeholder="Unesi URL za preuzimanje…" className="flex-1 px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
+                <input value={webUrl} onChange={(e) => setWebUrl(e.target.value)} placeholder="Unesi URL za preuzimanje…" className="flex-1 px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" />
                 <button onClick={handleFetchUrl} disabled={!webUrl.trim() || webLoading} className="px-2.5 py-1 text-[10px] bg-accent/10 text-accent rounded hover:bg-accent/20 disabled:opacity-30">Preuzmi</button>
               </div>
 
               {/* Search */}
               <div className="flex gap-1.5">
-                <input value={webQuery} onChange={(e) => setWebQuery(e.target.value)} placeholder="Pretraži web…" className="flex-1 px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" onKeyDown={(e) => e.key === "Enter" && handleWebSearch()} />
+                <input value={webQuery} onChange={(e) => setWebQuery(e.target.value)} placeholder="Pretraži web…" className="flex-1 px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" onKeyDown={(e) => e.key === "Enter" && handleWebSearch()} />
                 <button onClick={handleWebSearch} disabled={!webQuery.trim() || webLoading} className="px-2.5 py-1 text-[10px] bg-accent/10 text-accent rounded hover:bg-accent/20 disabled:opacity-30">🔍</button>
               </div>
 
@@ -321,7 +321,7 @@ export default function ContextPanel({ projectId, machineId, projectPath, onClos
                 value={previewPrompt}
                 onChange={(e) => setPreviewPrompt(e.target.value)}
                 placeholder="Unesi prompt za koji želiš vidjeti kontekst…"
-                className="w-full h-20 px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none resize-none"
+                className="w-full h-20 px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none resize-none"
               />
 
               <button
@@ -346,7 +346,7 @@ export default function ContextPanel({ projectId, machineId, projectPath, onClos
                       <span>Tokeni</span>
                       <span>{assembled.totalTokens} / 8000</span>
                     </div>
-                    <div className="w-full h-1.5 bg-[#222] rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-[#1a2130] rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all ${assembled.truncated ? "bg-yellow-500" : "bg-accent"}`}
                         style={{ width: `${Math.min((assembled.totalTokens / 8000) * 100, 100)}%` }}

@@ -62,7 +62,7 @@ export default function ResetPassword() {
             <div className="w-9 h-9 bg-accent rounded-xl flex items-center justify-center font-extrabold text-white text-sm">
               S
             </div>
-            <span className="text-2xl font-extrabold tracking-tight">Straxor</span>
+            <span className="text-2xl font-extrabold tracking-tight text-accent">Straxor</span>
           </div>
           <button
             onClick={toggleTheme}

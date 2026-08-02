@@ -343,7 +343,7 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Filtriraj datoteke..."
-                className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none"
+                className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none"
                 autoFocus
               />
             </div>
@@ -382,7 +382,7 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
               }}
               className={`group flex items-center gap-1.5 h-full px-3 text-[11px] border-r border-[#202838] cursor-pointer shrink-0 transition-colors ${
                 file.path === activeFile
-                  ? "bg-[#111] text-text"
+                  ? "bg-[#0e1422] text-text"
                   : "text-text-muted hover:bg-[#141824] hover:text-text-secondary"
               }`}
             >

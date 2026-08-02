@@ -7,3 +7,4 @@ server/image-data/
 server/.straxor-workspaces/
 *.log
 .DS_Store
+verification-screenshots/

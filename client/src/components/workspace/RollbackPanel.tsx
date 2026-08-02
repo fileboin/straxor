@@ -237,7 +237,7 @@ export default function RollbackPanel({ machineId, projectPath, onClose }: Props
                 value={createName}
                 onChange={(e) => setCreateName(e.target.value)}
                 placeholder="npr. Prije refaktoriranja"
-                className="w-full px-2 py-1.5 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none"
+                className="w-full px-2 py-1.5 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none"
               />
             </label>
             <label className="space-y-0.5">
@@ -246,7 +246,7 @@ export default function RollbackPanel({ machineId, projectPath, onClose }: Props
                 value={createDesc}
                 onChange={(e) => setCreateDesc(e.target.value)}
                 placeholder="Kratki opis promjena…"
-                className="w-full px-2 py-1.5 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none"
+                className="w-full px-2 py-1.5 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none"
               />
             </label>
             <label className="space-y-0.5">
@@ -259,7 +259,7 @@ export default function RollbackPanel({ machineId, projectPath, onClose }: Props
                     className={`px-2 py-1 text-[9px] rounded-lg border transition-colors ${
                       createType === t
                         ? "border-accent bg-accent/10 text-accent"
-                        : "border-[#333] text-text-muted hover:border-[#555]"
+                        : "border-[#202838] text-text-muted hover:border-[#2d3750]"
                     }`}
                   >
                     {RESTORE_TYPE_ICONS[t]} {RESTORE_TYPE_LABELS[t]}
