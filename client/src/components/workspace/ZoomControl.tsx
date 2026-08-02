@@ -6,15 +6,16 @@ interface Props {
   onZoomChange: (z: number) => void;
 }
 
-export const ZOOM_MIN = 0.6;
-export const ZOOM_MAX = 1.25;
+export const ZOOM_MIN = 0.7;
+export const ZOOM_MAX = 1.5;
 const ZOOM_STEP = 0.05;
 
 export const ZOOM_PRESETS = [
   { id: "tiny", value: 0.7, labelKey: "zoom.tiny" },
   { id: "small", value: 0.85, labelKey: "zoom.small" },
   { id: "medium", value: 1, labelKey: "zoom.medium" },
-  { id: "large", value: 1.15, labelKey: "zoom.large" },
+  { id: "large", value: 1.25, labelKey: "zoom.large" },
+  { id: "xlarge", value: 1.5, labelKey: "zoom.xlarge" },
 ] as const;
 
 export function clampZoom(z: number) {

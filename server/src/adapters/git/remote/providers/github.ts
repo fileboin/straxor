@@ -22,6 +22,16 @@ export function createGitHubAdapter(token?: string): GitRemoteAdapter {
     isAuthenticated: () => !!authToken,
     setToken: (token: string) => { authToken = token; },
 
+    async getUser(): Promise<{ username: string } | null> {
+      if (!authToken) return null;
+      try {
+        const data: any = await api("/user");
+        return { username: data.login };
+      } catch {
+        return null;
+      }
+    },
+
     async listRepos(): Promise<GitRemoteRepo[]> {
       const data: any[] = await api("/user/repos?per_page=100&sort=updated");
       return data.map(mapRepo);

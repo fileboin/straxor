@@ -18,6 +18,7 @@ interface Props {
   onOpenPromptLibrary: () => void;
   onToolbarAction: (actionId: string) => void;
   roleSelector?: ReactNode;
+  panelMenu?: ReactNode;
   micState?: "idle" | "recording" | "processing";
   budgetPopover?: ReactNode;
   micStatusBar?: ReactNode;
@@ -41,6 +42,7 @@ export default function WelcomeHero({
   onOpenPromptLibrary,
   onToolbarAction,
   roleSelector,
+  panelMenu,
   micState,
   budgetPopover,
   micStatusBar,
@@ -134,6 +136,7 @@ export default function WelcomeHero({
               >
                 💡 {t("welcome.ideas")}
               </button>
+              {panelMenu}
             </div>
             <button
               type="submit"

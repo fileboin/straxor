@@ -5,9 +5,10 @@ import ModelPickerModal from "./ModelPickerModal.js";
 import InputToolbar from "./InputToolbar.js";
 import InfoTip from "./InfoTip.js";
 import WelcomeHero from "./WelcomeHero.js";
-import ZoomControl from "./ZoomControl.js";
+import PanelMenu from "./PanelMenu.js";
 import InlineApiKeyForm from "./InlineApiKeyForm.js";
 import { useModelCatalog, type ThinkingBudget } from "../../lib/models.js";
+import type { AgentRole } from "../../lib/roles.js";
 import { t, useLang } from "../../lib/i18n.js";
 import { estimatePlan, formatCost, formatTokens } from "../../lib/plan-preview.js";
 import {
@@ -72,6 +73,9 @@ interface Props {
   onToggleExpand?: () => void;
   zoom?: number;
   onZoomChange?: (z: number) => void;
+  panelMenuKey?: string;
+  role?: AgentRole;
+  onRoleChange?: (role: AgentRole) => void;
   onOpenPromptLibrary?: () => void;
   isSteerable?: boolean;
   onSteerSend?: (message: string) => void;
@@ -229,6 +233,9 @@ export default function ChatPanel({
   onToggleExpand,
   zoom = 1,
   onZoomChange,
+  panelMenuKey = "ask",
+  role,
+  onRoleChange,
   onOpenPromptLibrary,
   isSteerable,
   onSteerSend,
@@ -647,6 +654,19 @@ export default function ChatPanel({
     />
   );
 
+  const panelMenuNode = onZoomChange ? (
+    <PanelMenu
+      role={role || "developer"}
+      onRoleChange={(r) => onRoleChange?.(r)}
+      zoom={zoom}
+      onZoomChange={onZoomChange}
+      onOpenModelPicker={() => setShowModelPicker(true)}
+      onOpenPromptLibrary={() => onOpenPromptLibrary?.()}
+      onOpenGitRemote={() => onOpenGitRemote?.()}
+      storageKey={panelMenuKey}
+    />
+  ) : null;
+
   return (
     <div className={`flex flex-col h-full min-h-0 overflow-hidden rounded-2xl ${isEmpty ? "border border-white/10" : "border border-border bg-surface shadow-lg shadow-black/30"}`}>
       {isEmpty ? (
@@ -666,6 +686,7 @@ export default function ChatPanel({
           onOpenPromptLibrary={() => onOpenPromptLibrary?.()}
           onToolbarAction={handleToolbarAction}
           roleSelector={headerLeft}
+          panelMenu={panelMenuNode}
           micState={micState}
           budgetPopover={budgetPopover}
           micStatusBar={micStatusBar}
@@ -732,9 +753,7 @@ export default function ChatPanel({
               <InfoTip text={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")} placement="bottom" />
             </div>
           )}
-          {onZoomChange && (
-            <ZoomControl zoom={zoom} onZoomChange={onZoomChange} />
-          )}
+          {panelMenuNode}
           <button
             onClick={() => setShowModelPicker(true)}
             className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"

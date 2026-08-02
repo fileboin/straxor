@@ -67,6 +67,10 @@ export interface GitRemoteAdapter {
   isAuthenticated(): boolean;
   setToken(token: string): void;
 
+  // Identity (used to validate a token and show the username). Optional —
+  // platforms that don't implement it are validated by a light API call instead.
+  getUser?(): Promise<{ username: string } | null>;
+
   // Repositories
   listRepos(): Promise<GitRemoteRepo[]>;
   getRepo(owner: string, repo: string): Promise<GitRemoteRepo>;

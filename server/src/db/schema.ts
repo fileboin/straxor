@@ -104,6 +104,9 @@ export const gitConnections = pgTable("git_connections", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   platform: varchar("platform", { length: 50 }).notNull(),
+  name: varchar("name", { length: 120 }).notNull().default("GitHub"),
+  username: varchar("username", { length: 120 }),
+  isDefault: boolean("is_default").notNull().default(false),
   encryptedToken: text("encrypted_token").notNull(),
   baseUrl: text("base_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

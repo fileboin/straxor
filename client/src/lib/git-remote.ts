@@ -82,6 +82,50 @@ export async function setGitConfig(platform: GitPlatformId, token: string, baseU
   });
 }
 
+// ── Token slots (multi-token) ──
+
+export interface GitTokenSlot {
+  id: string;
+  platform: GitPlatformId;
+  name: string;
+  username?: string | null;
+  baseUrl?: string | null;
+  isDefault: boolean;
+}
+
+export async function listGitTokens(platform: GitPlatformId) {
+  return api<{ platform: string; tokens: GitTokenSlot[] }>(`/${platform}/tokens`);
+}
+
+export async function validateGitToken(platform: GitPlatformId, token: string, baseUrl?: string) {
+  return api<{ valid: boolean; username?: string | null; platform: string }>(`/${platform}/tokens/validate`, {
+    method: "POST",
+    body: JSON.stringify({ token, baseUrl }),
+  });
+}
+
+export async function addGitToken(platform: GitPlatformId, opts: { name?: string; token: string; baseUrl?: string }) {
+  return api<{ token: GitTokenSlot }>(`/${platform}/tokens`, {
+    method: "POST",
+    body: JSON.stringify(opts),
+  });
+}
+
+export async function renameGitToken(platform: GitPlatformId, id: string, name: string) {
+  return api<{ ok: boolean }>(`/${platform}/tokens/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function activateGitToken(platform: GitPlatformId, id: string) {
+  return api<{ ok: boolean }>(`/${platform}/tokens/${id}/activate`, { method: "POST" });
+}
+
+export async function deleteGitToken(platform: GitPlatformId, id: string) {
+  return api<{ ok: boolean }>(`/${platform}/tokens/${id}`, { method: "DELETE" });
+}
+
 // ── Repos ──
 
 export async function listRepos(platform: GitPlatformId) {
