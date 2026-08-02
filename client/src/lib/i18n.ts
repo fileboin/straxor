@@ -251,6 +251,10 @@ const DICT: Record<string, { en: string; bs: string }> = {
     en: "Drag to resize panels",
     bs: "Povuci za promjenu širine panela",
   },
+  "layout.resizeHeight": {
+    en: "Drag to resize panel height",
+    bs: "Povuci za promjenu visine panela",
+  },
 
   // ── Auth pages ──
   "auth.login": { en: "Log in", bs: "Prijava" },

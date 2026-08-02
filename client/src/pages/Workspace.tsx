@@ -279,6 +279,49 @@ export default function Workspace() {
   const handleAskZoomChange = (z: number) => setAskZoom(clampZoomPct(z));
   const handleAgentZoomChange = (z: number) => setAgentZoom(clampZoomPct(z));
 
+  // Per-panel height (independent Ask/Agent, % of panels row) — persisted
+  const readPanelHeight = (key: string) => {
+    try {
+      const saved = parseInt(localStorage.getItem(key) || "", 10);
+      return Number.isFinite(saved) ? Math.max(30, Math.min(100, saved)) : 100;
+    } catch {
+      return 100;
+    }
+  };
+  const [askPanelHeightPct, setAskPanelHeightPct] = useState<number>(() =>
+    readPanelHeight("straxor.panelHeight.ask")
+  );
+  const [agentPanelHeightPct, setAgentPanelHeightPct] = useState<number>(() =>
+    readPanelHeight("straxor.panelHeight.agent")
+  );
+
+  const clampPanelHeight = (v: number) => Math.max(30, Math.min(100, v));
+  const startPanelHeightResize = (e: React.MouseEvent, which: "ask" | "agent") => {
+    e.preventDefault();
+    const container = panelsRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const startY = e.clientY;
+    const onMove = (ev: MouseEvent) => {
+      // The panel's top edge follows the cursor; the bottom edge stays fixed.
+      const top = startY - rect.top + (ev.clientY - startY);
+      const pct = ((rect.height - top) / rect.height) * 100;
+      const clamped = clampPanelHeight(pct);
+      if (which === "ask") setAskPanelHeightPct(clamped);
+      else setAgentPanelHeightPct(clamped);
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.body.style.cursor = "ns-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+
   const startPanelResize = (e: React.MouseEvent) => {
     e.preventDefault();
     const container = panelsRef.current;
@@ -335,6 +378,18 @@ export default function Workspace() {
       localStorage.setItem("straxor.zoom.agent", String(agentZoom));
     } catch {}
   }, [agentZoom]);
+
+  // Persist per-panel height
+  useEffect(() => {
+    try {
+      localStorage.setItem("straxor.panelHeight.ask", String(askPanelHeightPct));
+    } catch {}
+  }, [askPanelHeightPct]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("straxor.panelHeight.agent", String(agentPanelHeightPct));
+    } catch {}
+  }, [agentPanelHeightPct]);
 
   // Persist panel mode (expand/fullscreen)
   useEffect(() => {
@@ -1623,6 +1678,8 @@ export default function Workspace() {
         {/* Agent 1 panel */}
         <div
           className={`flex flex-col min-h-0 min-w-0 ${
+            panelsLayout === "side" ? "min-h-[200px]" : ""
+          } ${
             panelMode === "agent-full"
               ? "hidden md:hidden"
               : panelMode === "ask-full"
@@ -1639,11 +1696,26 @@ export default function Workspace() {
             ...(panelsLayout === "side" && panelMode === "split"
               ? { flexBasis: `${panelWidthPct}%` }
               : {}),
+            ...(panelsLayout === "side" && panelMode === "split"
+              ? {
+                  height: `${askPanelHeightPct}%`,
+                  ...(askPanelHeightPct < 100 ? { marginTop: "auto" } : {}),
+                }
+              : {}),
             ...(askZoom !== 1
               ? { transform: `scale(${askZoom})`, transformOrigin: "top center" }
               : {}),
           }}
         >
+          {panelsLayout === "side" && panelMode === "split" && (
+            <div
+              className="hidden md:flex items-center justify-center h-2.5 cursor-ns-resize shrink-0 select-none group"
+              onMouseDown={(e) => startPanelHeightResize(e, "ask")}
+              title={t("layout.resizeHeight")}
+            >
+              <div className="w-14 h-1 rounded-full bg-border group-hover:bg-accent transition-colors" />
+            </div>
+          )}
           <ChatPanel
             title={t("agent.panel1")}
             icon="⚡"
@@ -1703,6 +1775,8 @@ export default function Workspace() {
         {/* Agent 2 panel */}
         <div
           className={`flex flex-col min-h-0 min-w-0 ${
+            panelsLayout === "side" ? "min-h-[200px]" : ""
+          } ${
             panelMode === "ask-full"
               ? "hidden md:hidden"
               : panelMode === "agent-full"
@@ -1711,12 +1785,27 @@ export default function Workspace() {
               ? "hidden md:flex md:flex-1"
               : "flex-1"
           }`}
-          style={
-            agentZoom !== 1
+          style={{
+            ...(panelsLayout === "side" && panelMode === "split"
+              ? {
+                  height: `${agentPanelHeightPct}%`,
+                  ...(agentPanelHeightPct < 100 ? { marginTop: "auto" } : {}),
+                }
+              : {}),
+            ...(agentZoom !== 1
               ? { transform: `scale(${agentZoom})`, transformOrigin: "top center" }
-              : undefined
-          }
+              : {}),
+          }}
         >
+          {panelsLayout === "side" && panelMode === "split" && (
+            <div
+              className="hidden md:flex items-center justify-center h-2.5 cursor-ns-resize shrink-0 select-none group"
+              onMouseDown={(e) => startPanelHeightResize(e, "agent")}
+              title={t("layout.resizeHeight")}
+            >
+              <div className="w-14 h-1 rounded-full bg-border group-hover:bg-accent transition-colors" />
+            </div>
+          )}
           <ChatPanel
             title={t("agent.panel2")}
             icon="⚡"
