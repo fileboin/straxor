@@ -54,11 +54,20 @@ export default function ModelPickerModal({
       setInlineKeyFor(null);
       setPendingModelId(null);
       const loadKeys = async () => {
-        const keys: Record<string, boolean> = {};
-        for (const p of providers) {
-          keys[p.id] = await hasApiKey(p.id);
-        }
-        setProviderKeys(keys);
+        const results = await Promise.all(providers.map((p) => hasApiKey(p.id)));
+        const keys: Record<string, boolean> = Object.fromEntries(
+          providers.map((p, i) => [p.id, results[i]])
+        );
+        // Only fill in values that are still unknown. A key the user saved while
+        // this load was in flight (onSaved) must not be clobbered back to false
+        // by a stale result.
+        setProviderKeys((prev) => {
+          const next = { ...prev };
+          for (const [id, has] of Object.entries(keys)) {
+            if (next[id] === undefined) next[id] = has;
+          }
+          return next;
+        });
       };
       loadKeys();
     }
@@ -210,7 +219,7 @@ export default function ModelPickerModal({
                     {selectedProvider.name}
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
-                    {!needsApiKey(selectedProvider.id) && !providerKeys[selectedProvider.id] && (
+                    {!providerKeys[selectedProvider.id] && (
                       <button
                         onClick={() => setShowKeyInput((v) => !v)}
                         className={`text-[10px] px-2 py-1 rounded-md transition-colors ${
