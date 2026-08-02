@@ -47,6 +47,7 @@ export default function PanelMenu({
   const [renameValue, setRenameValue] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const pct = Math.round(zoom * 100);
 
@@ -76,7 +77,11 @@ export default function PanelMenu({
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insideTrigger =
+        rootRef.current && rootRef.current.contains(target);
+      const insideMenu = menuRef.current && menuRef.current.contains(target);
+      if (!insideTrigger && !insideMenu) {
         setOpen(false);
       }
     };
@@ -190,6 +195,7 @@ export default function PanelMenu({
         menuPos &&
         createPortal(
           <div
+            ref={menuRef}
             className="z-[100] w-[340px] max-w-[calc(100vw-16px)] max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl shadow-black/50 p-2.5 space-y-3.5"
             style={{ position: "fixed", top: menuPos.top, left: menuPos.left }}
           >
@@ -231,14 +237,14 @@ export default function PanelMenu({
             <div className="flex gap-1.5">
               <button
                 type="button"
-                onClick={onOpenModelPicker}
+                onClick={() => { setOpen(false); onOpenModelPicker(); }}
                 className="flex-1 px-2 py-2 rounded-lg border border-border bg-surface-2 text-[12px] text-text hover:border-border-light hover:text-text transition-colors"
               >
                 ✦ {t("panelMenu.model")}
               </button>
               <button
                 type="button"
-                onClick={onOpenPromptLibrary}
+                onClick={() => { setOpen(false); onOpenPromptLibrary(); }}
                 className="flex-1 px-2 py-2 rounded-lg border border-border bg-surface-2 text-[12px] text-text hover:border-border-light hover:text-text transition-colors"
               >
                 💡 {t("panelMenu.prompts")}
@@ -308,7 +314,7 @@ export default function PanelMenu({
               <div className="text-[11px] uppercase tracking-wider text-text-muted">GitHub token</div>
               <button
                 type="button"
-                onClick={onOpenGitRemote}
+                onClick={() => { setOpen(false); onOpenGitRemote(); }}
                 className="text-[11px] text-text-muted hover:text-text"
               >
                 {t("panelMenu.gitOpen")} →
