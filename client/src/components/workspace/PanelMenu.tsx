@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ROLES, type AgentRole } from "../../lib/roles.js";
 import { t } from "../../lib/i18n.js";
 import {
@@ -45,6 +46,8 @@ export default function PanelMenu({
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const pct = Math.round(zoom * 100);
 
   const selectedKey = `straxor.gitToken.${storageKey}`;
@@ -77,8 +80,15 @@ export default function PanelMenu({
         setOpen(false);
       }
     };
+    const close = () => setOpen(false);
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
   }, [open]);
 
   function flash(msg: string) {
@@ -145,8 +155,24 @@ export default function PanelMenu({
   return (
     <div ref={rootRef} className="relative shrink-0">
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) {
+            const r = btnRef.current?.getBoundingClientRect();
+            if (r) {
+              const W = 340;
+              const top = Math.min(
+                r.bottom + 4,
+                Math.max(8, window.innerHeight - Math.round(window.innerHeight * 0.8) - 8)
+              );
+              let left = Math.min(r.right - W, window.innerWidth - W - 8);
+              left = Math.max(8, left);
+              setMenuPos({ top, left });
+            }
+          }
+          setOpen((o) => !o);
+        }}
         aria-expanded={open}
         className={`flex items-center gap-1.5 h-8 pl-2 pr-2 rounded-lg border text-[12px] font-medium transition-colors sm:pr-2.5 ${
           open
@@ -160,33 +186,38 @@ export default function PanelMenu({
         <span className="hidden xl:inline">{t("panelMenu.title")}</span>
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-80 max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-surface shadow-xl shadow-black/40 p-2 space-y-3">
+      {open &&
+        menuPos &&
+        createPortal(
+          <div
+            className="z-[100] w-[340px] max-w-[calc(100vw-16px)] max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl shadow-black/50 p-2.5 space-y-3.5"
+            style={{ position: "fixed", top: menuPos.top, left: menuPos.left }}
+          >
           <div className="flex items-center justify-between px-1.5">
-            <div className="text-[10px] uppercase tracking-wider text-text-muted font-medium">
+            <div className="text-[11px] uppercase tracking-wider text-text-muted font-medium">
               {t("panelMenu.title")}
             </div>
-            {actionMsg && <div className="text-[10px] text-green-400">{actionMsg}</div>}
+            {actionMsg && <div className="text-[11px] text-green-400">{actionMsg}</div>}
           </div>
 
           {/* Uloga agenta */}
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-text-muted px-1.5 pb-1">
+            <div className="text-[11px] uppercase tracking-wider text-text-muted px-1.5 pb-1">
               {t("panelMenu.role")}
             </div>
-            <div className="grid grid-cols-1 gap-0.5">
+            <div className="grid grid-cols-1 gap-1">
               {ROLES.map((r) => (
                 <button
                   key={r.id}
                   type="button"
                   onClick={() => { onRoleChange(r.id); }}
-                  className={`flex items-center gap-2 px-1.5 py-1.5 rounded-lg text-left text-[11px] transition-colors ${
+                  className={`flex items-center gap-2 px-2 py-2 rounded-lg text-left text-[12px] transition-colors ${
                     r.id === role ? "bg-accent/15 text-accent font-semibold" : "text-text hover:bg-surface-2"
                   }`}
                 >
-                  <span className="text-xs w-5 text-center shrink-0">{r.icon}</span>
+                  <span className="text-[13px] w-5 text-center shrink-0">{r.icon}</span>
                   <span className="flex-1 min-w-0 truncate">{r.label}</span>
-                  {r.id === role && <span className="text-accent text-[9px]">●</span>}
+                  {r.id === role && <span className="text-accent text-[10px]">●</span>}
                 </button>
               ))}
             </div>
@@ -196,19 +227,19 @@ export default function PanelMenu({
 
           {/* Model */}
           <div className="px-1.5">
-            <div className="text-[10px] uppercase tracking-wider text-text-muted pb-1">{t("panelMenu.model")}</div>
+            <div className="text-[11px] uppercase tracking-wider text-text-muted pb-1">{t("panelMenu.model")}</div>
             <div className="flex gap-1.5">
               <button
                 type="button"
                 onClick={onOpenModelPicker}
-                className="flex-1 px-2 py-1.5 rounded-lg border border-border bg-surface-2 text-[11px] text-text hover:border-border-light hover:text-text transition-colors"
+                className="flex-1 px-2 py-2 rounded-lg border border-border bg-surface-2 text-[12px] text-text hover:border-border-light hover:text-text transition-colors"
               >
                 ✦ {t("panelMenu.model")}
               </button>
               <button
                 type="button"
                 onClick={onOpenPromptLibrary}
-                className="flex-1 px-2 py-1.5 rounded-lg border border-border bg-surface-2 text-[11px] text-text hover:border-border-light hover:text-text transition-colors"
+                className="flex-1 px-2 py-2 rounded-lg border border-border bg-surface-2 text-[12px] text-text hover:border-border-light hover:text-text transition-colors"
               >
                 💡 {t("panelMenu.prompts")}
               </button>
@@ -220,15 +251,15 @@ export default function PanelMenu({
           {/* Zoom */}
           <div className="px-1.5">
             <div className="flex items-center justify-between px-0 pb-1">
-              <div className="text-[10px] uppercase tracking-wider text-text-muted">{t("zoom.title")}</div>
-              <div className="text-[11px] tabular-nums text-text-muted">{pct}%</div>
+              <div className="text-[11px] uppercase tracking-wider text-text-muted">{t("zoom.title")}</div>
+              <div className="text-[12px] tabular-nums text-text-muted">{pct}%</div>
             </div>
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => onZoomChange(clampZoom(zoom - 0.05))}
                 disabled={zoom <= ZOOM_MIN}
-                className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-border disabled:opacity-30"
+                className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-border disabled:opacity-30"
               >
                 −
               </button>
@@ -246,7 +277,7 @@ export default function PanelMenu({
                 type="button"
                 onClick={() => onZoomChange(clampZoom(zoom + 0.05))}
                 disabled={zoom >= ZOOM_MAX}
-                className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-border disabled:opacity-30"
+                className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-border disabled:opacity-30"
               >
                 +
               </button>
@@ -257,7 +288,7 @@ export default function PanelMenu({
                   key={p.id}
                   type="button"
                   onClick={() => onZoomChange(p.value)}
-                  className={`flex-1 px-1 py-1 rounded-md text-[10px] transition-colors ${
+                  className={`flex-1 px-1 py-1.5 rounded-md text-[11px] transition-colors ${
                     Math.abs(zoom - p.value) < 0.001
                       ? "bg-accent/15 text-accent font-semibold"
                       : "text-text-muted hover:bg-surface-2 hover:text-text"
@@ -274,37 +305,37 @@ export default function PanelMenu({
           {/* GitHub token slots */}
           <div className="px-1.5">
             <div className="flex items-center justify-between pb-1">
-              <div className="text-[10px] uppercase tracking-wider text-text-muted">GitHub token</div>
+              <div className="text-[11px] uppercase tracking-wider text-text-muted">GitHub token</div>
               <button
                 type="button"
                 onClick={onOpenGitRemote}
-                className="text-[10px] text-text-muted hover:text-text"
+                className="text-[11px] text-text-muted hover:text-text"
               >
                 {t("panelMenu.gitOpen")} →
               </button>
             </div>
 
             {activeSlot && (
-              <div className="flex items-center gap-1.5 px-2 py-1.5 mb-1.5 rounded-lg border border-green-500/30 bg-green-500/5">
+              <div className="flex items-center gap-1.5 px-2 py-2 mb-1.5 rounded-lg border border-green-500/30 bg-green-500/5">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
-                <span className="text-[11px] text-text flex-1 min-w-0 truncate">
+                <span className="text-[12px] text-text flex-1 min-w-0 truncate">
                   {activeSlot.username || activeSlot.name}
                 </span>
-                <span className="text-[10px] text-text-muted shrink-0">aktivni</span>
+                <span className="text-[11px] text-text-muted shrink-0">aktivni</span>
               </div>
             )}
 
             <div className="space-y-1">
-              {loading && <div className="text-[10px] text-text-muted px-1.5 py-1">...</div>}
+              {loading && <div className="text-[11px] text-text-muted px-1.5 py-1">...</div>}
               {!loading && tokens.length === 0 && (
-                <div className="text-[10px] text-text-muted px-1.5 py-1">
+                <div className="text-[11px] text-text-muted px-1.5 py-1">
                   {t("panelMenu.noTokens")}
                 </div>
               )}
               {tokens.map((s) => (
                 <div
                   key={s.id}
-                  className={`group flex items-center gap-1.5 px-1.5 py-1 rounded-lg border transition-colors ${
+                  className={`group flex items-center gap-1.5 px-1.5 py-1.5 rounded-lg border transition-colors ${
                     s.id === selectedId
                       ? "border-accent/40 bg-accent/5"
                       : "border-transparent hover:bg-surface-2"
@@ -317,11 +348,11 @@ export default function PanelMenu({
                     title={t("panelMenu.gitActivate")}
                   >
                     <span className={`w-3 h-3 rounded-full border shrink-0 ${s.isDefault ? "border-green-400 bg-green-400/40" : "border-border"}`} />
-                    <span className="text-[11px] text-text flex-1 min-w-0 truncate">
+                    <span className="text-[12px] text-text flex-1 min-w-0 truncate">
                       {s.name}
                       {s.username && <span className="text-text-muted"> · @{s.username}</span>}
                     </span>
-                    {s.id === selectedId && <span className="text-[9px] text-accent shrink-0">●</span>}
+                    {s.id === selectedId && <span className="text-[10px] text-accent shrink-0">●</span>}
                   </button>
                   {renameId === s.id ? (
                     <input
@@ -333,14 +364,14 @@ export default function PanelMenu({
                         if (e.key === "Escape") setRenameId(null);
                       }}
                       onBlur={() => setRenameId(null)}
-                      className="w-20 input px-1 py-0.5 text-[11px]"
+                      className="w-20 input px-1 py-0.5 text-[12px]"
                     />
                   ) : (
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 shrink-0">
                       <button
                         type="button"
                         onClick={() => { setRenameId(s.id); setRenameValue(s.name); }}
-                        className="w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-surface text-[10px]"
+                        className="w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-text hover:bg-surface text-[11px]"
                         title={t("panelMenu.gitRename")}
                       >
                         ✎
@@ -348,7 +379,7 @@ export default function PanelMenu({
                       <button
                         type="button"
                         onClick={() => handleDelete(s.id)}
-                        className="w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-red-400 hover:bg-red-500/10 text-[10px]"
+                        className="w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-red-400 hover:bg-red-500/10 text-[11px]"
                         title={t("panelMenu.gitDelete")}
                       >
                         ✕
@@ -363,7 +394,7 @@ export default function PanelMenu({
               <div className="mt-1.5 space-y-1.5">
                 <input
                   autoFocus
-                  className="input w-full px-2 py-1.5 text-[11px]"
+                  className="input w-full px-2 py-2 text-[12px]"
                   placeholder={t("panelMenu.gitName")}
                   value={addName}
                   onChange={(e) => setAddName(e.target.value)}
@@ -373,7 +404,7 @@ export default function PanelMenu({
                     type="password"
                     autoComplete="off"
                     spellCheck={false}
-                    className="input w-full px-2 py-1.5 text-[11px]"
+                    className="input w-full px-2 py-2 text-[12px]"
                     placeholder="ghp_... / github_pat_..."
                     value={addToken}
                     onChange={(e) => setAddToken(e.target.value)}
@@ -383,7 +414,7 @@ export default function PanelMenu({
                     type="button"
                     onClick={handleAdd}
                     disabled={adding || !addToken.trim()}
-                    className="px-2 py-1 rounded-lg bg-accent text-white text-[11px] disabled:opacity-40"
+                    className="px-2.5 py-1 rounded-lg bg-accent text-white text-[12px] disabled:opacity-40"
                   >
                     {adding ? "..." : "✓"}
                   </button>
@@ -393,14 +424,15 @@ export default function PanelMenu({
               <button
                 type="button"
                 onClick={() => setAddOpen(true)}
-                className="w-full mt-1.5 px-2 py-1 rounded-lg border border-dashed border-border text-[11px] text-text-muted hover:text-text hover:border-border-light transition-colors"
+                className="w-full mt-1.5 px-2 py-1.5 rounded-lg border border-dashed border-border text-[12px] text-text-muted hover:text-text hover:border-border-light transition-colors"
               >
                 + {t("panelMenu.gitAdd")}
               </button>
             )}
           </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

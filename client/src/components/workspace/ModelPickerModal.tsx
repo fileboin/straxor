@@ -41,6 +41,7 @@ export default function ModelPickerModal({
   const [selectedProviderId, setSelectedProviderId] = useState(providerId);
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [inlineKeyFor, setInlineKeyFor] = useState<string | null>(null);
+  const [pendingModelId, setPendingModelId] = useState<string | null>(null);
   const [providerKeys, setProviderKeys] = useState<Record<string, boolean>>({});
   useLang();
 
@@ -50,6 +51,7 @@ export default function ModelPickerModal({
       setSelectedProviderId(providerId);
       setShowKeyInput(false);
       setInlineKeyFor(null);
+      setPendingModelId(null);
       const loadKeys = async () => {
         const keys: Record<string, boolean> = {};
         for (const p of providers) {
@@ -132,6 +134,7 @@ export default function ModelPickerModal({
                       setSelectedProviderId(p.id);
                       setShowKeyInput(false);
                       setInlineKeyFor(null);
+                      setPendingModelId(null);
                     }}
                     className={`w-full flex items-center justify-between gap-1 px-3 py-2 text-left hover:bg-surface-2 transition-colors cursor-pointer ${
                       selectedProviderId === p.id ? "bg-surface-2" : ""
@@ -175,6 +178,7 @@ export default function ModelPickerModal({
                       onSaved={() => {
                         setProviderKeys((prev) => ({ ...prev, [p.id]: true }));
                         setInlineKeyFor(null);
+                        setPendingModelId(null);
                         onApiKeyChange?.();
                       }}
                       onCancel={() => setInlineKeyFor(null)}
@@ -228,12 +232,19 @@ export default function ModelPickerModal({
                     providerName={selectedProvider.name}
                     autoFocus
                     onSaved={() => {
-                      setShowKeyInput(false);
                       setProviderKeys((prev) => ({
                         ...prev,
                         [selectedProvider.id]: true,
                       }));
+                      setShowKeyInput(false);
+                      setPendingModelId(null);
                       onApiKeyChange?.();
+                      const pm = pendingModelId;
+                      if (pm) {
+                        onProviderChange(selectedProvider.id);
+                        onModelChange(pm);
+                        onClose();
+                      }
                     }}
                   />
                 )}
@@ -248,6 +259,7 @@ export default function ModelPickerModal({
                       key={m.id}
                       onClick={() => {
                         if (!providerKeys[selectedProvider.id]) {
+                          setPendingModelId(m.id);
                           setShowKeyInput(true);
                           return;
                         }
@@ -255,7 +267,14 @@ export default function ModelPickerModal({
                         onModelChange(m.id);
                         onClose();
                       }}
+                      title={
+                        providerKeys[selectedProvider.id]
+                          ? undefined
+                          : t("models.keyNeeded")
+                      }
                       className={`w-full flex items-center justify-between gap-2 px-4 py-2 text-left hover:bg-surface-2 transition-colors ${
+                        providerKeys[selectedProvider.id] ? "" : "opacity-40 cursor-not-allowed"
+                      } ${
                         m.id === modelId && selectedProvider.id === providerId
                           ? "bg-surface-2"
                           : ""
