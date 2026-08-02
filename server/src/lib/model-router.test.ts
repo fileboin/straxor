@@ -38,6 +38,30 @@ describe("classifyComplexity", () => {
   it("prazan string se tretira kao simple (kraci od 50)", () => {
     expect(classifyComplexity("")).toBe("simple");
   });
+
+  it("granica dužine: 49 znakova → simple", () => {
+    const text = "x".repeat(49);
+    expect(classifyComplexity(text)).toBe("simple");
+  });
+
+  it("granica dužine: 50 znakova → moderate (bez markera)", () => {
+    const text = "x".repeat(50);
+    expect(classifyComplexity(text)).toBe("moderate");
+  });
+
+  it("granica dužine: 500 znakova → moderate", () => {
+    const text = "x".repeat(500);
+    expect(classifyComplexity(text)).toBe("moderate");
+  });
+
+  it("granica dužine: 501 znakova → complex", () => {
+    const text = "x".repeat(501);
+    expect(classifyComplexity(text)).toBe("complex");
+  });
+
+  it("jedan kompleksan marker u kratkom tekstu ne čini complex", () => {
+    expect(classifyComplexity("deploy this")).not.toBe("complex");
+  });
 });
 
 describe("pickModel", () => {
