@@ -73,6 +73,11 @@ import { verificationRoutes } from "./verification/api/routes.js";
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Behind a reverse proxy (Render) that sets X-Forwarded-For. Required for
+// express-rate-limit to resolve the real client IP instead of throwing
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on every request.
+app.set("trust proxy", 1);
+
 // ── CORS: same-origin since Express serves both API and client ──
 app.use(cors({
   origin: (origin, cb) => cb(null, origin || true),
