@@ -77,6 +77,10 @@ interface Props {
   onSteerSend?: (message: string) => void;
   steerStatusText?: string;
   runtimeControl?: React.ReactNode;
+  modelOrch?: boolean;
+  onModelOrchChange?: (value: boolean) => void;
+  modelOrchDisabled?: boolean;
+  modelOrchHint?: string;
 }
 
 const ACCEPTED_EXT_RE = /\.(jpe?g|png|webp|gif|avif|mp3|wav|ogg|webm|m4a|pdf|txt|md|csv|json)$/i;
@@ -230,6 +234,10 @@ export default function ChatPanel({
   onSteerSend,
   steerStatusText,
   runtimeControl,
+  modelOrch,
+  onModelOrchChange,
+  modelOrchDisabled,
+  modelOrchHint,
 }: Props) {
   const [input, setInput] = useState("");
   useLang();
@@ -692,6 +700,26 @@ export default function ChatPanel({
         </div>
         <div className="flex items-center gap-1 shrink-0 sm:gap-2">
           {runtimeControl}
+          {onModelOrchChange && (
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => !modelOrchDisabled && onModelOrchChange(!modelOrch)}
+                disabled={modelOrchDisabled}
+                className={`flex items-center gap-1 px-1.5 h-7 rounded-md border text-[10px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                  modelOrch
+                    ? "border-accent/50 bg-accent/10 text-accent"
+                    : "border-border bg-transparent text-text-muted hover:text-text-secondary hover:border-border-light"
+                }`}
+                title={modelOrchHint || (modelOrch ? "Model orkestracija uključena" : "Model orkestracija isključena")}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${modelOrch ? "bg-accent" : "bg-text-muted"}`} />
+                <span className="hidden lg:inline">M-Orch</span>
+                <span className="lg:hidden">M</span>
+              </button>
+              <InfoTip text={modelOrchHint || "Model orkestracija — task se automatski rutira na najbolji model prema težini"} placement="bottom" />
+            </div>
+          )}
           {onToggleExpand && (
             <div className="flex items-center gap-0.5">
               <button

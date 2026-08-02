@@ -15,6 +15,7 @@ import type { ChatMessage, ToolCall } from "../components/workspace/ChatPanel.js
 import type { Attachment } from "../lib/attachments.js";
 import type { ThinkingBudget } from "../lib/models.js";
 import { streamChat, hasApiKey } from "../lib/chat.js";
+import { routeChat } from "../lib/orchestrator.js";
 import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges, sendSteerInstruction } from "../lib/agent.js";
 import { listRepoConnections, type RepoConnection } from "../lib/repos.js";
 import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
@@ -77,7 +78,15 @@ export default function Workspace() {
   const { id: projectIdFromUrl } = useParams<{ id: string }>();
   const { toggleTheme } = useTheme();
   useLang();
-  const [orchestrator, setOrchestrator] = useState(false);
+  const [askModelOrch, setAskModelOrch] = useState(() => localStorage.getItem("straxor.orch.ask") === "1");
+  const [agentModelOrch, setAgentModelOrch] = useState(() => localStorage.getItem("straxor.orch.agent") === "1");
+
+  useEffect(() => {
+    localStorage.setItem("straxor.orch.ask", askModelOrch ? "1" : "0");
+  }, [askModelOrch]);
+  useEffect(() => {
+    localStorage.setItem("straxor.orch.agent", agentModelOrch ? "1" : "0");
+  }, [agentModelOrch]);
 
   const [askProvider, setAskProvider] = useState("anthropic");
   const [askModel, setAskModel] = useState("claude-sonnet-4");
@@ -578,7 +587,7 @@ export default function Workspace() {
     }
   }, [agentMachineId, agentSessionId]);
 
-  const handleAskSend = useCallback((msg: string, attachments?: Attachment[]) => {
+  const handleAskSend = useCallback(async (msg: string, attachments?: Attachment[]) => {
     const userMsg: ChatMessage = {
       id: `a-${Date.now()}`,
       role: "user",
@@ -597,6 +606,26 @@ export default function Workspace() {
     setAskLoading(true);
     setAskPrefill("");
 
+    // Model orkestracija — route to best model for this task's difficulty.
+    let provider = askProvider;
+    let model = askModel;
+    if (askModelOrch) {
+      try {
+        const route = await routeChat(msg, askThinking);
+        if (route.routed && route.providerId && route.modelId) {
+          provider = route.providerId;
+          model = route.modelId;
+        }
+      } catch {}
+    }
+
+    // Reflect the actual routed model in the message label.
+    if (model !== askModel) {
+      setAskMessages((prev) =>
+        prev.map((m) => (m.id === assistantMsg.id ? { ...m, label: model } : m))
+      );
+    }
+
     const roleConfig = getRoleById(askRole);
     const history: { role: "user" | "assistant" | "system"; content: string }[] = [
       {
@@ -610,7 +639,7 @@ export default function Workspace() {
       userMsg,
     ];
 
-    streamChat(askProvider, askModel, history, askThinking, {
+    streamChat(provider, model, history, askThinking, {
       onToken: (token) => {
         setAskMessages((prev) =>
           prev.map((m) =>
@@ -634,7 +663,7 @@ export default function Workspace() {
         setAskLoading(false);
       },
     });
-  }, [askProvider, askModel, askThinking, askRole, askMessages]);
+  }, [askProvider, askModel, askThinking, askRole, askMessages, askModelOrch]);
 
   // Helper: proceed with tool allow after permission/security check
   const proceedToolAllow = useCallback(
@@ -683,6 +712,26 @@ export default function Workspace() {
 
     // No VPS connected — fall back to plain model chat (works exactly like the Ask panel).
     if (!agentMachineId) {
+      // Model orkestracija — route to best model for this task's difficulty.
+      let provider = agentProvider;
+      let model = agentModel;
+      if (agentModelOrch) {
+        try {
+          const route = await routeChat(msg, agentThinking);
+          if (route.routed && route.providerId && route.modelId) {
+            provider = route.providerId;
+            model = route.modelId;
+          }
+        } catch {}
+      }
+
+      // Reflect the actual routed model in the message label.
+      if (model !== agentModel) {
+        setAgentMessages((prev) =>
+          prev.map((m) => (m.id === assistantMsg.id ? { ...m, label: model } : m))
+        );
+      }
+
       const systemParts: string[] = [];
       systemParts.push(`[SISTEMSKA ULOGA: ${roleConfig.label}]\n${roleConfig.systemPrompt}`);
       for (const p of activePrompts) {
@@ -697,7 +746,7 @@ export default function Workspace() {
         userMsg,
       ];
 
-      streamChat(agentProvider, agentModel, history, agentThinking, {
+      streamChat(provider, model, history, agentThinking, {
         onToken: (token) => {
           setAgentMessages((prev) =>
             prev.map((m) =>
@@ -923,7 +972,7 @@ export default function Workspace() {
         setAgentLoading(false);
       },
     });
-  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages]);
+  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch]);
 
   // Confirm a step — send message to agent to continue
   const handleConfirmStep = useCallback(
@@ -1442,8 +1491,6 @@ export default function Workspace() {
         projectName="straxor-landing"
         template="react"
         status="active"
-        orchestrator={orchestrator}
-        onOrchestratorChange={setOrchestrator}
         vpsStatus={vpsStatus}
         onConnectVps={() => setShowSshModal(true)}
         onOpenEnv={() => setShowEnvModal(true)}
@@ -1610,6 +1657,9 @@ export default function Workspace() {
             headerLeft={
               <RoleSelector role={askRole} onChange={setAskRole} />
             }
+            modelOrch={askModelOrch}
+            onModelOrchChange={setAskModelOrch}
+            modelOrchHint="Model orkestracija — task se automatski rutira na najbolji model prema težini"
             isSteerable={isAgentSteerable}
             onSteerSend={handleSteerSend}
             steerStatusText={agentTodos.length > 0 ? t("chat.steer.steps", { n: agentTodos.filter(t => t.status !== "completed").length }) : undefined            }
@@ -1680,6 +1730,9 @@ export default function Workspace() {
                 onOpenRuntimeManager={() => setShowRuntimeManager(true)}
               />
             }
+            modelOrch={agentModelOrch}
+            onModelOrchChange={setAgentModelOrch}
+            modelOrchHint="Model orkestracija — task se automatski rutira na najbolji model prema težini (kad agent radi kao običan chat)"
             headerContent={
               <>
                 <TodoList
