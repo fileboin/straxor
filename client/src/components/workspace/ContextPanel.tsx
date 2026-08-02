@@ -180,7 +180,7 @@ export default function ContextPanel({ projectId, machineId, projectPath, onClos
               </div>
 
               {showNewRule && (
-                <div className="bg-[#0d0d0d] rounded-lg border border-[#222] p-3 space-y-2">
+                <div className="bg-[#141824] rounded-lg border border-[#2d3750] p-3 space-y-2">
                   <input value={newRuleName} onChange={(e) => setNewRuleName(e.target.value)} placeholder="Naziv pravila" className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
                   <textarea value={newRuleContent} onChange={(e) => setNewRuleContent(e.target.value)} placeholder="Sadržaj pravila…" className="w-full h-16 px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none resize-none" />
                   <div className="flex items-center gap-1 flex-wrap">
@@ -202,7 +202,7 @@ export default function ContextPanel({ projectId, machineId, projectPath, onClos
               )}
 
               {rules.map((rule) => (
-                <div key={rule.id} className={`bg-[#0d0d0d] rounded-lg border p-2.5 transition-colors ${rule.isActive ? "border-[#222]" : "border-[#1a1a1a] opacity-50"}`}>
+                <div key={rule.id} className={`bg-[#141824] rounded-lg border p-2.5 transition-colors ${rule.isActive ? "border-[#2d3750]" : "border-[#202838] opacity-50"}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
@@ -233,7 +233,7 @@ export default function ContextPanel({ projectId, machineId, projectPath, onClos
               </div>
 
               {showNewMemory && (
-                <div className="bg-[#0d0d0d] rounded-lg border border-[#222] p-3 space-y-2">
+                <div className="bg-[#141824] rounded-lg border border-[#2d3750] p-3 space-y-2">
                   <input value={newMemKey} onChange={(e) => setNewMemKey(e.target.value)} placeholder="Ključ (npr. 'preferirani_stil')" className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
                   <textarea value={newMemContent} onChange={(e) => setNewMemContent(e.target.value)} placeholder="Sadržaj sjećanja…" className="w-full h-16 px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none resize-none" />
                   <div className="flex items-center gap-2">
@@ -261,7 +261,7 @@ export default function ContextPanel({ projectId, machineId, projectPath, onClos
               )}
 
               {memories.map((mem) => (
-                <div key={mem.id} className="bg-[#0d0d0d] rounded-lg border border-[#222] p-2.5">
+                <div key={mem.id} className="bg-[#141824] rounded-lg border border-[#2d3750] p-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
@@ -301,7 +301,7 @@ export default function ContextPanel({ projectId, machineId, projectPath, onClos
                 <div className="space-y-1.5">
                   <div className="text-[9px] text-text-muted uppercase tracking-wider">{webResults.length} rezultata</div>
                   {webResults.map((r) => (
-                    <div key={r.url} className="bg-[#0d0d0d] rounded-lg border border-[#222] p-2.5 hover:border-accent/30 transition-colors">
+                    <div key={r.url} className="bg-[#141824] rounded-lg border border-[#2d3750] p-2.5 hover:border-accent/30 transition-colors">
                       <div className="text-[11px] font-medium text-text truncate">{r.title}</div>
                       <div className="text-[9px] text-accent/60 truncate mt-0.5">{r.url}</div>
                       <div className="text-[10px] text-text-muted mt-1 line-clamp-2">{r.snippet}</div>
@@ -335,13 +335,13 @@ export default function ContextPanel({ projectId, machineId, projectPath, onClos
               {assembled && (
                 <div className="space-y-2">
                   {/* Summary */}
-                  <div className="flex items-center justify-between bg-[#0d0d0d] rounded-lg px-2.5 py-2 border border-[#222]">
+                  <div className="flex items-center justify-between bg-[#141824] rounded-lg px-2.5 py-2 border border-[#2d3750]">
                     <span className="text-[10px] text-text-muted">Sažetak</span>
                     <span className="text-[10px] text-text-secondary font-mono">{assembled.summary}</span>
                   </div>
 
                   {/* Token bar */}
-                  <div className="bg-[#0d0d0d] rounded-lg px-2.5 py-2 border border-[#222]">
+                  <div className="bg-[#141824] rounded-lg px-2.5 py-2 border border-[#2d3750]">
                     <div className="flex items-center justify-between text-[9px] text-text-muted mb-1">
                       <span>Tokeni</span>
                       <span>{assembled.totalTokens} / 8000</span>
@@ -356,7 +356,7 @@ export default function ContextPanel({ projectId, machineId, projectPath, onClos
 
                   {/* Sources */}
                   {assembled.sources.map((src, i) => (
-                    <div key={i} className="bg-[#0d0d0d] rounded-lg border border-[#222] p-2.5">
+                    <div key={i} className="bg-[#141824] rounded-lg border border-[#2d3750] p-2.5">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10px]">{SOURCE_ICONS[src.type] || "📝"}</span>

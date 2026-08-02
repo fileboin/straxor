@@ -24,6 +24,6 @@
 
 ## Design System
 - **Tema:** OLED true black (`#000000`), light tema toggle
-- **Primarna boja:** Military olive green (`#6b8c42`)
+- **Primarna boja:** Burnt orange (`#ff4d2e`)
 - **Tokeni:** CSS custom properties sa `[data-accent]` i `[data-theme]` selectorima
 - **Layout:** Dual AI panels (Ask + Agent), mobile-first PWA

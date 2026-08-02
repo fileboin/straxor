@@ -9,10 +9,10 @@
 
 /* ── Accent paleta (dostupna za Theme picker) ── */
 :root {
-  --accent-olive: #6b8c42;
-  --accent-olive-hover: #7c9a3e;
-  --accent-olive-dim: rgba(107, 140, 66, 0.12);
-  --accent-olive-border: rgba(107, 140, 66, 0.3);
+  --accent-burnt: #ff4d2e;
+  --accent-burnt-hover: #e63f24;
+  --accent-burnt-dim: rgba(255, 77, 46, 0.12);
+  --accent-burnt-border: rgba(255, 77, 46, 0.3);
 
   --accent-blue: #3b82f6;
   --accent-blue-hover: #2563eb;
@@ -35,46 +35,68 @@
   --accent-red-border: rgba(239, 68, 68, 0.3);
 }
 
-/* ── Dark tema (default — OLED black) ── */
+/* ── Dark tema (default — tamno teget/plavo-crna) ── */
 [data-theme="dark"], :root {
-  --bg: #000000;
-  --surface: #0a0a0a;
-  --surface-2: #111111;
-  --surface-3: #1a1a1a;
-  --border: #222222;
-  --border-light: #2a2a2a;
-  --text: #e8e8e8;
-  --text-secondary: #888888;
-  --text-muted: #555555;
-  --danger: #c0392b;
+  --bg: #0a0e1a;
+  --surface: #141824;
+  --surface-2: #1a2130;
+  --surface-3: #232b3f;
+  --border: #202838;
+  --border-light: #2d3750;
+  --text: #e8ecf4;
+  --text-secondary: #8b93a8;
+  --text-muted: #5b6377;
+  --danger: #e5484d;
+
+  /* Suptilan grid pattern preko cijele pozadine */
+  --bg-grid:
+    linear-gradient(to right, rgba(148, 163, 184, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.045) 1px, transparent 1px);
 
   /* Aktivni accent — token varijabla, ne hardkodovana boja */
-  --accent: var(--accent-olive);
-  --accent-hover: var(--accent-olive-hover);
-  --accent-dim: var(--accent-olive-dim);
-  --accent-border: var(--accent-olive-border);
+  --accent: var(--accent-burnt);
+  --accent-hover: var(--accent-burnt-hover);
+  --accent-dim: var(--accent-burnt-dim);
+  --accent-border: var(--accent-burnt-border);
 }
 
 /* ── Light tema ── */
 [data-theme="light"] {
-  --bg: #f5f5f5;
+  --bg: #f5f6fb;
   --surface: #ffffff;
-  --surface-2: #f0f0f0;
-  --surface-3: #e8e8e8;
-  --border: #d4d4d4;
-  --border-light: #e0e0e0;
-  --text: #111111;
-  --text-secondary: #666666;
-  --text-muted: #999999;
-  --danger: #c0392b;
+  --surface-2: #eef0f7;
+  --surface-3: #e4e7f0;
+  --border: #dfe3ef;
+  --border-light: #cfd5e5;
+  --text: #12141d;
+  --text-secondary: #5a6276;
+  --text-muted: #9aa3b5;
+  --danger: #d8352f;
 
-  --accent: var(--accent-olive);
-  --accent-hover: var(--accent-olive-hover);
-  --accent-dim: var(--accent-olive-dim);
-  --accent-border: var(--accent-olive-border);
+  --bg-grid:
+    linear-gradient(to right, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
+
+  --accent: var(--accent-burnt);
+  --accent-hover: var(--accent-burnt-hover);
+  --accent-dim: var(--accent-burnt-dim);
+  --accent-border: var(--accent-burnt-border);
 }
 
 /* ── Accent tema swap (za Theme picker u Fazi 3) ── */
+[data-accent="burnt"] {
+  --accent: var(--accent-burnt);
+  --accent-hover: var(--accent-burnt-hover);
+  --accent-dim: var(--accent-burnt-dim);
+  --accent-border: var(--accent-burnt-border);
+}
+/* Backward-compat: stari korisnici sa straxor-accent=olive u localStorage */
+[data-accent="olive"] {
+  --accent: var(--accent-burnt);
+  --accent-hover: var(--accent-burnt-hover);
+  --accent-dim: var(--accent-burnt-dim);
+  --accent-border: var(--accent-burnt-border);
+}
 [data-accent="blue"] {
   --accent: var(--accent-blue);
   --accent-hover: var(--accent-blue-hover);
@@ -101,7 +123,9 @@
 }
 
 body {
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: var(--bg-grid);
+  background-size: 34px 34px;
   color: var(--text);
 }
 
@@ -297,7 +321,7 @@ body {
 }
 
 .detail-info { flex: 1; }
-.detail-info h2 { font-size: 24px; font-weight: 700; margin: 0 0 8px; }
+.detail-info h2 { font-size: 24px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.02em; }
 
 .detail-meta {
   display: flex;
@@ -535,8 +559,9 @@ body {
 
 .page-header h1 {
   font-size: 28px;
-  font-weight: 700;
+  font-weight: 800;
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
 .text-secondary {
@@ -565,17 +590,17 @@ body {
 
 .stat-item {
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: 2px;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid var(--border-color, #ddd);
   background: var(--surface-2, #f5f5f5);
   min-width: 100px;
 }
 
-.stat-value { font-size: 24px; font-weight: 700; }
-.stat-label { font-size: 11px; opacity: 0.6; }
+.stat-value { font-size: 30px; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; }
+.stat-label { font-size: 11px; opacity: 0.55; text-transform: uppercase; letter-spacing: 0.05em; }
 .stats-green { color: #22c55e; }
 .stats-red { color: #ef4444; }
 

@@ -7,7 +7,7 @@ import {
 } from "react";
 
 export type Theme = "dark" | "light";
-export type AccentColor = "olive" | "blue" | "yellow" | "orange" | "red";
+export type AccentColor = "burnt" | "blue" | "yellow" | "orange" | "red";
 
 interface ThemeContextType {
   theme: Theme;
@@ -19,7 +19,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | null>(null);
 
 export const ACCENT_COLORS: { id: AccentColor; label: string; color: string }[] = [
-  { id: "olive", label: "Maslinasto-zelena", color: "#6b8c42" },
+  { id: "burnt", label: "Narandžasto-crvena", color: "#FF4D2E" },
   { id: "blue", label: "Plava", color: "#3b82f6" },
   { id: "yellow", label: "Žuta", color: "#eab308" },
   { id: "orange", label: "Narandžasta", color: "#f97316" },
@@ -31,7 +31,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return (localStorage.getItem("straxor-theme") as Theme) || "dark";
   });
   const [accent, setAccentState] = useState<AccentColor>(() => {
-    return (localStorage.getItem("straxor-accent") as AccentColor) || "olive";
+    const stored = localStorage.getItem("straxor-accent");
+    if (stored === "olive") return "burnt";
+    return (stored as AccentColor) || "burnt";
   });
 
   useEffect(() => {

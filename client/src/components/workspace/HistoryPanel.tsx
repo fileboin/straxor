@@ -65,9 +65,9 @@ export default function HistoryPanel({ open, onClose, onJump }: Props) {
   }
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col bg-[#0a0a0a]">
+    <div className="absolute inset-0 z-40 flex flex-col bg-[#0e1422]">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[#1a1a1a] shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[#202838] shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-text-muted text-[11px] font-medium">Povijest promjena</span>
           <span className="text-[9px] text-text-muted/50">
@@ -178,8 +178,8 @@ export default function HistoryPanel({ open, onClose, onJump }: Props) {
                   {/* Expanded diff preview */}
                   {isExpanded && (
                     <div className="px-3 pb-2 ml-4">
-                      <div className="bg-[#0d0d0d] rounded border border-[#222] text-[10px] font-mono overflow-hidden">
-                        <div className="px-2 py-1 border-b border-[#222] text-text-muted">
+                      <div className="bg-[#141824] rounded border border-[#2d3750] text-[10px] font-mono overflow-hidden">
+                        <div className="px-2 py-1 border-b border-[#2d3750] text-text-muted">
                           <span className="text-red-400/60">−</span> {entry.contentBefore.split("\n").length} redaka
                           {" → "}
                           <span className="text-green-400/60">+</span> {entry.contentAfter.split("\n").length} redaka
@@ -194,7 +194,7 @@ export default function HistoryPanel({ open, onClose, onJump }: Props) {
                             <div className="px-2 py-0 text-text-muted/30">…</div>
                           )}
                         </div>
-                        <div className="border-t border-[#222] max-h-32 overflow-y-auto">
+                        <div className="border-t border-[#2d3750] max-h-32 overflow-y-auto">
                           {entry.contentAfter.split("\n").slice(0, 10).map((_line, i) => (
                             <div key={i} className="px-2 py-0 text-green-400/40">
                               + {_line}
@@ -215,7 +215,7 @@ export default function HistoryPanel({ open, onClose, onJump }: Props) {
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-1.5 border-t border-[#1a1a1a] text-[9px] text-text-muted/50 flex items-center gap-3 shrink-0">
+      <div className="px-3 py-1.5 border-t border-[#202838] text-[9px] text-text-muted/50 flex items-center gap-3 shrink-0">
         <span>↶ undo</span>
         <span>↷ redo</span>
         <span>✕ zatvori</span>

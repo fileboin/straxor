@@ -149,7 +149,7 @@ Major entity groups:
 ## Design System
 
 - **Theme**: OLED true black (`#000000`), light theme via `[data-theme="light"]`
-- **Accent**: Military olive green (`#6b8c42`), customizable via `[data-accent]`
+- **Accent**: Burnt orange (`#ff4d2e`), customizable via `[data-accent]`
 - **Tokens**: CSS custom properties for surface, border, accent, danger colors
 - **Breakpoints**: Responsive with mobile tab switcher
 - **PWA**: Manifest + service worker ready

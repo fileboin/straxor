@@ -1516,20 +1516,20 @@ export default function Workspace() {
           onOpenKnowledge={() => navigate(`/project/${projectIdFromUrl || "unknown"}/knowledge`)}
         />
 
-      {/* Mobile tab switcher */}
-      <div className="flex border-b border-border bg-surface shrink-0 md:hidden">
+      {/* Mobile tab switcher — pill segmented control */}
+      <div className="flex items-center gap-1 px-2 py-2 bg-surface-2 rounded-[20px] mx-2 mb-1 shrink-0 md:hidden">
         <button
           onClick={() => {
             setMobileTab("ask");
             setPanelMode("split");
           }}
-          className={`flex-1 py-2.5 text-[13px] font-semibold border-b-2 -mb-px transition-colors flex items-center justify-center gap-1.5 ${
+          className={`flex-1 py-2 text-[13px] font-semibold rounded-full transition-colors flex items-center justify-center gap-1.5 ${
             mobileTab === "ask"
-              ? "text-text border-accent-blue"
-              : "text-text-muted border-transparent"
+              ? "bg-accent text-white"
+              : "text-text-muted hover:text-text hover:bg-surface-3"
           }`}
         >
-          <span className="w-2 h-2 rounded-full bg-accent shrink-0" />
+          <span className={`w-2 h-2 rounded-full ${mobileTab === "ask" ? "bg-white/80" : "bg-accent"} shrink-0`} />
           {t("agent.panel1")}
         </button>
         <button
@@ -1537,13 +1537,13 @@ export default function Workspace() {
             setMobileTab("agent");
             setPanelMode("split");
           }}
-          className={`flex-1 py-2.5 text-[13px] font-semibold border-b-2 -mb-px transition-colors flex items-center justify-center gap-1.5 ${
+          className={`flex-1 py-2 text-[13px] font-semibold rounded-full transition-colors flex items-center justify-center gap-1.5 ${
             mobileTab === "agent"
-              ? "text-text border-accent"
-              : "text-text-muted border-transparent"
+              ? "bg-accent text-white"
+              : "text-text-muted hover:text-text hover:bg-surface-3"
           }`}
         >
-          <span className="w-2 h-2 rounded-full bg-accent shrink-0" />
+          <span className={`w-2 h-2 rounded-full ${mobileTab === "agent" ? "bg-white/80" : "bg-accent"} shrink-0`} />
           {t("agent.panel2")}
         </button>
       </div>

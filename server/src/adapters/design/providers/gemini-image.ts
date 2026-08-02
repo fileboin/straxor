@@ -14,7 +14,7 @@ export class GeminiImageProvider extends BaseImageProvider {
     if (!apiKey) {
       return {
         id: this.makeId(),
-        url: `https://placehold.co/${width}x${height}/1a1a1a/6b8c42?text=Gemini+${encodeURIComponent(req.prompt.slice(0, 30))}`,
+        url: `https://placehold.co/${width}x${height}/0e1422/ff4d2e?text=Gemini+${encodeURIComponent(req.prompt.slice(0, 30))}`,
         provider: "gemini-image",
         prompt: req.prompt,
         width,
@@ -42,7 +42,7 @@ export class GeminiImageProvider extends BaseImageProvider {
     const imageData = data?.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData;
     const url = imageData
       ? `data:${imageData.mimeType};base64,${imageData.data}`
-      : `https://placehold.co/${width}x${height}/1a1a1a/6b8c42?text=Gemini`;
+      : `https://placehold.co/${width}x${height}/0e1422/ff4d2e?text=Gemini`;
 
     return {
       id: this.makeId(),
