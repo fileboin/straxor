@@ -13,7 +13,7 @@ import {
   createIssue,
 } from "../../lib/git-remote";
 import type { GitPlatformId } from "../../lib/git-remote";
-import { listRepoConnections, connectRepo, setActiveRepo, disconnectRepo } from "../../lib/repos";
+import { listRepoConnections, connectRepo, setActiveRepo, disconnectRepo, pushRepo } from "../../lib/repos";
 import type { RepoConnection } from "../../lib/repos";
 
 interface Props {
@@ -124,6 +124,16 @@ export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
     }
   }
 
+  async function handlePush() {
+    setActionMsg("Push u toku...");
+    try {
+      const r = await pushRepo();
+      setActionMsg("Push uspio: " + r.repo + " (" + r.branch + ")");
+    } catch (e: any) {
+      setActionMsg("Push neuspio: " + e.message);
+    }
+  }
+
   async function handleFork(fullName: string) {
     const [o, r] = fullName.split("/");
     try {
@@ -226,13 +236,35 @@ export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
             <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
           ))}
         </select>
-        <input
-          className="input w-full"
-          type="password"
-          placeholder="API Token / Personal Access Token"
-          value={token}
-          onChange={(e: any) => setToken(e.target.value)}
-        />
+        <div>
+          <label className="block text-xs font-semibold text-text mb-1">
+            GitHub Personal Access Token
+          </label>
+          <input
+            className="input w-full"
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="ghp_... / github_pat_..."
+            value={token}
+            onChange={(e: any) => setToken(e.target.value)}
+          />
+          <details className="mt-1.5 text-[11px] text-text-muted">
+            <summary className="cursor-pointer hover:text-text">
+              Kako napraviti fine-grained token?
+            </summary>
+            <div className="mt-1.5 pl-1 space-y-0.5 text-[11px]">
+              <div>1. GitHub → Settings → Developer settings</div>
+              <div>2. Personal access tokens → Fine-grained tokens → Generate new token</div>
+              <div>3. Repository access → samo tvoj repo (npr. fileboin/straxor)</div>
+              <div>4. Permissions → Contents: Read and write</div>
+              <div>5. Kopiraj token i zalijepi ga u polje iznad</div>
+            </div>
+          </details>
+          <div className="text-[10px] text-green-400/80 mt-1.5">
+            Token se šalje na server, enkriptuje (AES-256-GCM) i čuva vezano za tvoj nalog — Straxor ga nikad ne prikazuje ponovo.
+          </div>
+        </div>
         {meta.selfHosted && (
           <input
             className="input w-full"
@@ -241,9 +273,14 @@ export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
             onChange={(e: any) => setBaseUrl(e.target.value)}
           />
         )}
-        <button className="btn btn-primary w-full" onClick={handleSaveConfig}>
-          Sačuvaj i poveži
-        </button>
+        <div className="flex gap-2">
+          <button className="btn btn-primary flex-1" onClick={handleSaveConfig}>
+            Sačuvaj token
+          </button>
+          <button className="btn btn-secondary" onClick={() => setConfigured(true)}>
+            Nazad
+          </button>
+        </div>
       </div>
     );
   }
@@ -255,6 +292,7 @@ export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
           <h2 className="text-lg font-bold flex items-center gap-2">
             <span className={meta.color}>{meta.icon}</span> {meta.name}
           </h2>
+        <div className="flex items-center gap-2">
           <select
             className="input text-sm w-40"
             value={platform}
@@ -264,7 +302,15 @@ export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
               <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
             ))}
           </select>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => setConfigured(false)}
+            title="Unesi ili izmijeni GitHub token"
+          >
+            {"\u{1F511}"} Token
+          </button>
         </div>
+      </div>
 
         {actionMsg && (
           <div className="text-sm text-green-400 bg-green-400/10 px-3 py-1 rounded">{actionMsg}</div>
@@ -326,6 +372,15 @@ export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
                               title="Postavi kao aktivni repo za agenta"
                             >
                               Postavi aktivni
+                            </button>
+                          )}
+                          {isActive && (
+                            <button
+                              className="btn btn-xs px-2 py-0.5 border border-green-500/40 text-green-400 rounded hover:bg-green-500/20"
+                              onClick={(e) => { e.stopPropagation(); handlePush(); }}
+                              title="Push lokalnog sandboxa na GitHub"
+                            >
+                              {"\u2191"} Push
                             </button>
                           )}
                           <button

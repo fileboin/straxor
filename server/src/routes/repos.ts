@@ -9,7 +9,7 @@ import {
   getGitRemoteToken,
 } from "../adapters/git/remote/registry.js";
 import type { GitPlatformId } from "../adapters/git/remote/adapter.js";
-import { ensureWorkspace, getRepoWorkspaceDir, hasGitBinary } from "../runtime/local/workspace.js";
+import { ensureWorkspace, getRepoWorkspaceDir, hasGitBinary, pushWorkspace } from "../runtime/local/workspace.js";
 import { stopLocalEnginesForUser } from "../runtime/local/engine.js";
 
 const router = Router();
@@ -252,6 +252,50 @@ router.get("/workspace", async (req, res) => {
       cloned: ready,
       gitBinary: await hasGitBinary(),
     });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/repos/push — push the active repo's sandbox to the remote.
+// The server decrypts the stored token internally and refreshes the sandbox
+// origin URL before pushing, so the raw token never leaves the server.
+router.post("/push", async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const active = await db
+      .select()
+      .from(repoConnections)
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+      .limit(1);
+
+    if (active.length === 0) {
+      res.status(404).json({ error: "No active repo — connect one first" });
+      return;
+    }
+
+    const conn = active[0];
+    const token = await getGitRemoteToken(userId, conn.platform as GitPlatformId);
+    if (!token) {
+      res.status(401).json({ error: "Platform token missing — save a token first" });
+      return;
+    }
+
+    const info = await ensureWorkspace({
+      userId,
+      platform: conn.platform,
+      owner: conn.owner,
+      name: conn.name,
+      fullName: conn.fullName,
+      cloneUrl: conn.cloneUrl,
+      defaultBranch: conn.defaultBranch,
+      token,
+    });
+
+    const output = await pushWorkspace(userId, conn.owner, conn.name, conn.defaultBranch);
+
+    res.json({ success: true, repo: conn.fullName, branch: conn.defaultBranch, lastCommit: info.lastCommit, output });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({ error: message });

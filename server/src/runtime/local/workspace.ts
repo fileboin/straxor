@@ -126,6 +126,17 @@ async function ensureIsomorphic(cwd: string, repo: WorkspaceRepo): Promise<void>
   await g.setConfig({ fs: fsP, dir: cwd, path: "user.email", value: "agent@straxor.dev" }).catch(() => {});
 }
 
+// Push the local sandbox to the remote origin (requires git binary).
+export async function pushWorkspace(
+  userId: string,
+  owner: string,
+  name: string,
+  branch?: string
+): Promise<string> {
+  const dir = getRepoWorkspaceDir(userId, owner, name);
+  return gitExec(dir, ["push", "origin", branch || "main"]);
+}
+
 export async function ensureWorkspace(repo: WorkspaceRepo): Promise<WorkspaceInfo> {
   const dir = getRepoWorkspaceDir(repo.userId, repo.owner, repo.name);
   await fs.promises.mkdir(dir, { recursive: true });

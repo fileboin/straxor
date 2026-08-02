@@ -59,3 +59,9 @@ export async function disconnectRepo(platform: GitPlatformId, fullName: string) 
     body: JSON.stringify({ platform, fullName }),
   });
 }
+
+export async function pushRepo() {
+  return api<{ success: boolean; repo: string; branch: string; lastCommit: string; output: string }>(`/push`, {
+    method: "POST",
+  });
+}
