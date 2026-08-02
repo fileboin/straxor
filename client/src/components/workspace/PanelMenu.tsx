@@ -53,6 +53,29 @@ export default function PanelMenu({
   const pct = Math.round(zoom * 100);
   const { accent, setAccent, setTheme } = useTheme();
 
+  const place = useCallback(() => {
+    const r = btnRef.current?.getBoundingClientRect();
+    const d = menuRef.current;
+    if (!r || !d) return;
+    const W = 340;
+    const H = d.offsetHeight;
+    let left = Math.min(r.right - W, window.innerWidth - W - 8);
+    left = Math.max(8, left);
+    const below = r.bottom + 4;
+    let top = below;
+    if (below + H > window.innerHeight - 8) {
+      const above = r.top - H - 4;
+      top = above >= 8 ? above : Math.max(8, window.innerHeight - H - 8);
+    }
+    setMenuPos({ top, left });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const raf = requestAnimationFrame(place);
+    return () => cancelAnimationFrame(raf);
+  }, [open, place, tokens, loading]);
+
   const selectAccent = (id: AccentColor) => {
     if (id === "white") setTheme("light");
     else if (id === "black") setTheme("dark");
@@ -170,22 +193,7 @@ export default function PanelMenu({
       <button
         ref={btnRef}
         type="button"
-        onClick={() => {
-          if (!open) {
-            const r = btnRef.current?.getBoundingClientRect();
-            if (r) {
-              const W = 340;
-              const top = Math.min(
-                r.bottom + 4,
-                Math.max(8, window.innerHeight - Math.round(window.innerHeight * 0.8) - 8)
-              );
-              let left = Math.min(r.right - W, window.innerWidth - W - 8);
-              left = Math.max(8, left);
-              setMenuPos({ top, left });
-            }
-          }
-          setOpen((o) => !o);
-        }}
+        onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         className={`flex items-center gap-1.5 h-8 pl-2 pr-2 rounded-lg border text-[12px] font-medium transition-colors sm:pr-2.5 ${
           open
@@ -200,12 +208,11 @@ export default function PanelMenu({
       </button>
 
       {open &&
-        menuPos &&
         createPortal(
           <div
             ref={menuRef}
-            className="z-[100] w-[340px] max-w-[calc(100vw-16px)] max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl shadow-black/50 p-2.5 space-y-3.5"
-            style={{ position: "fixed", top: menuPos.top, left: menuPos.left }}
+            className="z-[100] w-[340px] max-w-[calc(100vw-16px)] max-h-[calc(100vh-16px)] overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl shadow-black/50 p-2.5 space-y-3.5"
+            style={{ position: "fixed", top: menuPos?.top, left: menuPos?.left, visibility: menuPos ? "visible" : "hidden" }}
           >
           <div className="flex items-center justify-between px-1.5">
             <div className="text-[11px] uppercase tracking-wider text-text-muted font-medium">

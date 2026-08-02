@@ -142,7 +142,7 @@ export default function WelcomeHero({
               type="submit"
               disabled={disabled}
               className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white text-sm sm:text-base transition-opacity hover:opacity-85 disabled:opacity-30 shrink-0"
-              style={{ background: "#ff4d2e", boxShadow: "0 4px 16px rgba(255,77,46,0.45)" }}
+              style={{ background: "var(--accent)", boxShadow: "0 4px 16px color-mix(in srgb, var(--accent) 45%, transparent)" }}
               title={t("welcome.send")}
             >
               ↑
