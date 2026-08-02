@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { ROLES, type AgentRole } from "../../lib/roles.js";
+import { useTheme, ACCENT_COLORS, type AccentColor } from "../../lib/theme.js";
 import { t } from "../../lib/i18n.js";
 import {
   listGitTokens,
@@ -50,6 +51,13 @@ export default function PanelMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const pct = Math.round(zoom * 100);
+  const { accent, setAccent, setTheme } = useTheme();
+
+  const selectAccent = (id: AccentColor) => {
+    if (id === "white") setTheme("light");
+    else if (id === "black") setTheme("dark");
+    setAccent(id);
+  };
 
   const selectedKey = `straxor.gitToken.${storageKey}`;
   const [selectedId, setSelectedId] = useState<string>(() => localStorage.getItem(selectedKey) || "");
@@ -276,7 +284,7 @@ export default function PanelMenu({
                 step={5}
                 value={pct}
                 onChange={(e) => onZoomChange(Number(e.target.value) / 100)}
-                className="flex-1 accent-[#ff4d2e]"
+                className="flex-1 accent-[var(--accent)]"
                 aria-label={t("zoom.title")}
               />
               <button
@@ -303,6 +311,55 @@ export default function PanelMenu({
                   {Math.round(p.value * 100)}%
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* Tema (accent picker) */}
+          <div className="px-1.5">
+            <div className="flex items-center justify-between px-0 pb-1.5">
+              <div className="text-[11px] uppercase tracking-wider text-text-muted">
+                {t("panelMenu.theme")}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {ACCENT_COLORS.map((c) => {
+                const active = accent === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    title={c.label}
+                    aria-label={c.label}
+                    onClick={() => selectAccent(c.id)}
+                    className={`relative w-9 h-9 rounded-full transition-all hover:scale-110 shrink-0 ${
+                      active
+                        ? "ring-2 ring-accent ring-offset-2 ring-offset-surface"
+                        : "ring-1 ring-border hover:ring-border-light"
+                    }`}
+                    style={{
+                      backgroundColor: c.color,
+                      boxShadow: active
+                        ? `0 0 10px ${c.color}80`
+                        : "0 1px 3px rgba(0,0,0,0.4)",
+                    }}
+                  >
+                    {active && (
+                      <span
+                        className="absolute inset-0 flex items-center justify-center text-[12px] font-bold"
+                        style={{
+                          color:
+                            c.id === "white" || c.id === "yellow" ? "#111" : "#fff",
+                          textShadow: "0 1px 2px rgba(0,0,0,0.5)",
+                        }}
+                      >
+                        ✓
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

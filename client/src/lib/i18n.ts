@@ -221,6 +221,7 @@ const DICT: Record<string, { en: string; bs: string }> = {
   "zoom.large": { en: "Large", bs: "Veliki" },
   "zoom.xlarge": { en: "Extra large", bs: "Ekstra veliki" },
   "panelMenu.title": { en: "Panel settings", bs: "Podešavanja panela" },
+  "panelMenu.theme": { en: "Theme", bs: "Tema" },
   "panelMenu.role": { en: "Agent role", bs: "Uloga agenta" },
   "panelMenu.model": { en: "Choose model", bs: "Izaberi model" },
   "panelMenu.prompts": { en: "Ideas & templates", bs: "Ideje i šabloni" },
