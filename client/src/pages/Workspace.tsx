@@ -18,6 +18,7 @@ import { streamChat, hasApiKey } from "../lib/chat.js";
 import { routeChat } from "../lib/orchestrator.js";
 import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges, sendSteerInstruction } from "../lib/agent.js";
 import { listRepoConnections, type RepoConnection } from "../lib/repos.js";
+import { fetchProjects } from "../lib/projects.js";
 import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
 import { type AgentRole, getRoleById, fetchPrompts, type SavedPrompt } from "../lib/roles.js";
 import { t, useLang } from "../lib/i18n.js";
@@ -76,6 +77,20 @@ const INITIAL_ASK_MESSAGES: ChatMessage[] = [];
 export default function Workspace() {
   const navigate = useNavigate();
   const { id: projectIdFromUrl } = useParams<{ id: string }>();
+  const projectId = projectIdFromUrl || "";
+  const [projectName, setProjectName] = useState<string>("straxor-landing");
+  const projectPath = `/root/${projectName.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-+|-+$/g, "") || "straxor-landing"}`;
+
+  useEffect(() => {
+    if (!projectId) return;
+    fetchProjects()
+      .then((list) => {
+        const found = list.find((p) => p.id === projectId);
+        if (found) setProjectName(found.name);
+      })
+      .catch(() => {});
+  }, [projectId]);
+
   const { toggleTheme } = useTheme();
   useLang();
   const [askModelOrch, setAskModelOrch] = useState(() => localStorage.getItem("straxor.orch.ask") === "1");
@@ -346,9 +361,9 @@ export default function Workspace() {
 
   // Resume system — load sessions on mount
   useEffect(() => {
-    const PROJECT_ID = "straxor-landing";
+    const PROJECT_ID = projectId || "straxor-landing";
     fetchSessions(PROJECT_ID).then(setDbSessions);
-  }, []);
+  }, [projectId]);
 
   // Resume system — restore latest active session
   const restoreLatestSession = useCallback(async () => {
@@ -785,7 +800,7 @@ export default function Workspace() {
     let activeDbSessionId = dbSessionId;
     if (!activeDbSessionId) {
       try {
-        const PROJECT_ID = "straxor-landing";
+        const PROJECT_ID = projectId || "straxor-landing";
         const sess = await createSession(
           PROJECT_ID,
           agentMachineId,
@@ -1495,7 +1510,7 @@ export default function Workspace() {
   return (
     <div className="h-full flex flex-col relative">
       <WorkspaceTopbar
-        projectName="straxor-landing"
+        projectName={projectName}
         template="react"
         status="active"
         vpsStatus={vpsStatus}
@@ -1919,7 +1934,7 @@ export default function Workspace() {
       {/* Export Panel */}
       {showExportModal && (
         <ExportPanel
-          projectId="straxor-landing"
+          projectId={projectId || "straxor-landing"}
           machineId={agentMachineId || undefined}
           onClose={() => setShowExportModal(false)}
         />
@@ -1946,16 +1961,16 @@ export default function Workspace() {
       {showRollback && agentMachineId && (
         <RollbackPanel
           machineId={agentMachineId}
-          projectPath="/root/straxor-landing"
+          projectPath={projectPath}
           onClose={() => setShowRollback(false)}
         />
       )}
 
       {showContext && (
         <ContextPanel
-          projectId="straxor-landing"
+          projectId={projectId || "straxor-landing"}
           machineId={agentMachineId}
-          projectPath="/root/straxor-landing"
+          projectPath={projectPath}
           onClose={() => setShowContext(false)}
           onAssembled={(ctx) => {
             // Inject assembled context into next agent message

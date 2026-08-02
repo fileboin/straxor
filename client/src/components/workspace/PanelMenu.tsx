@@ -147,11 +147,17 @@ export default function PanelMenu({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors text-[13px]"
+        aria-expanded={open}
+        className={`flex items-center gap-1.5 h-8 pl-2 pr-2 rounded-lg border text-[12px] font-medium transition-colors sm:pr-2.5 ${
+          open
+            ? "border-accent/50 bg-accent/10 text-accent"
+            : "border-border bg-surface-3 text-text-secondary hover:text-text hover:border-border-light"
+        }`}
         title={t("panelMenu.title")}
         aria-label={t("panelMenu.title")}
       >
-        ⚙
+        <span className="text-sm leading-none">⚙</span>
+        <span className="hidden xl:inline">{t("panelMenu.title")}</span>
       </button>
 
       {open && (
