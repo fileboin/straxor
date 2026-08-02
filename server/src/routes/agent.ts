@@ -196,6 +196,29 @@ router.post("/send", async (req: Request, res: Response) => {
                 id: part.callID,
                 content: part.content,
               });
+            } else if (part?.type === "tool") {
+              // Current opencode (>=1.16): tool parts are `type: "tool"` with
+              // state.status pending|running|completed|error, state.input args,
+              // state.output result. Forward state transitions as call/result.
+              const status = part.state?.status;
+              if (status === "pending" || status === "running") {
+                send({
+                  type: "tool_call",
+                  id: part.callID,
+                  name: part.tool,
+                  args: part.state?.input || {},
+                });
+              } else if (status === "completed" || status === "error") {
+                send({
+                  type: "tool_result",
+                  id: part.callID,
+                  result:
+                    part.state?.output ||
+                    part.state?.error ||
+                    (status === "error" ? "Alat nije uspio" : ""),
+                  status: status === "completed" ? "completed" : "error",
+                });
+              }
             }
           }
 

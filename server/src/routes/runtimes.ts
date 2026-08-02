@@ -137,7 +137,7 @@ function ensureInit(userId: string) {
 
 // GET /api/runtimes — list all registered runtimes
 router.get("/", requireAuth, (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const runtimes = mgr.listAll().map((d) => ({
     ...d,
@@ -149,7 +149,7 @@ router.get("/", requireAuth, (req, res) => {
 
 // GET /api/runtimes/active — get active runtime
 router.get("/active", requireAuth, (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const activeId = mgr.getActiveId();
   const def = mgr.getDefinition(activeId);
@@ -159,7 +159,7 @@ router.get("/active", requireAuth, (req, res) => {
 
 // POST /api/runtimes/switch — switch active runtime
 router.post("/switch", requireAuth, (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const { runtimeId } = req.body as { runtimeId: RuntimeId };
   const mgr = getRuntimeManager();
   try {
@@ -173,7 +173,7 @@ router.post("/switch", requireAuth, (req, res) => {
 
 // GET /api/runtimes/:id/health — check health of a specific runtime
 router.get("/:id/health", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const { id } = req.params;
   const { machineId } = req.query;
   const mgr = getRuntimeManager();
@@ -187,7 +187,7 @@ router.get("/:id/health", requireAuth, async (req, res) => {
 
 // POST /api/runtimes/:id/restart — restart a runtime
 router.post("/:id/restart", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const { id } = req.params;
   const { machineId } = req.body;
   const mgr = getRuntimeManager();
@@ -201,7 +201,7 @@ router.post("/:id/restart", requireAuth, async (req, res) => {
 
 // POST /api/runtimes/:id/reconnect — reconnect a runtime
 router.post("/:id/reconnect", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const { id } = req.params;
   const { machineId } = req.body;
   const mgr = getRuntimeManager();
@@ -215,7 +215,7 @@ router.post("/:id/reconnect", requireAuth, async (req, res) => {
 
 // POST /api/runtimes/:id/update — update runtime
 router.post("/:id/update", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const { id } = req.params;
   const { machineId, channel, version } = req.body as {
     machineId: string; channel: RuntimeChannel; version?: string;
@@ -231,7 +231,7 @@ router.post("/:id/update", requireAuth, async (req, res) => {
 
 // POST /api/runtimes/:id/install — install runtime on machine
 router.post("/:id/install", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const { id } = req.params;
   const { machineId } = req.body;
   const mgr = getRuntimeManager();
@@ -248,7 +248,7 @@ router.post("/:id/install", requireAuth, async (req, res) => {
 
 // POST /api/runtimes/sessions — create session
 router.post("/sessions", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const { machineId, title, runtimeId } = req.body;
   try {
@@ -262,7 +262,7 @@ router.post("/sessions", requireAuth, async (req, res) => {
 
 // GET /api/runtimes/sessions — list sessions
 router.get("/sessions", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const { machineId, runtimeId } = req.query;
   try {
@@ -276,7 +276,7 @@ router.get("/sessions", requireAuth, async (req, res) => {
 
 // POST /api/runtimes/sessions/:id/send — send message
 router.post("/sessions/:id/send", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const { id } = req.params;
   const { machineId, text, mode, systemPrompt, runtimeId } = req.body;
@@ -291,7 +291,7 @@ router.post("/sessions/:id/send", requireAuth, async (req, res) => {
 
 // GET /api/runtimes/sessions/:id/todos
 router.get("/sessions/:id/todos", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const { id } = req.params;
   const { machineId, runtimeId } = req.query;
@@ -306,7 +306,7 @@ router.get("/sessions/:id/todos", requireAuth, async (req, res) => {
 
 // GET /api/runtimes/sessions/:id/diff
 router.get("/sessions/:id/diff", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const { id } = req.params;
   const { machineId, runtimeId } = req.query;
@@ -321,7 +321,7 @@ router.get("/sessions/:id/diff", requireAuth, async (req, res) => {
 
 // POST /api/runtimes/sessions/:id/abort
 router.post("/sessions/:id/abort", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const { id } = req.params;
   const { machineId, runtimeId } = req.body;
@@ -338,7 +338,7 @@ router.post("/sessions/:id/abort", requireAuth, async (req, res) => {
 
 // POST /api/runtimes/providers — set provider for runtime
 router.post("/providers", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const { machineId, runtimeId, ...config } = req.body as {
     machineId: string; runtimeId: RuntimeId;
@@ -356,7 +356,7 @@ router.post("/providers", requireAuth, async (req, res) => {
 
 // GET /api/runtimes/providers — get active provider
 router.get("/providers", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const { machineId, runtimeId } = req.query;
   try {
@@ -374,7 +374,7 @@ router.get("/providers", requireAuth, async (req, res) => {
 
 // GET /api/runtimes/mcp — list MCP servers
 router.get("/mcp", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const { machineId, runtimeId } = req.query;
   try {
@@ -390,7 +390,7 @@ router.get("/mcp", requireAuth, async (req, res) => {
 
 // POST /api/runtimes/mcp — add MCP server
 router.post("/mcp", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const { machineId, runtimeId, ...config } = req.body as {
     machineId: string; runtimeId: RuntimeId;
@@ -408,7 +408,7 @@ router.post("/mcp", requireAuth, async (req, res) => {
 
 // DELETE /api/runtimes/mcp/:serverId
 router.delete("/mcp/:serverId", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const { serverId } = req.params;
   const { machineId, runtimeId } = req.query;
@@ -427,7 +427,7 @@ router.delete("/mcp/:serverId", requireAuth, async (req, res) => {
 
 // POST /api/runtimes/exec — execute shell command
 router.post("/exec", requireAuth, async (req, res) => {
-  ensureInit((req as any).userId);
+  ensureInit((req as any).user?.userId);
   const mgr = getRuntimeManager();
   const { machineId, command, runtimeId } = req.body;
   try {
