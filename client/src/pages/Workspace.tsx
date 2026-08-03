@@ -242,6 +242,93 @@ export default function Workspace() {
   // ── Global app-state persistence (FAZA 2) ──
   const [stateReady, setStateReady] = useState(false);
 
+  // Panel mode: split | ask-full | agent-full
+  const [panelMode, setPanelMode] = useState<"split" | "ask-full" | "agent-full">(() => {
+    try {
+      const saved = localStorage.getItem("straxor.panelMode");
+      if (saved === "ask-full" || saved === "agent-full") return saved;
+    } catch {}
+    return "split";
+  });
+
+  // Panel layout: side-by-side | stacked (persisted)
+  const [panelsLayout, setPanelsLayout] = useState<"side" | "stack">(() => {
+    try {
+      const saved = localStorage.getItem("straxor.panelsLayout");
+      return saved === "stack" ? "stack" : "side";
+    } catch {
+      return "side";
+    }
+  });
+
+  // Ask panel width (side-by-side layout, resizable divider) — persisted
+  const [panelWidthPct, setPanelWidthPct] = useState<number>(() => {
+    try {
+      const saved = parseInt(localStorage.getItem("straxor.panelWidth") || "", 10);
+      return Number.isFinite(saved) ? Math.max(25, Math.min(75, saved)) : 50;
+    } catch {
+      return 50;
+    }
+  });
+  const panelsRef = useRef<HTMLDivElement>(null);
+
+  // Per-panel zoom (independent Ask/Agent) — persisted
+  const readZoom = (key: string) => {
+    try {
+      const saved = parseFloat(localStorage.getItem(key) || "");
+      return Number.isFinite(saved) ? Math.max(0.7, Math.min(1.5, saved)) : 1;
+    } catch {
+      return 1;
+    }
+  };
+  const [askZoom, setAskZoom] = useState<number>(() => readZoom("straxor.zoom.ask"));
+  const [agentZoom, setAgentZoom] = useState<number>(() => readZoom("straxor.zoom.agent"));
+
+  const clampZoomPct = (z: number) => Math.max(0.7, Math.min(1.5, Math.round(z * 20) / 20));
+  const handleAskZoomChange = (z: number) => setAskZoom(clampZoomPct(z));
+  const handleAgentZoomChange = (z: number) => setAgentZoom(clampZoomPct(z));
+
+  // Per-panel vertical zoom (top-down compression, independent of zoom)
+  const readVerticalZoom = (key: string) => {
+    try {
+      const saved = parseFloat(localStorage.getItem(key) || "");
+      return Number.isFinite(saved) ? Math.max(0.5, Math.min(1.5, saved)) : 1;
+    } catch {
+      return 1;
+    }
+  };
+  const [askVerticalZoom, setAskVerticalZoom] = useState<number>(() => readVerticalZoom("straxor.vzoom.ask"));
+  const [agentVerticalZoom, setAgentVerticalZoom] = useState<number>(() => readVerticalZoom("straxor.vzoom.agent"));
+
+  const clampVerticalPct = (z: number) => Math.max(0.5, Math.min(1.5, Math.round(z * 20) / 20));
+  const handleAskVerticalZoomChange = (z: number) => setAskVerticalZoom(clampVerticalPct(z));
+  const handleAgentVerticalZoomChange = (z: number) => setAgentVerticalZoom(clampVerticalPct(z));
+
+  // Per-panel accent color (overrides global accent for that panel)
+  const readPanelAccent = (key: string): string => {
+    try { return localStorage.getItem(key) || ""; } catch { return ""; }
+  };
+  const [askPanelAccent, setAskPanelAccent] = useState<string>(() => readPanelAccent("straxor.panelAccent.ask"));
+  const [agentPanelAccent, setAgentPanelAccent] = useState<string>(() => readPanelAccent("straxor.panelAccent.agent"));
+  const handleAskPanelAccentChange = (a: string) => { localStorage.setItem("straxor.panelAccent.ask", a); setAskPanelAccent(a); };
+  const handleAgentPanelAccentChange = (a: string) => { localStorage.setItem("straxor.panelAccent.agent", a); setAgentPanelAccent(a); };
+
+  // Per-panel height (independent Ask/Agent, % of panels row) — persisted
+  const readPanelHeight = (key: string) => {
+    try {
+      const saved = parseInt(localStorage.getItem(key) || "", 10);
+      return Number.isFinite(saved) ? Math.max(30, Math.min(100, saved)) : 100;
+    } catch {
+      return 100;
+    }
+  };
+  const [askPanelHeightPct, setAskPanelHeightPct] = useState<number>(() =>
+    readPanelHeight("straxor.panelHeight.ask")
+  );
+  const [agentPanelHeightPct, setAgentPanelHeightPct] = useState<number>(() =>
+    readPanelHeight("straxor.panelHeight.agent")
+  );
+
   // Load persisted state from the DB once on mount, then hydrate UI.
   useEffect(() => {
     let mounted = true;
@@ -362,93 +449,6 @@ export default function Workspace() {
   // Panel-to-panel copy
   const [askPrefill, setAskPrefill] = useState("");
   const [agentPrefill, setAgentPrefill] = useState("");
-
-  // Panel mode: split | ask-full | agent-full
-  const [panelMode, setPanelMode] = useState<"split" | "ask-full" | "agent-full">(() => {
-    try {
-      const saved = localStorage.getItem("straxor.panelMode");
-      if (saved === "ask-full" || saved === "agent-full") return saved;
-    } catch {}
-    return "split";
-  });
-
-  // Panel layout: side-by-side | stacked (persisted)
-  const [panelsLayout, setPanelsLayout] = useState<"side" | "stack">(() => {
-    try {
-      const saved = localStorage.getItem("straxor.panelsLayout");
-      return saved === "stack" ? "stack" : "side";
-    } catch {
-      return "side";
-    }
-  });
-
-  // Ask panel width (side-by-side layout, resizable divider) — persisted
-  const [panelWidthPct, setPanelWidthPct] = useState<number>(() => {
-    try {
-      const saved = parseInt(localStorage.getItem("straxor.panelWidth") || "", 10);
-      return Number.isFinite(saved) ? Math.max(25, Math.min(75, saved)) : 50;
-    } catch {
-      return 50;
-    }
-  });
-  const panelsRef = useRef<HTMLDivElement>(null);
-
-  // Per-panel zoom (independent Ask/Agent) — persisted
-  const readZoom = (key: string) => {
-    try {
-      const saved = parseFloat(localStorage.getItem(key) || "");
-      return Number.isFinite(saved) ? Math.max(0.7, Math.min(1.5, saved)) : 1;
-    } catch {
-      return 1;
-    }
-  };
-  const [askZoom, setAskZoom] = useState<number>(() => readZoom("straxor.zoom.ask"));
-  const [agentZoom, setAgentZoom] = useState<number>(() => readZoom("straxor.zoom.agent"));
-
-  const clampZoomPct = (z: number) => Math.max(0.7, Math.min(1.5, Math.round(z * 20) / 20));
-  const handleAskZoomChange = (z: number) => setAskZoom(clampZoomPct(z));
-  const handleAgentZoomChange = (z: number) => setAgentZoom(clampZoomPct(z));
-
-  // Per-panel vertical zoom (top-down compression, independent of zoom)
-  const readVerticalZoom = (key: string) => {
-    try {
-      const saved = parseFloat(localStorage.getItem(key) || "");
-      return Number.isFinite(saved) ? Math.max(0.5, Math.min(1.5, saved)) : 1;
-    } catch {
-      return 1;
-    }
-  };
-  const [askVerticalZoom, setAskVerticalZoom] = useState<number>(() => readVerticalZoom("straxor.vzoom.ask"));
-  const [agentVerticalZoom, setAgentVerticalZoom] = useState<number>(() => readVerticalZoom("straxor.vzoom.agent"));
-
-  const clampVerticalPct = (z: number) => Math.max(0.5, Math.min(1.5, Math.round(z * 20) / 20));
-  const handleAskVerticalZoomChange = (z: number) => setAskVerticalZoom(clampVerticalPct(z));
-  const handleAgentVerticalZoomChange = (z: number) => setAgentVerticalZoom(clampVerticalPct(z));
-
-  // Per-panel accent color (overrides global accent for that panel)
-  const readPanelAccent = (key: string): string => {
-    try { return localStorage.getItem(key) || ""; } catch { return ""; }
-  };
-  const [askPanelAccent, setAskPanelAccent] = useState<string>(() => readPanelAccent("straxor.panelAccent.ask"));
-  const [agentPanelAccent, setAgentPanelAccent] = useState<string>(() => readPanelAccent("straxor.panelAccent.agent"));
-  const handleAskPanelAccentChange = (a: string) => { localStorage.setItem("straxor.panelAccent.ask", a); setAskPanelAccent(a); };
-  const handleAgentPanelAccentChange = (a: string) => { localStorage.setItem("straxor.panelAccent.agent", a); setAgentPanelAccent(a); };
-
-  // Per-panel height (independent Ask/Agent, % of panels row) — persisted
-  const readPanelHeight = (key: string) => {
-    try {
-      const saved = parseInt(localStorage.getItem(key) || "", 10);
-      return Number.isFinite(saved) ? Math.max(30, Math.min(100, saved)) : 100;
-    } catch {
-      return 100;
-    }
-  };
-  const [askPanelHeightPct, setAskPanelHeightPct] = useState<number>(() =>
-    readPanelHeight("straxor.panelHeight.ask")
-  );
-  const [agentPanelHeightPct, setAgentPanelHeightPct] = useState<number>(() =>
-    readPanelHeight("straxor.panelHeight.agent")
-  );
 
   const clampPanelHeight = (v: number) => Math.max(30, Math.min(100, v));
   const startPanelHeightResize = (e: React.MouseEvent, which: "ask" | "agent") => {
