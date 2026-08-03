@@ -684,9 +684,11 @@ export default function Workspace() {
     setAskPrefill("");
 
     // Model orkestracija — route to best model for this task's difficulty.
+    // Skipped when images are attached (router is text-only and may pick a
+    // non-vision model); image messages use the user's selected model.
     let provider = askProvider;
     let model = askModel;
-    if (askModelOrch) {
+    if (askModelOrch && (!attachments || attachments.length === 0)) {
       try {
         const route = await routeChat(msg, askThinking);
         if (route.routed && route.providerId && route.modelId) {
@@ -739,7 +741,7 @@ export default function Workspace() {
         setAskStreamingId(null);
         setAskLoading(false);
       },
-    });
+    }, attachments);
   }, [askProvider, askModel, askThinking, askRole, askMessages, askModelOrch]);
 
   // Helper: proceed with tool allow after permission/security check
@@ -790,9 +792,10 @@ export default function Workspace() {
     // No VPS connected — fall back to plain model chat (works exactly like the Ask panel).
     if (!agentMachineId) {
       // Model orkestracija — route to best model for this task's difficulty.
+      // Skipped when images are attached (router may pick a non-vision model).
       let provider = agentProvider;
       let model = agentModel;
-      if (agentModelOrch) {
+      if (agentModelOrch && (!attachments || attachments.length === 0)) {
         try {
           const route = await routeChat(msg, agentThinking);
           if (route.routed && route.providerId && route.modelId) {
@@ -846,7 +849,7 @@ export default function Workspace() {
           setAgentStreamingId(null);
           setAgentLoading(false);
         },
-      });
+      }, attachments);
       return;
     }
 
@@ -1048,7 +1051,7 @@ export default function Workspace() {
         setAgentStreamingId(null);
         setAgentLoading(false);
       },
-    });
+    }, attachments);
   }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch]);
 
   // Confirm a step — send message to agent to continue

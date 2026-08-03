@@ -1,11 +1,15 @@
+import type { ContentBlock } from "../../lib/attachments.js";
+
 export interface AIStreamEvent {
   type: "token" | "error";
   content: string;
 }
 
+export type ChatContent = string | ContentBlock[];
+
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
-  content: string;
+  content: ChatContent;
 }
 
 export interface AIProviderAdapter {

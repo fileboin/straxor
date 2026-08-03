@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import type { Attachment } from "./attachments.js";
 
 export interface ToolCall {
   id: string;
@@ -27,7 +28,8 @@ export async function streamAgentMessage(
   machineId: string,
   message: string,
   sessionId: string | null,
-  callbacks: AgentStreamCallbacks
+  callbacks: AgentStreamCallbacks,
+  attachments?: Attachment[]
 ): Promise<void> {
   try {
     const token = localStorage.getItem("token");
@@ -41,6 +43,7 @@ export async function streamAgentMessage(
         machineId,
         message,
         sessionId: sessionId || undefined,
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
       }),
     });
 

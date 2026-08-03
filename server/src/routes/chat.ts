@@ -6,6 +6,12 @@ import { db } from "../db/index.js";
 import { userApiKeys } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import { classifyComplexity, pickModel } from "../lib/model-router.js";
+import {
+  resolveAttachments,
+  countImageBlocks,
+  type AttachmentRef,
+  type ContentBlock,
+} from "../lib/attachments.js";
 
 const router = Router();
 
@@ -51,12 +57,13 @@ router.post("/route", requireAuth, async (req: Request, res: Response) => {
 
 // POST /api/chat — streaming SSE proxy via AIProviderAdapter
 router.post("/", async (req: Request, res: Response) => {
-  const { providerId, modelId, messages, apiKey, thinking } = req.body as {
+  const { providerId, modelId, messages, apiKey, thinking, attachments } = req.body as {
     providerId: string;
     modelId: string;
     messages: { role: "user" | "assistant" | "system"; content: string }[];
     apiKey: string;
     thinking?: string;
+    attachments?: AttachmentRef[];
   };
 
   // Providers that work without an API key (e.g. local Ollama).
@@ -74,8 +81,19 @@ router.post("/", async (req: Request, res: Response) => {
   res.setHeader("X-Accel-Buffering", "no");
 
   try {
+    // Resolve attached files (images → base64 content blocks, other → text note).
+    const { contentBlocks } = await resolveAttachments(attachments);
+
+    let finalMessages: { role: "user" | "assistant" | "system"; content: string | ContentBlock[] }[] = messages;
+    if (contentBlocks.length > 0) {
+      finalMessages = appendBlocksToLastUser(messages, contentBlocks);
+      console.log(
+        `[chat:debug] provider=${providerId} model=${modelId} attachments=${attachments?.length ?? 0} imageBlocks=${countImageBlocks(contentBlocks)}`
+      );
+    }
+
     const adapter = getAdapters().aiProvider;
-    const stream = adapter.streamChat({ providerId, modelId, messages, apiKey, thinking });
+    const stream = adapter.streamChat({ providerId, modelId, messages: finalMessages, apiKey, thinking });
 
     for await (const event of stream) {
       if (event.type === "token") {
@@ -95,5 +113,26 @@ router.post("/", async (req: Request, res: Response) => {
     res.end();
   }
 });
+
+// Attach image/text blocks to the last user message so the model receives them
+// as part of the same message as the user's text.
+function appendBlocksToLastUser(
+  messages: { role: "user" | "assistant" | "system"; content: string }[],
+  blocks: ContentBlock[]
+): { role: "user" | "assistant" | "system"; content: string | ContentBlock[] }[] {
+  const out: { role: "user" | "assistant" | "system"; content: string | ContentBlock[] }[] = messages.map((m) => ({ ...m }));
+  for (let i = out.length - 1; i >= 0; i--) {
+    const cur = out[i];
+    if (cur.role === "user") {
+      const text = typeof cur.content === "string" ? cur.content : "";
+      const parts: ContentBlock[] = [];
+      if (text) parts.push({ type: "text", text });
+      parts.push(...blocks);
+      out[i] = { ...cur, content: parts };
+      break;
+    }
+  }
+  return out;
+}
 
 export default router;

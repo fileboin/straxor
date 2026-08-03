@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { getAdapters } from "../adapters/registry.js";
 import { requireAuth } from "../middleware/auth.js";
+import { resolveAttachments, type AttachmentRef } from "../lib/attachments.js";
 
 const CONNECTION_TIMEOUT_MS = 30 * 60 * 1000; // 30 min hard timeout
 const router = Router();
@@ -11,12 +12,13 @@ router.use(requireAuth);
 // POST /api/agent/send — send message to OpenCode via adapter
 router.post("/send", async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  const { machineId, sessionId, text, message, mode } = req.body as {
+  const { machineId, sessionId, text, message, mode, attachments } = req.body as {
     machineId: string;
     sessionId?: string;
     text?: string;
     message?: string;
     mode?: "sync" | "async";
+    attachments?: AttachmentRef[];
   };
 
   // Support both `text` and `message` field names
@@ -25,6 +27,16 @@ router.post("/send", async (req: Request, res: Response) => {
   if (!machineId || !msgText) {
     res.status(400).json({ error: "Missing required fields: machineId, text/message" });
     return;
+  }
+
+  // Resolve attached files (images → base64 file parts, other → text note).
+  const { engineAttachments, notes } = await resolveAttachments(attachments);
+  const fullText =
+    notes.length > 0 ? [msgText, ...notes].filter(Boolean).join("\n\n") : msgText;
+  if (engineAttachments.length > 0) {
+    console.log(
+      `[agent:debug] machineId=${machineId} attachments=${attachments?.length ?? 0} imageParts=${engineAttachments.length}`
+    );
   }
 
   // Auto-create session if none provided
@@ -54,10 +66,10 @@ router.post("/send", async (req: Request, res: Response) => {
     const effectiveMode = mode || "async";
     let result;
     try {
-      result = await adapter.sendMessage(machineId, activeSessionId, msgText, effectiveMode);
+      result = await adapter.sendMessage(machineId, activeSessionId, fullText, effectiveMode, engineAttachments);
     } catch {
       // prompt_async may not be supported, fall back to sync
-      result = await adapter.sendMessage(machineId, activeSessionId, msgText, "sync");
+      result = await adapter.sendMessage(machineId, activeSessionId, fullText, "sync", engineAttachments);
     }
 
     // If we got parts back from sync, forward them as events

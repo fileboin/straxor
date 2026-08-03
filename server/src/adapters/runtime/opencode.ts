@@ -26,7 +26,7 @@ import {
   stopLocalEngine,
 } from "../../runtime/local/engine.js";
 import { getRepoWorkspaceDir } from "../../runtime/local/workspace.js";
-import type { RuntimeAdapter, TodoItem, FileDiff, RuntimeHealth, RuntimeChannel } from "./adapter.js";
+import type { RuntimeAdapter, TodoItem, FileDiff, RuntimeHealth, RuntimeChannel, EngineAttachment } from "./adapter.js";
 
 const execFileP = promisify(execFile);
 
@@ -206,6 +206,23 @@ function localEventStream(port: number): Readable {
   return stream;
 }
 
+// Build the opencode message parts array: a text part plus optional file parts.
+// opencode (>=1.18.11) represents attached images as `type: "file"` parts whose
+// `url` is an inline data URL (`data:<mime>;base64,<data>`).
+function buildMessageParts(text: string, attachments?: EngineAttachment[]): Record<string, unknown>[] {
+  const parts: Record<string, unknown>[] = [{ type: "text", text }];
+  for (const a of attachments || []) {
+    if (!a?.data) continue;
+    parts.push({
+      type: "file",
+      mime: a.mime || "image/jpeg",
+      filename: a.filename || "attachment",
+      url: `data:${a.mime || "image/jpeg"};base64,${a.data}`,
+    });
+  }
+  return parts;
+}
+
 export function createOpenCodeAdapter(): RuntimeAdapter {
   return {
     async createSession(machineId, title) {
@@ -214,7 +231,7 @@ export function createOpenCodeAdapter(): RuntimeAdapter {
       throw new Error("createSession requires userId — use bound adapter");
     },
 
-    async sendMessage(machineId, sessionId, text, mode) {
+    async sendMessage(machineId, sessionId, text, mode, attachments) {
       throw new Error("sendMessage requires userId — use bound adapter");
     },
 
@@ -307,14 +324,22 @@ export function createBoundAdapter(userId: string) {
       });
     },
 
-    async sendMessage(machineId: string, sessionId: string, text: string, mode: "sync" | "async" = "async") {
+    async sendMessage(
+      machineId: string,
+      sessionId: string,
+      text: string,
+      mode: "sync" | "async" = "async",
+      attachments?: EngineAttachment[]
+    ) {
       return withTransport(machineId, userId, async (port, ssh) => {
         const endpoint = mode === "async"
           ? `/session/${sessionId}/prompt_async`
           : `/session/${sessionId}/message`;
-        const res = await httpCall(port, ssh, "POST", endpoint, {
-          parts: [{ type: "text", text }],
-        });
+        const parts = buildMessageParts(text, attachments);
+        if (attachments?.length) {
+          console.log(`[agent:debug] machineId=${machineId} sessionId=${sessionId} parts=${parts.length} attachments=${attachments.length}`);
+        }
+        const res = await httpCall(port, ssh, "POST", endpoint, { parts });
         if (res.status !== 200 && res.status !== 204) {
           throw new Error(`Failed to send message: ${res.data}`);
         }

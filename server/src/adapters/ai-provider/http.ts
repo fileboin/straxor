@@ -1,4 +1,62 @@
-import type { AIProviderAdapter, AIStreamEvent, ChatMessage } from "./adapter.js";
+import type {
+  AIProviderAdapter,
+  AIStreamEvent,
+  ChatContent,
+  ChatMessage,
+} from "./adapter.js";
+import type { ContentBlock, TextContentBlock } from "../../lib/attachments.js";
+
+function toAnthropicContent(content: ChatContent): unknown {
+  if (typeof content === "string") return content;
+  return content.map((b) =>
+    b.type === "text"
+      ? { type: "text", text: b.text }
+      : {
+          type: "image",
+          source: { type: "base64", media_type: b.image.mediaType, data: b.image.data },
+        }
+  );
+}
+
+function toOpenAIContent(content: ChatContent): unknown {
+  if (typeof content === "string") return content;
+  return content.map((b) =>
+    b.type === "text"
+      ? { type: "text", text: b.text }
+      : {
+          type: "image_url",
+          image_url: { url: `data:${b.image.mediaType};base64,${b.image.data}` },
+        }
+  );
+}
+
+function toGoogleParts(content: ChatContent): Array<Record<string, unknown>> {
+  if (typeof content === "string") return [{ text: content }];
+  return content.flatMap<Record<string, unknown>>((b) =>
+    b.type === "text"
+      ? [{ text: b.text }]
+      : [{ inlineData: { mimeType: b.image.mediaType, data: b.image.data } }]
+  );
+}
+
+function toTextOnlyContent(content: ChatContent): string {
+  if (typeof content === "string") return content;
+  const text = content
+    .filter((b) => b.type === "text")
+    .map((b) => (b as TextContentBlock).text)
+    .join("\n\n");
+  return text || "[sadrži sliku — model bez vizije]";
+}
+
+function countImageBlocks(messages: ChatMessage[]): number {
+  let n = 0;
+  for (const m of messages) {
+    if (Array.isArray(m.content)) {
+      n += m.content.filter((b): b is Extract<ContentBlock, { type: "image" }> => b.type === "image").length;
+    }
+  }
+  return n;
+}
 
 interface ProviderConfig {
   baseUrl: string | ((model: string) => string);
@@ -24,7 +82,7 @@ const PROVIDER_CONFIG: Record<string, ProviderConfig> = {
           budget_tokens: thinking === "high" ? 10000 : thinking === "medium" ? 4000 : 1000,
         },
       }),
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: messages.map((m) => ({ role: m.role, content: toAnthropicContent(m.content) })),
     }),
     extractStreamLine: (line) => {
       try {
@@ -43,7 +101,7 @@ const PROVIDER_CONFIG: Record<string, ProviderConfig> = {
     buildBody: (model, messages) => ({
       model,
       stream: true,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: messages.map((m) => ({ role: m.role, content: toOpenAIContent(m.content) })),
     }),
     extractStreamLine: (line) => {
       try {
@@ -65,7 +123,7 @@ const PROVIDER_CONFIG: Record<string, ProviderConfig> = {
     buildBody: (_model, messages) => ({
       contents: messages.map((m) => ({
         role: m.role === "assistant" ? "model" : m.role,
-        parts: [{ text: m.content }],
+        parts: toGoogleParts(m.content),
       })),
     }),
     extractStreamLine: (line) => {
@@ -87,7 +145,7 @@ const PROVIDER_CONFIG: Record<string, ProviderConfig> = {
     buildBody: (model, messages) => ({
       model,
       stream: true,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: messages.map((m) => ({ role: m.role, content: toTextOnlyContent(m.content) })),
     }),
     extractStreamLine: (line) => {
       try {
@@ -143,8 +201,13 @@ export function createHttpAIProviderAdapter(): AIProviderAdapter {
         : {
             model: modelId,
             stream: true,
-            messages: messages.map((m) => ({ role: m.role, content: m.content })),
+            messages: messages.map((m) => ({ role: m.role, content: toOpenAIContent(m.content) })),
           };
+
+      const imageCount = countImageBlocks(messages);
+      console.log(
+        `[ai-provider] provider=${providerId} model=${modelId} messages=${messages.length} imageBlocks=${imageCount}`
+      );
 
       const response = await fetch(baseUrl, {
         method: "POST",
