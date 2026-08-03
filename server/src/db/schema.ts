@@ -107,6 +107,7 @@ export const gitConnections = pgTable("git_connections", {
   name: varchar("name", { length: 120 }).notNull().default("GitHub"),
   username: varchar("username", { length: 120 }),
   isDefault: boolean("is_default").notNull().default(false),
+  connectionType: varchar("connection_type", { length: 20 }).notNull().default("token"),
   encryptedToken: text("encrypted_token").notNull(),
   baseUrl: text("base_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -129,6 +130,7 @@ export const repoConnections = pgTable("repo_connections", {
   cloneUrl: text("clone_url").notNull(),
   defaultBranch: varchar("default_branch", { length: 255 }).notNull().default("main"),
   isActive: boolean("is_active").notNull().default(false),
+  connectionType: varchar("connection_type", { length: 20 }).notNull().default("token"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

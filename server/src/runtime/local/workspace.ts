@@ -20,7 +20,7 @@ export interface WorkspaceRepo {
   fullName: string;
   cloneUrl: string;
   defaultBranch: string;
-  token: string;
+  token?: string;
 }
 
 export interface WorkspaceInfo {
@@ -56,7 +56,7 @@ export async function hasGitBinary(): Promise<boolean> {
   return gitBinaryCheck;
 }
 
-function tokenizedCloneUrl(cloneUrl: string, token: string): string {
+function tokenizedCloneUrl(cloneUrl: string, token?: string): string {
   if (!token) return cloneUrl;
   try {
     const url = new URL(cloneUrl);

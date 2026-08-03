@@ -75,6 +75,7 @@ router.post("/connect", async (req, res) => {
         .set({
           cloneUrl: repo.cloneUrl,
           defaultBranch: repo.defaultBranch || "main",
+          connectionType: "token",
           updatedAt: new Date(),
         })
         .where(and(eq(repoConnections.userId, userId), eq(repoConnections.platform, platform), eq(repoConnections.fullName, fullName)));
@@ -91,6 +92,7 @@ router.post("/connect", async (req, res) => {
           cloneUrl: repo.cloneUrl,
           defaultBranch: repo.defaultBranch || "main",
           isActive: true,
+          connectionType: "token",
         })
         .returning();
       connectionId = inserted[0].id;
@@ -199,8 +201,10 @@ router.post("/prepare", async (req, res) => {
     }
 
     const conn = active[0];
-    const token = await getGitRemoteToken(userId, conn.platform as GitPlatformId);
-    if (!token) {
+    // URL (read-only) connections clone via the plain public URL — no token.
+    const isUrlReadOnly = conn.connectionType === "url";
+    const token = isUrlReadOnly ? undefined : await getGitRemoteToken(userId, conn.platform as GitPlatformId);
+    if (!token && !isUrlReadOnly) {
       res.status(401).json({ error: "Platform token missing — save a token first" });
       return;
     }
@@ -250,6 +254,7 @@ router.get("/workspace", async (req, res) => {
       branch: conn.defaultBranch,
       sandboxDir: dir,
       cloned: ready,
+      readOnly: conn.connectionType === "url",
       gitBinary: await hasGitBinary(),
     });
   } catch (error) {
@@ -276,6 +281,13 @@ router.post("/push", async (req, res) => {
     }
 
     const conn = active[0];
+
+    // Read-only URL connections can never push — token required.
+    if (conn.connectionType === "url") {
+      res.status(403).json({ error: "Read-only — connect with token to enable push" });
+      return;
+    }
+
     const token = await getGitRemoteToken(userId, conn.platform as GitPlatformId);
     if (!token) {
       res.status(401).json({ error: "Platform token missing — save a token first" });

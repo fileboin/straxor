@@ -83,6 +83,8 @@ export async function hydrateGitRemoteConfig(userId: string): Promise<void> {
 
     const slots: GitTokenSlot[] = [];
     for (const row of rows) {
+      // URL (read-only) connections carry no token — never expose them as slots.
+      if (row.connectionType === "url") continue;
       let token: string | undefined;
       try {
         token = decrypt(row.encryptedToken);

@@ -13,8 +13,8 @@ import {
   createIssue,
 } from "../../lib/git-remote";
 import type { GitPlatformId } from "../../lib/git-remote";
-import { listRepoConnections, connectRepo, setActiveRepo, disconnectRepo, pushRepo } from "../../lib/repos";
-import type { RepoConnection } from "../../lib/repos";
+import { listRepoConnections, connectRepo, setActiveRepo, disconnectRepo, pushRepo, connectRepoUrl } from "../../lib/repos";
+import type { RepoConnection, UrlRepoMeta } from "../../lib/repos";
 
 interface Props {
   onClose: () => void;
@@ -38,6 +38,11 @@ export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
   const [selectedRepo, setSelectedRepo] = useState("");
   const [connections, setConnections] = useState<RepoConnection[]>([]);
   const [connecting, setConnecting] = useState("");
+  const [connectMode, setConnectMode] = useState<"token" | "url">("token");
+  const [repoUrl, setRepoUrl] = useState("");
+  const [connectingUrl, setConnectingUrl] = useState(false);
+  const [urlError, setUrlError] = useState("");
+  const [urlMeta, setUrlMeta] = useState<UrlRepoMeta | null>(null);
 
   const meta = GIT_PLATFORMS.find((p) => p.id === platform)!;
 
@@ -64,6 +69,26 @@ export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
     setConfigured(true);
     setActionMsg("Token sačuvan");
     setTimeout(() => setActionMsg(""), 2000);
+  }
+
+  async function handleConnectUrl() {
+    setUrlError("");
+    setUrlMeta(null);
+    if (!repoUrl.trim()) {
+      setUrlError("Unesi GitHub repo URL (npr. https://github.com/owner/repo)");
+      return;
+    }
+    setConnectingUrl(true);
+    try {
+      const r = await connectRepoUrl(repoUrl.trim());
+      setUrlMeta(r.repo);
+      setActionMsg("Povezan (read-only): " + r.repo.fullName);
+      await loadConnections();
+      onRepoChanged?.();
+    } catch (e: any) {
+      setUrlError(e.message);
+    }
+    setConnectingUrl(false);
   }
 
   async function loadRepos() {
@@ -227,60 +252,141 @@ export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
         <h2 className="text-lg font-bold flex items-center gap-2">
           <span className={meta.color}>{meta.icon}</span> {meta.name}
         </h2>
-        <select
-          className="input w-full"
-          value={platform}
-          onChange={(e: any) => setPlatform(e.target.value)}
-        >
-          {GIT_PLATFORMS.map((p) => (
-            <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
-          ))}
-        </select>
-        <div>
-          <label className="block text-xs font-semibold text-text mb-1">
-            GitHub Personal Access Token
-          </label>
-          <input
-            className="input w-full"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="ghp_... / github_pat_..."
-            value={token}
-            onChange={(e: any) => setToken(e.target.value)}
-          />
-          <details className="mt-1.5 text-[11px] text-text-muted">
-            <summary className="cursor-pointer hover:text-text">
-              Kako napraviti fine-grained token?
-            </summary>
-            <div className="mt-1.5 pl-1 space-y-0.5 text-[11px]">
-              <div>1. GitHub → Settings → Developer settings</div>
-              <div>2. Personal access tokens → Fine-grained tokens → Generate new token</div>
-              <div>3. Repository access → samo tvoj repo (npr. fileboin/straxor)</div>
-              <div>4. Permissions → Contents: Read and write</div>
-              <div>5. Kopiraj token i zalijepi ga u polje iznad</div>
+
+        <div className="flex gap-2 border-b border-gray-700 pb-2">
+          <button
+            className={'tab ' + (connectMode === 'token' ? 'tab-active' : '')}
+            onClick={() => setConnectMode("token")}
+          >
+            {"\u{1F511}"} Connect with Token
+          </button>
+          <button
+            className={'tab ' + (connectMode === 'url' ? 'tab-active' : '')}
+            onClick={() => setConnectMode("url")}
+          >
+            {"\u{1F517}"} Connect with URL
+          </button>
+        </div>
+
+        {connectMode === "token" ? (
+          <>
+            <select
+              className="input w-full"
+              value={platform}
+              onChange={(e: any) => setPlatform(e.target.value)}
+            >
+              {GIT_PLATFORMS.map((p) => (
+                <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
+              ))}
+            </select>
+            <div>
+              <label className="block text-xs font-semibold text-text mb-1">
+                GitHub Personal Access Token
+              </label>
+              <input
+                className="input w-full"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="ghp_... / github_pat_..."
+                value={token}
+                onChange={(e: any) => setToken(e.target.value)}
+              />
+              <details className="mt-1.5 text-[11px] text-text-muted">
+                <summary className="cursor-pointer hover:text-text">
+                  Kako napraviti fine-grained token?
+                </summary>
+                <div className="mt-1.5 pl-1 space-y-0.5 text-[11px]">
+                  <div>1. GitHub → Settings → Developer settings</div>
+                  <div>2. Personal access tokens → Fine-grained tokens → Generate new token</div>
+                  <div>3. Repository access → samo tvoj repo (npr. fileboin/straxor)</div>
+                  <div>4. Permissions → Contents: Read and write</div>
+                  <div>5. Kopiraj token i zalijepi ga u polje iznad</div>
+                </div>
+              </details>
+              <div className="text-[10px] text-green-400/80 mt-1.5">
+                Token se šalje na server, enkriptuje (AES-256-GCM) i čuva vezano za tvoj nalog — Straxor ga nikad ne prikazuje ponovo.
+              </div>
             </div>
-          </details>
-          <div className="text-[10px] text-green-400/80 mt-1.5">
-            Token se šalje na server, enkriptuje (AES-256-GCM) i čuva vezano za tvoj nalog — Straxor ga nikad ne prikazuje ponovo.
-          </div>
-        </div>
-        {meta.selfHosted && (
-          <input
-            className="input w-full"
-            placeholder="Self-hosted URL (npr. https://git.example.com)"
-            value={baseUrl}
-            onChange={(e: any) => setBaseUrl(e.target.value)}
-          />
+            {meta.selfHosted && (
+              <input
+                className="input w-full"
+                placeholder="Self-hosted URL (npr. https://git.example.com)"
+                value={baseUrl}
+                onChange={(e: any) => setBaseUrl(e.target.value)}
+              />
+            )}
+            <div className="flex gap-2">
+              <button className="btn btn-primary flex-1" onClick={handleSaveConfig}>
+                Sačuvaj token
+              </button>
+              <button className="btn btn-secondary" onClick={() => setConfigured(true)}>
+                Nazad
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-[11px] text-text-muted">
+              Poveži bilo koji <span className="text-text">javni</span> GitHub repo po URL-u — bez tokena.
+              Konekcija je <span className="text-amber-400">read-only</span>: agent može čitati/sinhronizovati kod,
+              ali ne može push-ovati (za push dodaj token).
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-text mb-1">
+                GitHub Repository URL
+              </label>
+              <input
+                className="input w-full"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="https://github.com/owner/repo"
+                value={repoUrl}
+                onChange={(e: any) => { setRepoUrl(e.target.value); setUrlError(""); setUrlMeta(null); }}
+                onKeyDown={(e: any) => { if (e.key === "Enter") handleConnectUrl(); }}
+              />
+              <div className="text-[10px] text-text-muted mt-1">
+                Podržano: <code className="text-accent">https://github.com/owner/repo</code>{" "}
+                <span className="text-text-muted">·</span> <code className="text-accent">.git</code>{" "}
+                <span className="text-text-muted">·</span> <code className="text-accent">owner/repo</code>
+              </div>
+            </div>
+
+            {urlError && (
+              <div className="text-sm text-red-400 bg-red-400/10 px-3 py-2 rounded border border-red-400/30">
+                {urlError}
+              </div>
+            )}
+
+            {urlMeta && (
+              <div className="text-sm text-green-400 bg-green-400/10 px-3 py-2 rounded border border-green-400/30 space-y-0.5">
+                <div className="font-semibold">{"\u2713"} Povezan: {urlMeta.fullName}</div>
+                {urlMeta.description && <div className="text-xs text-green-300/80">{urlMeta.description}</div>}
+                <div className="text-[11px] text-green-300/70">
+                  {"\u2B50"} {urlMeta.stars} · branch: {urlMeta.defaultBranch} ·{" "}
+                  {urlMeta.isPrivate ? "privatni" : "javni"}
+                </div>
+                <div className="text-[11px] text-amber-400/90 pt-0.5">
+                  Read-only — connect with token to enable push
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                className="btn btn-primary flex-1"
+                onClick={handleConnectUrl}
+                disabled={connectingUrl}
+              >
+                {connectingUrl ? "Povezivanje..." : "Connect"}
+              </button>
+              <button className="btn btn-secondary" onClick={() => setConfigured(true)}>
+                Nazad
+              </button>
+            </div>
+          </>
         )}
-        <div className="flex gap-2">
-          <button className="btn btn-primary flex-1" onClick={handleSaveConfig}>
-            Sačuvaj token
-          </button>
-          <button className="btn btn-secondary" onClick={() => setConfigured(true)}>
-            Nazad
-          </button>
-        </div>
       </div>
     );
   }
@@ -374,7 +480,7 @@ export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
                               Postavi aktivni
                             </button>
                           )}
-                          {isActive && (
+                          {isActive && conn.connectionType !== "url" && (
                             <button
                               className="btn btn-xs px-2 py-0.5 border border-green-500/40 text-green-400 rounded hover:bg-green-500/20"
                               onClick={(e) => { e.stopPropagation(); handlePush(); }}
@@ -382,6 +488,14 @@ export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
                             >
                               {"\u2191"} Push
                             </button>
+                          )}
+                          {isActive && conn.connectionType === "url" && (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded border border-amber-500/40 text-amber-400 bg-amber-500/10 whitespace-nowrap"
+                              title="Read-only — connect with token to enable push"
+                            >
+                              {"\u{1F512}"} Read-only
+                            </span>
                           )}
                           <button
                             className="btn btn-xs px-2 py-0.5 bg-green-600/30 text-green-400 rounded hover:bg-green-600/50"
