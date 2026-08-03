@@ -1,17 +1,21 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import type { Request, Response } from "express";
 import { db } from "../db/index.js";
 import { consoleEntries } from "../db/schema.js";
 import { eq, and, desc, like, sql } from "drizzle-orm";
 import { EventEmitter } from "events";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
+
+router.use(requireAuth);
+
 const bus = new EventEmitter();
 bus.setMaxListeners(50);
 
-// GET /api/console — search console entries
+// GET /api/console â€” search console entries
 router.get("/", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const { category, level, query, limit: limitStr } = req.query as Record<string, string>;
   const limit = Math.min(parseInt(limitStr || "300", 10), 500);
 
@@ -47,9 +51,9 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/console — ingest a console entry
+// POST /api/console â€” ingest a console entry
 router.post("/", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const { category, level, message, source, stackTrace, metadata } = req.body as {
     category: string;
     level?: string;
@@ -100,9 +104,9 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/console — clear all console entries for user
+// DELETE /api/console â€” clear all console entries for user
 router.delete("/", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
 
   try {
     await db
@@ -115,9 +119,9 @@ router.delete("/", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/console/stream — SSE stream of console entries
+// GET /api/console/stream â€” SSE stream of console entries
 router.get("/stream", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const { category } = req.query as { category?: string };
 
   res.setHeader("Content-Type", "text/event-stream");

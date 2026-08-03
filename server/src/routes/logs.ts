@@ -1,12 +1,15 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import type { Request, Response } from "express";
 import { getAdapters } from "../adapters/registry.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
-// GET /api/logs — search logs
+router.use(requireAuth);
+
+// GET /api/logs â€” search logs
 router.get("/", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const { category, level, query, limit, offset } = req.query as Record<string, string>;
 
   try {
@@ -25,9 +28,9 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/logs/stream — SSE real-time log stream
+// GET /api/logs/stream â€” SSE real-time log stream
 router.get("/stream", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const { category } = req.query as { category?: string };
 
   res.setHeader("Content-Type", "text/event-stream");
@@ -62,9 +65,9 @@ router.get("/stream", async (req: Request, res: Response) => {
   res.end();
 });
 
-// GET /api/logs/export — export logs
+// GET /api/logs/export â€” export logs
 router.get("/export", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const { category, format } = req.query as { category?: string; format?: string };
 
   try {
@@ -89,9 +92,9 @@ router.get("/export", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/logs — ingest a log entry
+// POST /api/logs â€” ingest a log entry
 router.post("/", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const { category, level, message, source, metadata } = req.body as {
     category: string;
     level?: string;

@@ -1,4 +1,4 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import type { Request, Response } from "express";
 import { db } from "../db/index.js";
 import { deployments, deploymentBuildLogs } from "../db/schema.js";
@@ -6,14 +6,17 @@ import { eq, and, desc } from "drizzle-orm";
 import { createBoundDeploymentAdapter } from "../adapters/deployment/db.js";
 import type { DeploymentTarget } from "../adapters/deployment/types.js";
 import { configureProvider, getProviderConfig, isProviderConfigured, TARGET_META } from "../adapters/deployment/registry.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
-// ── Provider config ──
+router.use(requireAuth);
 
-// GET /api/deployments/providers — list all providers with config status
+// â”€â”€ Provider config â”€â”€
+
+// GET /api/deployments/providers â€” list all providers with config status
 router.get("/providers", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const result = Object.entries(TARGET_META).map(([id, meta]) => ({
     id,
     name: meta.name,
@@ -24,21 +27,21 @@ router.get("/providers", async (req: Request, res: Response) => {
   res.json(result);
 });
 
-// GET /api/deployments/providers/:target — get provider config
+// GET /api/deployments/providers/:target â€” get provider config
 router.get("/providers/:target", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const target = req.params.target as DeploymentTarget;
   const config = getProviderConfig(userId, target);
   const meta = TARGET_META[target];
   res.json({
     configured: !!config && Object.keys(config).length > 0,
-    fields: Object.entries(config || {}).map(([key, value]) => ({ key, value: meta?.configFields.find(f => f.key === key)?.secret ? "••••••" : value })),
+    fields: Object.entries(config || {}).map(([key, value]) => ({ key, value: meta?.configFields.find(f => f.key === key)?.secret ? "â€¢â€¢â€¢â€¢â€¢â€¢" : value })),
   });
 });
 
-// POST /api/deployments/providers/:target — configure provider
+// POST /api/deployments/providers/:target â€” configure provider
 router.post("/providers/:target", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const target = req.params.target as DeploymentTarget;
   const { config } = req.body as { config: Record<string, string> };
 
@@ -47,11 +50,11 @@ router.post("/providers/:target", async (req: Request, res: Response) => {
   res.json({ target, configured: isProviderConfigured(userId, target) });
 });
 
-// ── Existing deployment endpoints ──
+// â”€â”€ Existing deployment endpoints â”€â”€
 
-// GET /api/deployments/:projectId — list deployments for project
+// GET /api/deployments/:projectId â€” list deployments for project
 router.get("/:projectId", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const projectId = req.params.projectId as string;
 
   try {
@@ -84,9 +87,9 @@ router.get("/:projectId", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/deployments/:projectId — trigger deployment
+// POST /api/deployments/:projectId â€” trigger deployment
 router.post("/:projectId", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const projectId = req.params.projectId as string;
   const { target, branch, envVars } = req.body as {
     target: DeploymentTarget;
@@ -109,7 +112,7 @@ router.post("/:projectId", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/deployments/detail/:deploymentId — get single deployment
+// GET /api/deployments/detail/:deploymentId â€” get single deployment
 router.get("/detail/:deploymentId", async (req: Request, res: Response) => {
   const deploymentId = req.params.deploymentId as string;
 
@@ -145,7 +148,7 @@ router.get("/detail/:deploymentId", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/deployments/log/:deploymentId — get build log
+// GET /api/deployments/log/:deploymentId â€” get build log
 router.get("/log/:deploymentId", async (req: Request, res: Response) => {
   const deploymentId = req.params.deploymentId as string;
 
@@ -169,12 +172,12 @@ router.get("/log/:deploymentId", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/deployments/stop/:deploymentId — stop deployment
+// POST /api/deployments/stop/:deploymentId â€” stop deployment
 router.post("/stop/:deploymentId", async (req: Request, res: Response) => {
   const deploymentId = req.params.deploymentId as string;
 
   try {
-    const adapter = createBoundDeploymentAdapter((req as any).userId as string);
+    const adapter = createBoundDeploymentAdapter(req.userId as string);
     await adapter.stop(deploymentId);
     res.json({ ok: true });
   } catch (error) {
