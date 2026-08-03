@@ -251,6 +251,16 @@ export default function ProviderModelDropdown({
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-[13px] text-text truncate">{m.name}</span>
+                      {m.free && (
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/15 text-emerald-500 font-medium shrink-0">
+                          Free
+                        </span>
+                      )}
+                      {m.vision && (
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-purple-500/15 text-purple-400 font-medium shrink-0">
+                          Vision
+                        </span>
+                      )}
                       {m.thinking && (
                         <span className="text-[9px] px-1 py-0.5 rounded bg-accent-blue-dim text-accent-blue font-medium shrink-0">
                           thinking

@@ -6,6 +6,8 @@ export interface CatalogModel {
   id: string;
   name: string;
   thinking?: boolean;
+  free?: boolean;
+  vision?: boolean;
 }
 
 export interface CatalogProvider {
@@ -101,6 +103,19 @@ const GEMINI_MODELS: CatalogModel[] = [
 const DEEPSEEK_MODELS: CatalogModel[] = [
   { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", thinking: true },
   { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", thinking: true },
+];
+
+// OpenCode Zen — free OpenAI-compatible models (base: https://opencode.ai/zen/v1).
+// Model IDs follow the `opencode/<id>` convention used by OpenCode configs.
+// MiMo-V2.5 is multimodal (vision); flagged so the UI can gate image uploads.
+const OPENCODE_ZEN_MODELS: CatalogModel[] = [
+  { id: "opencode/big-pickle", name: "Big Pickle", free: true },
+  { id: "opencode/deepseek-v4-flash-free", name: "DeepSeek V4 Flash Free", free: true },
+  { id: "opencode/laguna-s-2.1-free", name: "Laguna S 2.1 Free", free: true },
+  { id: "opencode/ling-3.0-flash-free", name: "Ling-3.0-flash Free", free: true },
+  { id: "opencode/mimo-v2.5-free", name: "MiMo-V2.5 Free", free: true, vision: true },
+  { id: "opencode/nemotron-3-ultra-free", name: "Nemotron 3 Ultra Free", free: true },
+  { id: "opencode/north-mini-code-free", name: "North Mini Code Free", free: true },
 ];
 
 const OLLAMA_MODELS: CatalogModel[] = [
@@ -267,6 +282,7 @@ const STATIC_PROVIDERS: CatalogProvider[] = [
   { id: "openai", name: "OpenAI", status: "ready", models: OPENAI_MODELS },
   { id: "google", name: "Google Gemini", status: "ready", models: GEMINI_MODELS },
   { id: "deepseek", name: "DeepSeek", status: "ready", models: DEEPSEEK_MODELS },
+  { id: "opencode-zen", name: "OpenCode Zen", status: "ready", models: OPENCODE_ZEN_MODELS },
   { id: "openrouter", name: "OpenRouter", status: "needs-setup", models: OPENROUTER_FALLBACK },
   { id: "ollama", name: "Ollama", status: "needs-setup", models: OLLAMA_MODELS },
   { id: "qwen", name: "Qwen", status: "needs-setup", models: QWEN_MODELS },

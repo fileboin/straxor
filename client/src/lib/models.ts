@@ -22,6 +22,8 @@ export interface Model {
   id: string;
   name: string;
   thinking?: boolean;
+  free?: boolean;
+  vision?: boolean;
 }
 
 export const PROVIDERS: Provider[] = [
@@ -65,6 +67,20 @@ export const PROVIDERS: Provider[] = [
       { id: "deepseek-r1", name: "DeepSeek R1", thinking: true },
       { id: "deepseek-v3", name: "DeepSeek V3" },
       { id: "deepseek-coder", name: "DeepSeek Coder" },
+    ],
+  },
+  {
+    id: "opencode-zen",
+    name: "OpenCode Zen",
+    status: "ready",
+    models: [
+      { id: "opencode/big-pickle", name: "Big Pickle", free: true },
+      { id: "opencode/deepseek-v4-flash-free", name: "DeepSeek V4 Flash Free", free: true },
+      { id: "opencode/laguna-s-2.1-free", name: "Laguna S 2.1 Free", free: true },
+      { id: "opencode/ling-3.0-flash-free", name: "Ling-3.0-flash Free", free: true },
+      { id: "opencode/mimo-v2.5-free", name: "MiMo-V2.5 Free", free: true, vision: true },
+      { id: "opencode/nemotron-3-ultra-free", name: "Nemotron 3 Ultra Free", free: true },
+      { id: "opencode/north-mini-code-free", name: "North Mini Code Free", free: true },
     ],
   },
   {

@@ -287,6 +287,13 @@ export default function ChatPanel({
   const providerName =
     catalogProviders.find((p) => p.id === providerId)?.name || providerId;
 
+  // Vision capability check for gating image/camera uploads.
+  // Default true: assume vision for providers where metadata is unknown.
+  const supportsVision =
+    catalogProviders
+      .find((p) => p.id === providerId)
+      ?.models.find((m) => m.id === modelId)?.vision ?? true;
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition>>(null);
@@ -502,6 +509,7 @@ export default function ChatPanel({
       return;
     }
     if (actionId === "camera") {
+      if (!supportsVision) return;
       setCameraOpen(true);
       return;
     }
@@ -510,6 +518,7 @@ export default function ChatPanel({
       return;
     }
     if (actionId === "image") {
+      if (!supportsVision) return;
       imageInputRef.current?.click();
       return;
     }
@@ -963,6 +972,7 @@ export default function ChatPanel({
           <InputToolbar
             onAction={handleToolbarAction}
             micState={micState}
+            disabledActions={supportsVision ? [] : ["camera", "image"]}
           />
           <input
             type="text"

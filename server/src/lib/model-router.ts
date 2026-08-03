@@ -41,12 +41,15 @@ const LADDER: Record<TaskDifficulty, ModelOption[]> = {
     { providerId: "openai", modelId: "gpt-4o-mini", reason: "Brzo i jeftino za jednostavne upite" },
     { providerId: "google", modelId: "gemini-2.0-flash", reason: "Brzo za jednostavne upite" },
     { providerId: "deepseek", modelId: "deepseek-v3", reason: "Jeftino za jednostavne upite" },
+    { providerId: "opencode-zen", modelId: "opencode/deepseek-v4-flash-free", reason: "Besplatno za jednostavne upite" },
+    { providerId: "opencode-zen", modelId: "opencode/big-pickle", reason: "Besplatno za jednostavne upite" },
   ],
   moderate: [
     { providerId: "anthropic", modelId: "claude-sonnet-4", reason: "Balans brzine i kvaliteta" },
     { providerId: "google", modelId: "gemini-2.5-flash", reason: "Balans brzine i kvaliteta" },
     { providerId: "openai", modelId: "gpt-4o", reason: "Pouzdan za srednje zadatke" },
     { providerId: "deepseek", modelId: "deepseek-coder", reason: "Dobar za kodiranje" },
+    { providerId: "opencode-zen", modelId: "opencode/laguna-s-2.1-free", reason: "Besplatno za srednje zadatke" },
   ],
   complex: [
     { providerId: "anthropic", modelId: "claude-opus-4-6", reason: "Najsnažniji model za složene zadatke" },

@@ -12,9 +12,10 @@ interface ToolbarAction {
 interface Props {
   onAction: (actionId: string) => void;
   micState?: "idle" | "recording" | "processing";
+  disabledActions?: string[];
 }
 
-export default function InputToolbar({ onAction, micState = "idle" }: Props) {
+export default function InputToolbar({ onAction, micState = "idle", disabledActions = [] }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useLang();
@@ -60,30 +61,35 @@ export default function InputToolbar({ onAction, micState = "idle" }: Props) {
           <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted border-b border-border bg-surface-2">
             {t("toolbar.menu")}
           </div>
-          {ACTIONS.map((a) => (
-            <div
-              key={a.id}
-              className={`flex items-center gap-1 px-1.5 hover:bg-surface-2 transition-colors ${
-                a.id === "mic" && micState === "recording" ? "bg-red-500/10" : ""
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  onAction(a.id);
-                  setOpen(false);
-                }}
-                className="flex-1 flex items-center gap-2.5 px-1.5 py-2 text-left"
-              >
-                <span className="text-sm shrink-0">{a.icon}</span>
-                <span className="text-[13px] text-text truncate">{a.label}</span>
-                {a.id === "mic" && micState === "recording" && (
-                  <span className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-                )}
-              </button>
-              <InfoTip text={a.info} />
-            </div>
-          ))}
+{ACTIONS.map((a) => {
+              const disabled = disabledActions.includes(a.id);
+              return (
+                <div
+                  key={a.id}
+                  className={`flex items-center gap-1 px-1.5 transition-colors ${
+                    disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-surface-2"
+                  } ${a.id === "mic" && micState === "recording" ? "bg-red-500/10" : ""}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (disabled) return;
+                      onAction(a.id);
+                      setOpen(false);
+                    }}
+                    disabled={disabled}
+                    className="flex-1 flex items-center gap-2.5 px-1.5 py-2 text-left"
+                  >
+                    <span className="text-sm shrink-0">{a.icon}</span>
+                    <span className="text-[13px] text-text truncate">{a.label}</span>
+                    {a.id === "mic" && micState === "recording" && (
+                      <span className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                    )}
+                  </button>
+                  <InfoTip text={a.info} />
+                </div>
+              );
+            })}
         </div>
       )}
     </div>
