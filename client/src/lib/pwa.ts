@@ -11,6 +11,14 @@ export function registerServiceWorker(): void {
   if (!("serviceWorker" in navigator)) return;
   if (import.meta.env.DEV) return;
   window.addEventListener("load", () => {
+    // Nuke any pre-existing service worker registrations first. A stale SW
+    // (from an earlier deploy) can hold a poisoned cache that keeps serving
+    // the old, broken bundle indefinitely. Unregistering guarantees the next
+    // SW we register a moment later is the only one in control.
+    navigator.serviceWorker.getRegistrations().then((regs) =>
+      Promise.all(regs.map((r) => r.unregister()))
+    );
+
     navigator.serviceWorker
       .register("/sw.js")
       .then((reg) => {

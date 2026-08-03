@@ -218,8 +218,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientDist = path.join(__dirname, "../../client/dist");
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  // SPA fallback: serve index.html for all non-API routes
+  // SPA fallback: serve index.html for all non-API routes. Never cache the
+  // hash-free index.html so navigations always fetch the latest shell (which
+  // references the newest hashed JS/CSS). Hashed /assets/* are immutable and
+  // cached normally by express.static.
   app.get("*", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.sendFile(path.join(clientDist, "index.html"));
   });
   console.log("Serving client from", clientDist);
