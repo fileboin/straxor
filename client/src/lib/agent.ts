@@ -201,3 +201,52 @@ export async function fetchFileContent(
     return "";
   }
 }
+
+// FAZA 6: Background execution. Fire-and-forget start + polling.
+export interface BackgroundTimelineEntry {
+  t: "text" | "tool_call" | "tool_result" | "error";
+  content?: string;
+  toolId?: string;
+  toolName?: string;
+  toolStatus?: "running" | "completed" | "error";
+}
+
+export interface BackgroundStatus {
+  jobId: string;
+  sessionId: string;
+  status: "running" | "done" | "error";
+  error?: string;
+  finished: boolean;
+  timeline: BackgroundTimelineEntry[];
+}
+
+export async function startAgentBackground(
+  machineId: string,
+  message: string,
+  sessionId: string | null,
+  attachments?: Attachment[]
+): Promise<{ jobId: string; sessionId: string }> {
+  const token = localStorage.getItem("token");
+  const res = await fetch("/api/agent/background", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: JSON.stringify({
+      machineId,
+      message,
+      sessionId: sessionId || undefined,
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to start" }));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchBackgroundStatus(jobId: string): Promise<BackgroundStatus> {
+  return api<BackgroundStatus>(`/agent/background/${jobId}`);
+}

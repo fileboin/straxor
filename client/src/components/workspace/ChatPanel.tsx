@@ -35,6 +35,14 @@ export interface ToolCall {
   status: "pending" | "running" | "completed" | "error";
 }
 
+export interface OrchestratedResult {
+  modelId: string;
+  label: string;
+  content: string;
+  error?: string;
+  done: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -42,6 +50,7 @@ export interface ChatMessage {
   label?: string;
   toolCalls?: ToolCall[];
   attachments?: Attachment[];
+  orchestrated?: OrchestratedResult[];
 }
 
 interface Props {
@@ -73,6 +82,8 @@ interface Props {
   onToggleExpand?: () => void;
   zoom?: number;
   onZoomChange?: (z: number) => void;
+  verticalZoom?: number;
+  onVerticalZoomChange?: (z: number) => void;
   panelMenuKey?: string;
   role?: AgentRole;
   onRoleChange?: (role: AgentRole) => void;
@@ -85,6 +96,14 @@ interface Props {
   onModelOrchChange?: (value: boolean) => void;
   modelOrchDisabled?: boolean;
   modelOrchHint?: string;
+  background?: boolean;
+  onBackgroundChange?: (value: boolean) => void;
+  backgroundHint?: string;
+  panelAccent?: string;
+  onPanelAccentChange?: (color: string) => void;
+  orchestratedModels?: { providerId: string; modelId: string }[];
+  onOrchestratedModelsChange?: (models: { providerId: string; modelId: string }[]) => void;
+  availableModels?: { providerId: string; name: string; models: { id: string; name: string }[] }[];
 }
 
 const ACCEPTED_EXT_RE = /\.(jpe?g|png|webp|gif|avif|mp3|wav|ogg|webm|m4a|pdf|txt|md|csv|json)$/i;
@@ -233,6 +252,8 @@ export default function ChatPanel({
   onToggleExpand,
   zoom = 1,
   onZoomChange,
+  verticalZoom = 1,
+  onVerticalZoomChange,
   panelMenuKey = "ask",
   role,
   onRoleChange,
@@ -245,6 +266,9 @@ export default function ChatPanel({
   onModelOrchChange,
   modelOrchDisabled,
   modelOrchHint,
+  background,
+  onBackgroundChange,
+  backgroundHint,
 }: Props) {
   const [input, setInput] = useState("");
   useLang();
@@ -660,15 +684,26 @@ export default function ChatPanel({
       onRoleChange={(r) => onRoleChange?.(r)}
       zoom={zoom}
       onZoomChange={onZoomChange}
+      verticalZoom={verticalZoom}
+      onVerticalZoomChange={onVerticalZoomChange || (() => {})}
       onOpenModelPicker={() => setShowModelPicker(true)}
       onOpenPromptLibrary={() => onOpenPromptLibrary?.()}
       onOpenGitRemote={() => onOpenGitRemote?.()}
       storageKey={panelMenuKey}
+      panelAccent={panelAccent}
+      onPanelAccentChange={onPanelAccentChange}
+      orchestratedModels={orchestratedModels}
+      onOrchestratedModelsChange={onOrchestratedModelsChange}
+      availableModels={availableModels}
     />
   ) : null;
 
   return (
-    <div className={`flex flex-col h-full min-h-0 overflow-hidden rounded-2xl ${isEmpty ? "border border-white/10" : "border border-border bg-surface shadow-lg shadow-black/30"}`}>
+    <div
+      className={`flex flex-col h-full min-h-0 overflow-hidden rounded-2xl panel-glass ${isEmpty ? "border border-white/10" : "border border-border shadow-lg shadow-black/30"}`}
+      style={panelAccent ? { "--panel-accent": panelAccent } as React.CSSProperties : undefined}
+      data-panel-accent={panelAccent ? "true" : undefined}
+    >
       {isEmpty ? (
         <WelcomeHero
           icon={icon}
@@ -721,6 +756,25 @@ export default function ChatPanel({
         </div>
         <div className="flex items-center gap-1 shrink-0 sm:gap-2">
           {runtimeControl}
+          {onBackgroundChange && (
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => onBackgroundChange(!background)}
+                className={`flex items-center gap-1 px-1.5 h-7 rounded-md border text-[10px] font-medium transition-colors ${
+                  background
+                    ? "border-accent/50 bg-accent/10 text-accent"
+                    : "border-border bg-transparent text-text-muted hover:text-text-secondary hover:border-border-light"
+                }`}
+                title={backgroundHint || (background ? t("chat.background.on") : t("chat.background.off"))}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${background ? "bg-accent animate-pulse" : "bg-text-muted"}`} />
+                <span className="hidden lg:inline">Bg</span>
+                <span className="lg:hidden">Bg</span>
+              </button>
+              <InfoTip text={backgroundHint || t("chat.background.hint")} placement="bottom" />
+            </div>
+          )}
           {onModelOrchChange && (
             <div className="flex items-center gap-0.5">
               <button
@@ -802,6 +856,34 @@ export default function ChatPanel({
                 <span className="inline-block w-2 h-4 ml-0.5 bg-accent animate-pulse" />
               )}
             </div>
+            {msg.orchestrated && msg.orchestrated.length > 0 && (
+              <div className="grid gap-2 mt-1.5 grid-cols-1 sm:grid-cols-2">
+                {msg.orchestrated.map((res) => (
+                  <div
+                    key={res.modelId}
+                    className="rounded-xl border border-border bg-surface/60 p-2.5"
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[10px] font-semibold text-text-muted truncate">
+                        {res.label}
+                      </span>
+                      {!res.done && (
+                        <span className="inline-block w-1.5 h-3 bg-accent animate-pulse shrink-0" />
+                      )}
+                      {res.done && res.error && (
+                        <span className="text-[10px] text-red-400 ml-auto shrink-0">✗</span>
+                      )}
+                      {res.done && !res.error && (
+                        <span className="text-[10px] text-green-500 ml-auto shrink-0">✓</span>
+                      )}
+                    </div>
+                    <div className="text-[12px] whitespace-pre-wrap break-words text-text/90">
+                      {res.error || res.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {/* Missing API key error → inline "Add key" action */}
             {msg.role === "assistant" &&
               msg.content.includes("API key not configured") && (

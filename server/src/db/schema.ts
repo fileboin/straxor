@@ -1349,3 +1349,19 @@ export const verificationTasks = pgTable("verification_tasks", {
 });
 
 export const verificationTasksRelations = relations(verificationTasks, () => ({}));
+
+// ── Global App State Persistence (Block 74) ──
+
+export const userAppState = pgTable("user_app_state", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  state: jsonb("state").notNull().default({}),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const userAppStateRelations = relations(userAppState, ({ one }) => ({
+  user: one(users, { fields: [userAppState.userId], references: [users.id] }),
+}));

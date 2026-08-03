@@ -167,7 +167,7 @@ export default function BottomBar({ machineId }: BottomBarProps) {
       {/* Mobile floating toggle */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="md:hidden fixed bottom-4 right-4 z-40 w-11 h-11 rounded-full border border-border bg-surface shadow-lg shadow-black/40 flex items-center justify-center text-text-secondary hover:text-text hover:border-border-light transition-colors"
+        className="md:hidden fixed bottom-4 left-4 z-40 w-11 h-11 rounded-full border border-border bg-surface shadow-lg shadow-black/40 flex items-center justify-center text-text-secondary hover:text-text hover:border-border-light transition-colors"
         title="Terminal / Datoteke / Logovi / Konzola"
       >
         <span className="text-sm">▸</span>

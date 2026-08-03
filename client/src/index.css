@@ -242,6 +242,59 @@
 .text-accent\/60 { color: color-mix(in srgb, var(--accent) 60%, transparent); }
 .text-accent\/70 { color: color-mix(in srgb, var(--accent) 70%, transparent); }
 
+/* ═══════════════════════════════════════════
+   FAZA 4 — Per-panel accent override
+   `[data-panel-accent]` na panel wrapperu
+   preklapa globalne `--accent` varijable
+   za sve potomke tog panela.
+   ═══════════════════════════════════════════ */
+[data-panel-accent] {
+  --accent: var(--panel-accent);
+  --accent-hover: color-mix(in srgb, var(--panel-accent) 80%, #ffffff);
+  --accent-light: color-mix(in srgb, var(--panel-accent) 60%, #ffffff);
+  --accent-dim: color-mix(in srgb, var(--panel-accent) 15%, transparent);
+  --accent-border: color-mix(in srgb, var(--panel-accent) 40%, transparent);
+}
+
+/* ═══════════════════════════════════════════
+   FAZA 4 — Glassmorphism panel
+   Semi-transparentna pozadina + backdrop blur
+   + blagi gradient glow rubova u boji accenta.
+   ═══════════════════════════════════════════ */
+.panel-glass {
+  background: rgba(10, 14, 26, 0.55);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  position: relative;
+  overflow: hidden;
+}
+.panel-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 15% 0%, var(--panel-accent, var(--accent)) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 85% 100%, var(--panel-accent, var(--accent)) 0%, transparent 50%);
+  opacity: 0.12;
+}
+.panel-glass > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Light tema — glass panel */
+[data-theme="light"] .panel-glass {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+[data-theme="light"] .panel-glass::before {
+  opacity: 0.06;
+}
+
 html,
 body,
 #root {

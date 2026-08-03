@@ -22,6 +22,20 @@ export function clampZoom(z: number) {
   return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(z * 20) / 20));
 }
 
+export const VZOOM_MIN = 0.5;
+export const VZOOM_MAX = 1.5;
+export const VZOOM_PRESETS = [
+  { id: "v-squeeze", value: 0.6, labelKey: "vzoom.squeeze" },
+  { id: "v-compact", value: 0.8, labelKey: "vzoom.compact" },
+  { id: "v-normal", value: 1, labelKey: "vzoom.normal" },
+  { id: "v-tall", value: 1.25, labelKey: "vzoom.tall" },
+  { id: "v-full", value: 1.5, labelKey: "vzoom.full" },
+] as const;
+
+export function clampVerticalZoom(z: number) {
+  return Math.max(VZOOM_MIN, Math.min(VZOOM_MAX, Math.round(z * 20) / 20));
+}
+
 export default function ZoomControl({ zoom, onZoomChange }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);

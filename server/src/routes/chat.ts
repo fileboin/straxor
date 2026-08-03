@@ -15,6 +15,103 @@ import {
 
 const router = Router();
 
+// POST /api/chat/orchestrate — parallel multi-model execution.
+// Accepts an array of models; runs all in parallel, merges SSE stream
+// tagged with modelId so the client can display side-by-side results.
+router.post("/orchestrate", requireAuth, async (req: Request, res: Response) => {
+  const {
+    models,
+    messages,
+    thinking,
+    attachments,
+  } = req.body as {
+    models: { providerId: string; modelId: string; apiKey: string }[];
+    messages: { role: "user" | "assistant" | "system"; content: string }[];
+    thinking?: string;
+    attachments?: AttachmentRef[];
+  };
+
+  if (!models || !Array.isArray(models) || models.length === 0) {
+    res.status(400).json({ error: "models array required (1+ entries)" });
+    return;
+  }
+  if (!messages || !Array.isArray(messages)) {
+    res.status(400).json({ error: "messages array required" });
+    return;
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+
+  try {
+    const { contentBlocks } = await resolveAttachments(attachments);
+    let finalMessages: { role: "user" | "assistant" | "system"; content: string | ContentBlock[] }[] = messages;
+    if (contentBlocks.length > 0) {
+      finalMessages = appendBlocksToLastUser(messages, contentBlocks);
+    }
+
+    const adapter = getAdapters().aiProvider;
+
+    // Launch all model streams in parallel.
+    const streams = models.map((m) =>
+      adapter.streamChat({
+        providerId: m.providerId,
+        modelId: m.modelId,
+        messages: finalMessages,
+        apiKey: m.apiKey,
+        thinking,
+      })
+    );
+
+    const readers = streams.map((s) => s[Symbol.asyncIterator]());
+    const done = new Array(readers.length).fill(false);
+    let activeCount = readers.length;
+
+    async function pull(idx: number) {
+      try {
+        while (true) {
+          const { done: d, value } = await readers[idx].next();
+          if (d) {
+            done[idx] = true;
+            activeCount--;
+            if (activeCount === 0) {
+              res.write("data: [DONE]\n\n");
+              res.end();
+            }
+            return;
+          }
+          const event = value;
+          if (event.type === "token") {
+            res.write(
+              `data: ${JSON.stringify({ modelIndex: idx, token: event.content })}\n\n`
+            );
+          } else if (event.type === "error") {
+            res.write(
+              `data: ${JSON.stringify({ modelIndex: idx, error: event.content })}\n\n`
+            );
+          }
+        }
+      } catch {
+        done[idx] = true;
+        activeCount--;
+        if (activeCount === 0) {
+          res.write("data: [DONE]\n\n");
+          res.end();
+        }
+      }
+    }
+
+    await Promise.all(readers.map((_, i) => pull(i)));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.write(`data: ${JSON.stringify({ error: message })}\n\n`);
+    res.write("data: [DONE]\n\n");
+    res.end();
+  }
+});
+
 // POST /api/chat/route — difficulty router for Model orkestracija.
 // Returns the best model the user has an API key for, based on task complexity.
 router.post("/route", requireAuth, async (req: Request, res: Response) => {

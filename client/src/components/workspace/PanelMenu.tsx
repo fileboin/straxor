@@ -11,17 +11,24 @@ import {
   deleteGitToken,
   type GitTokenSlot,
 } from "../../lib/git-remote.js";
-import { ZOOM_MIN, ZOOM_MAX, ZOOM_PRESETS, clampZoom } from "./ZoomControl.js";
+import { ZOOM_MIN, ZOOM_MAX, ZOOM_PRESETS, clampZoom, VZOOM_MIN, VZOOM_MAX, VZOOM_PRESETS, clampVerticalZoom } from "./ZoomControl.js";
 
 interface Props {
   role: AgentRole;
   onRoleChange: (role: AgentRole) => void;
   zoom: number;
   onZoomChange: (z: number) => void;
+  verticalZoom: number;
+  onVerticalZoomChange: (z: number) => void;
   onOpenModelPicker: () => void;
   onOpenPromptLibrary: () => void;
   onOpenGitRemote: () => void;
   storageKey: string;
+  panelAccent?: string;
+  onPanelAccentChange?: (color: string) => void;
+  orchestratedModels: { providerId: string; modelId: string }[];
+  onOrchestratedModelsChange: (models: { providerId: string; modelId: string }[]) => void;
+  availableModels: { providerId: string; name: string; models: { id: string; name: string }[] }[];
 }
 
 const PLATFORM = "github";
@@ -31,10 +38,17 @@ export default function PanelMenu({
   onRoleChange,
   zoom,
   onZoomChange,
+  verticalZoom,
+  onVerticalZoomChange,
   onOpenModelPicker,
   onOpenPromptLibrary,
   onOpenGitRemote,
   storageKey,
+  panelAccent,
+  onPanelAccentChange,
+  orchestratedModels,
+  onOrchestratedModelsChange,
+  availableModels,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [tokens, setTokens] = useState<GitTokenSlot[]>([]);
@@ -51,6 +65,7 @@ export default function PanelMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const pct = Math.round(zoom * 100);
+  const vPct = Math.round(verticalZoom * 100);
   const { accent, setAccent, setTheme } = useTheme();
 
   const place = useCallback(() => {
@@ -321,6 +336,58 @@ export default function PanelMenu({
             </div>
           </div>
 
+          {/* Vertical zoom — top-down compression, independent of zoom */}
+          <div className="px-1.5 mt-1">
+            <div className="flex items-center justify-between px-0 pb-1">
+              <div className="text-[11px] uppercase tracking-wider text-text-muted">{t("vzoom.title")}</div>
+              <div className="text-[12px] tabular-nums text-text-muted">{vPct}%</div>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onVerticalZoomChange(clampVerticalZoom(verticalZoom - 0.05))}
+                disabled={verticalZoom <= VZOOM_MIN}
+                className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-border disabled:opacity-30"
+              >
+                −
+              </button>
+              <input
+                type="range"
+                min={Math.round(VZOOM_MIN * 100)}
+                max={Math.round(VZOOM_MAX * 100)}
+                step={5}
+                value={vPct}
+                onChange={(e) => onVerticalZoomChange(Number(e.target.value) / 100)}
+                className="flex-1 accent-[var(--accent)]"
+                aria-label={t("vzoom.title")}
+              />
+              <button
+                type="button"
+                onClick={() => onVerticalZoomChange(clampVerticalZoom(verticalZoom + 0.05))}
+                disabled={verticalZoom >= VZOOM_MAX}
+                className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-border disabled:opacity-30"
+              >
+                +
+              </button>
+            </div>
+            <div className="flex items-center gap-1 mt-1.5">
+              {VZOOM_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => onVerticalZoomChange(p.value)}
+                  className={`flex-1 px-1 py-1.5 rounded-md text-[11px] transition-colors ${
+                    Math.abs(verticalZoom - p.value) < 0.001
+                      ? "bg-accent/15 text-accent font-semibold"
+                      : "text-text-muted hover:bg-surface-2 hover:text-text"
+                  }`}
+                >
+                  {Math.round(p.value * 100)}%
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="border-t border-border" />
 
           {/* Tema (accent picker) */}
@@ -368,6 +435,137 @@ export default function PanelMenu({
                 );
               })}
             </div>
+          </div>
+
+          {onPanelAccentChange && (
+            <>
+              <div className="border-t border-border" />
+
+              {/* Per-panel accent */}
+              <div className="px-1.5">
+                <div className="flex items-center justify-between px-0 pb-1.5">
+                  <div className="text-[11px] uppercase tracking-wider text-text-muted">
+                    {t("panelMenu.panelAccent")}
+                  </div>
+                  {panelAccent && (
+                    <button
+                      type="button"
+                      onClick={() => onPanelAccentChange("")}
+                      className="text-[10px] text-text-muted hover:text-text underline"
+                      title="Reset na globalnu boju"
+                    >
+                      reset
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {ACCENT_COLORS.map((c) => {
+                    const active = panelAccent === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        title={c.label}
+                        aria-label={c.label}
+                        onClick={() => onPanelAccentChange(c.id)}
+                        className={`relative w-9 h-9 rounded-full transition-all hover:scale-110 shrink-0 ${
+                          active
+                            ? "ring-2 ring-accent ring-offset-2 ring-offset-surface"
+                            : "ring-1 ring-border hover:ring-border-light"
+                        }`}
+                        style={{
+                          backgroundColor: c.color,
+                          boxShadow: active
+                            ? `0 0 10px ${c.color}80`
+                            : "0 1px 3px rgba(0,0,0,0.4)",
+                        }}
+                      >
+                        {active && (
+                          <span
+                            className="absolute inset-0 flex items-center justify-center text-[12px] font-bold"
+                            style={{
+                              color:
+                                c.id === "white" || c.id === "yellow"
+                                  ? "#111"
+                                  : "#fff",
+                              textShadow: "0 1px 2px rgba(0,0,0,0.5)",
+                            }}
+                          >
+                            ✓
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Multi-model orchestration selector */}
+          <div className="border-t border-border" />
+          <div className="px-1.5">
+            <div className="flex items-center justify-between px-0 pb-1.5">
+              <div className="text-[11px] uppercase tracking-wider text-text-muted">
+                {t("panelMenu.orchestrator")}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-text-muted">
+                  {orchestratedModels.length}
+                </span>
+                {orchestratedModels.length >= 3 && (
+                  <span className="text-[10px] text-yellow-400" title="Više API poziva = više troškova">
+                    ⚠
+                  </span>
+                )}
+              </div>
+            </div>
+            {availableModels.map((provider) => (
+              <div key={provider.providerId} className="mb-2">
+                <div className="text-[10px] text-text-muted uppercase tracking-wider px-0 pb-1">
+                  {provider.name}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {provider.models.map((m) => {
+                    const active = orchestratedModels.some(
+                      (om) => om.providerId === provider.providerId && om.modelId === m.id
+                    );
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          if (active) {
+                            onOrchestratedModelsChange(
+                              orchestratedModels.filter(
+                                (om) => !(om.providerId === provider.providerId && om.modelId === m.id)
+                              )
+                            );
+                          } else {
+                            onOrchestratedModelsChange([
+                              ...orchestratedModels,
+                              { providerId: provider.providerId, modelId: m.id },
+                            ]);
+                          }
+                        }}
+                        className={`px-2 py-1 rounded-md text-[11px] border transition-colors ${
+                          active
+                            ? "border-accent/50 bg-accent/10 text-accent"
+                            : "border-border bg-surface-2 text-text-muted hover:border-border-light hover:text-text"
+                        }`}
+                      >
+                        {m.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {orchestratedModels.length === 0 && (
+              <div className="text-[11px] text-text-muted px-0 py-1">
+                {t("panelMenu.orchestratorEmpty")}
+              </div>
+            )}
           </div>
 
           <div className="border-t border-border" />

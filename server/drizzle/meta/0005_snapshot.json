@@ -1,6 +1,6 @@
 {
-  "id": "57a4c786-8d6f-4bdb-9511-33c20b88915c",
-  "prevId": "f9f372c2-fd22-43ad-89cf-cb899acd0403",
+  "id": "6dddafc7-ffb9-4427-9239-7e4cbb8e2938",
+  "prevId": "57a4c786-8d6f-4bdb-9511-33c20b88915c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -6246,6 +6246,68 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_app_state": {
+      "name": "user_app_state",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_app_state_user_id_users_id_fk": {
+          "name": "user_app_state_user_id_users_id_fk",
+          "tableFrom": "user_app_state",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "user_app_state_user_id_unique": {
+          "name": "user_app_state_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

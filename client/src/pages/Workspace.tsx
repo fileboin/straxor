@@ -11,12 +11,13 @@ import DeploymentPanel from "../components/workspace/DeploymentPanel.js";
 import DiffReview, { type DiffFile } from "../components/workspace/DiffReview.js";
 import PermissionsPanel from "../components/workspace/PermissionsPanel.js";
 import ToolConfirmDialog from "../components/workspace/ToolConfirmDialog.js";
-import type { ChatMessage, ToolCall } from "../components/workspace/ChatPanel.js";
+import type { ChatMessage, ToolCall, OrchestratedResult } from "../components/workspace/ChatPanel.js";
 import type { Attachment } from "../lib/attachments.js";
 import type { ThinkingBudget } from "../lib/models.js";
-import { streamChat, hasApiKey } from "../lib/chat.js";
-import { routeChat } from "../lib/orchestrator.js";
-import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges, sendSteerInstruction } from "../lib/agent.js";
+import { PROVIDERS } from "../lib/models.js";
+import { streamChat, hasApiKey, getApiKey } from "../lib/chat.js";
+import { routeChat, orchestrateChat, type OrchestrateModel } from "../lib/orchestrator.js";
+import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges, sendSteerInstruction, startAgentBackground, fetchBackgroundStatus, type BackgroundTimelineEntry } from "../lib/agent.js";
 import { listRepoConnections, type RepoConnection } from "../lib/repos.js";
 import { fetchProjects } from "../lib/projects.js";
 import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
@@ -71,6 +72,7 @@ import {
   type Session,
 } from "../lib/sessions.js";
 import type { Command } from "../lib/commands.js";
+import { loadAppState, saveAppState, saveAppStateNow, type AppStateShape } from "../lib/app-state.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [];
 
@@ -91,10 +93,12 @@ export default function Workspace() {
       .catch(() => {});
   }, [projectId]);
 
-  const { toggleTheme } = useTheme();
+  const { toggleTheme, setTheme: setAppTheme, accent, setAccent, theme } = useTheme();
   useLang();
   const [askModelOrch, setAskModelOrch] = useState(() => localStorage.getItem("straxor.orch.ask") === "1");
   const [agentModelOrch, setAgentModelOrch] = useState(() => localStorage.getItem("straxor.orch.agent") === "1");
+  const [askBackground, setAskBackground] = useState(() => localStorage.getItem("straxor.bg.ask") === "1");
+  const [agentBackground, setAgentBackground] = useState(() => localStorage.getItem("straxor.bg.agent") === "1");
 
   useEffect(() => {
     localStorage.setItem("straxor.orch.ask", askModelOrch ? "1" : "0");
@@ -102,6 +106,36 @@ export default function Workspace() {
   useEffect(() => {
     localStorage.setItem("straxor.orch.agent", agentModelOrch ? "1" : "0");
   }, [agentModelOrch]);
+  useEffect(() => {
+    localStorage.setItem("straxor.bg.ask", askBackground ? "1" : "0");
+  }, [askBackground]);
+  useEffect(() => {
+    localStorage.setItem("straxor.bg.agent", agentBackground ? "1" : "0");
+  }, [agentBackground]);
+
+  // Per-panel multi-model orchestration (FAZA 5) selection + persistence.
+  const [askOrchestratedModels, setAskOrchestratedModels] = useState<{ providerId: string; modelId: string }[]>(() => {
+    try { return JSON.parse(localStorage.getItem("straxor.orchModels.ask") || "[]"); } catch { return []; }
+  });
+  const [agentOrchestratedModels, setAgentOrchestratedModels] = useState<{ providerId: string; modelId: string }[]>(() => {
+    try { return JSON.parse(localStorage.getItem("straxor.orchModels.agent") || "[]"); } catch { return []; }
+  });
+  useEffect(() => {
+    localStorage.setItem("straxor.orchModels.ask", JSON.stringify(askOrchestratedModels));
+  }, [askOrchestratedModels]);
+  useEffect(() => {
+    localStorage.setItem("straxor.orchModels.agent", JSON.stringify(agentOrchestratedModels));
+  }, [agentOrchestratedModels]);
+
+  const availableModels = useMemo(
+    () =>
+      PROVIDERS.map((p) => ({
+        providerId: p.id,
+        name: p.name,
+        models: p.models.map((m) => ({ id: m.id, name: m.name })),
+      })),
+    []
+  );
 
   const [askProvider, setAskProvider] = useState("anthropic");
   const [askModel, setAskModel] = useState("claude-sonnet-4");
@@ -205,6 +239,102 @@ export default function Workspace() {
     loadActiveRepo();
   }, [loadActiveRepo]);
 
+  // ── Global app-state persistence (FAZA 2) ──
+  const [stateReady, setStateReady] = useState(false);
+
+  // Load persisted state from the DB once on mount, then hydrate UI.
+  useEffect(() => {
+    let mounted = true;
+    const hydrate = async () => {
+      const saved = await loadAppState();
+      // Theme + accent
+      if (saved && typeof saved === "object") {
+        const s = saved as Record<string, unknown>;
+        if (typeof s.theme === "string") setAppTheme(s.theme as "dark" | "light");
+        if (typeof s.accent === "string") setAccent(s.accent as never);
+        // Models per agent
+        if (s.ask && typeof s.ask === "object") {
+          const ask = s.ask as Record<string, unknown>;
+          if (typeof ask.provider === "string") setAskProvider(ask.provider);
+          if (typeof ask.model === "string") setAskModel(ask.model);
+          if (ask.thinking === "low" || ask.thinking === "medium" || ask.thinking === "high") setAskThinking(ask.thinking);
+          if (ask.role && typeof ask.role === "string") setAskRole(ask.role as AgentRole);
+          if (typeof ask.orch === "boolean") setAskModelOrch(ask.orch);
+        }
+        if (s.agent && typeof s.agent === "object") {
+          const agent = s.agent as Record<string, unknown>;
+          if (typeof agent.provider === "string") setAgentProvider(agent.provider);
+          if (typeof agent.model === "string") setAgentModel(agent.model);
+          if (agent.thinking === "low" || agent.thinking === "medium" || agent.thinking === "high") setAgentThinking(agent.thinking);
+          if (agent.role && typeof agent.role === "string") setAgentRole(agent.role as AgentRole);
+          if (typeof agent.orch === "boolean") setAgentModelOrch(agent.orch);
+        }
+        // Panel / layout / zoom / height
+        if (s.panelMode === "ask-full" || s.panelMode === "agent-full") setPanelMode(s.panelMode);
+        if (s.panelsLayout === "stack") setPanelsLayout("stack");
+        if (typeof s.panelWidthPct === "number") {
+          const w = Math.max(25, Math.min(75, s.panelWidthPct));
+          setPanelWidthPct(w);
+        }
+        if (typeof s.askZoom === "number") setAskZoom(Math.max(0.7, Math.min(1.5, s.askZoom)));
+        if (typeof s.agentZoom === "number") setAgentZoom(Math.max(0.7, Math.min(1.5, s.agentZoom)));
+        if (typeof s.askVerticalZoom === "number") setAskVerticalZoom(Math.max(0.5, Math.min(1.5, s.askVerticalZoom)));
+        if (typeof s.agentVerticalZoom === "number") setAgentVerticalZoom(Math.max(0.5, Math.min(1.5, s.agentVerticalZoom)));
+        if (typeof s.askHeight === "number") setAskPanelHeightPct(Math.max(30, Math.min(100, s.askHeight)));
+        if (typeof s.agentHeight === "number") setAgentPanelHeightPct(Math.max(30, Math.min(100, s.agentHeight)));
+      }
+      if (mounted) setStateReady(true);
+    };
+    hydrate().catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Debounced save of the full UI state to the DB.
+  useEffect(() => {
+    if (!stateReady) return;
+    const state: AppStateShape = {
+      version: 1,
+      theme,
+      accent,
+      ask: { provider: askProvider, model: askModel, thinking: askThinking, role: askRole, orch: askModelOrch },
+      agent: { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, orch: agentModelOrch },
+      panelMode,
+      panelsLayout,
+      panelWidthPct,
+      askZoom,
+      agentZoom,
+      askVerticalZoom,
+      agentVerticalZoom,
+      askHeight: askPanelHeightPct,
+      agentHeight: agentPanelHeightPct,
+    };
+    saveAppState(state);
+  }, [
+    stateReady, theme, accent, askProvider, askModel, askThinking, askRole, askModelOrch,
+    agentProvider, agentModel, agentThinking, agentRole, agentModelOrch,
+    panelMode, panelsLayout, panelWidthPct, askZoom, agentZoom, askVerticalZoom, agentVerticalZoom, askPanelHeightPct, agentPanelHeightPct,
+  ]);
+
+  // Flush pending save when leaving the page.
+  useEffect(() => {
+    const handler = () => {
+      saveAppStateNow({
+        version: 1,
+        theme, accent,
+        ask: { provider: askProvider, model: askModel, thinking: askThinking, role: askRole, orch: askModelOrch },
+        agent: { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, orch: agentModelOrch },
+        panelMode, panelLayout: panelsLayout, panelWidthPct,
+        askZoom, agentZoom, askVerticalZoom, agentVerticalZoom, askHeight: askPanelHeightPct, agentHeight: agentPanelHeightPct,
+      });
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [stateReady, theme, accent, askProvider, askModel, askThinking, askRole, askModelOrch,
+    agentProvider, agentModel, agentThinking, agentRole, agentModelOrch,
+    panelMode, panelsLayout, panelWidthPct, askZoom, agentZoom, askVerticalZoom, agentVerticalZoom, askPanelHeightPct, agentPanelHeightPct]);
+
   // When an active repo exists, point the agent at the local engine unless a
   // VPS machine is already selected. When the repo goes away, drop local.
   useEffect(() => {
@@ -278,6 +408,31 @@ export default function Workspace() {
   const clampZoomPct = (z: number) => Math.max(0.7, Math.min(1.5, Math.round(z * 20) / 20));
   const handleAskZoomChange = (z: number) => setAskZoom(clampZoomPct(z));
   const handleAgentZoomChange = (z: number) => setAgentZoom(clampZoomPct(z));
+
+  // Per-panel vertical zoom (top-down compression, independent of zoom)
+  const readVerticalZoom = (key: string) => {
+    try {
+      const saved = parseFloat(localStorage.getItem(key) || "");
+      return Number.isFinite(saved) ? Math.max(0.5, Math.min(1.5, saved)) : 1;
+    } catch {
+      return 1;
+    }
+  };
+  const [askVerticalZoom, setAskVerticalZoom] = useState<number>(() => readVerticalZoom("straxor.vzoom.ask"));
+  const [agentVerticalZoom, setAgentVerticalZoom] = useState<number>(() => readVerticalZoom("straxor.vzoom.agent"));
+
+  const clampVerticalPct = (z: number) => Math.max(0.5, Math.min(1.5, Math.round(z * 20) / 20));
+  const handleAskVerticalZoomChange = (z: number) => setAskVerticalZoom(clampVerticalPct(z));
+  const handleAgentVerticalZoomChange = (z: number) => setAgentVerticalZoom(clampVerticalPct(z));
+
+  // Per-panel accent color (overrides global accent for that panel)
+  const readPanelAccent = (key: string): string => {
+    try { return localStorage.getItem(key) || ""; } catch { return ""; }
+  };
+  const [askPanelAccent, setAskPanelAccent] = useState<string>(() => readPanelAccent("straxor.panelAccent.ask"));
+  const [agentPanelAccent, setAgentPanelAccent] = useState<string>(() => readPanelAccent("straxor.panelAccent.agent"));
+  const handleAskPanelAccentChange = (a: string) => { localStorage.setItem("straxor.panelAccent.ask", a); setAskPanelAccent(a); };
+  const handleAgentPanelAccentChange = (a: string) => { localStorage.setItem("straxor.panelAccent.agent", a); setAgentPanelAccent(a); };
 
   // Per-panel height (independent Ask/Agent, % of panels row) — persisted
   const readPanelHeight = (key: string) => {
@@ -378,6 +533,18 @@ export default function Workspace() {
       localStorage.setItem("straxor.zoom.agent", String(agentZoom));
     } catch {}
   }, [agentZoom]);
+
+  // Persist per-panel vertical zoom
+  useEffect(() => {
+    try {
+      localStorage.setItem("straxor.vzoom.ask", String(askVerticalZoom));
+    } catch {}
+  }, [askVerticalZoom]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("straxor.vzoom.agent", String(agentVerticalZoom));
+    } catch {}
+  }, [agentVerticalZoom]);
 
   // Persist per-panel height
   useEffect(() => {
@@ -688,6 +855,100 @@ export default function Workspace() {
     // non-vision model); image messages use the user's selected model.
     let provider = askProvider;
     let model = askModel;
+
+    const roleConfig = getRoleById(askRole);
+    const history: { role: "user" | "assistant" | "system"; content: string }[] = [
+      {
+        role: "system",
+        content: `[SISTEMSKA ULOGA: ${roleConfig.label}]\n${roleConfig.systemPrompt}`,
+      },
+      ...askMessages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+      userMsg,
+    ];
+
+    // FAZA 5: parallel multi-model execution when 2+ models selected and no
+    // attachments (attachments break the shared-message fan-out for text-only
+    // orchestration).
+    if (askOrchestratedModels.length >= 2 && (!attachments || attachments.length === 0)) {
+      const results: OrchestratedResult[] = askOrchestratedModels.map((m) => {
+        const providerDef = availableModels.find((p) => p.providerId === m.providerId);
+        const label = providerDef?.models.find((mm) => mm.id === m.modelId)?.name || m.modelId;
+        return { modelId: m.modelId, label, content: "", done: false };
+      });
+      setAskMessages((prev) =>
+        prev.map((m) => (m.id === assistantMsg.id ? { ...m, orchestrated: results } : m))
+      );
+
+      const models: OrchestrateModel[] = [];
+      for (const sel of askOrchestratedModels) {
+        const key = await getApiKey(sel.providerId).catch(() => null);
+        models.push({ providerId: sel.providerId, modelId: sel.modelId, apiKey: key || "" });
+      }
+
+      try {
+        for await (const part of orchestrateChat(models, history, askThinking, attachments)) {
+          if (part.error !== undefined) {
+            setAskMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantMsg.id && m.orchestrated
+                  ? {
+                      ...m,
+                      orchestrated: m.orchestrated.map((r, i) =>
+                        i === part.modelIndex ? { ...r, error: part.error!, done: true } : r
+                      ),
+                    }
+                  : m
+              )
+            );
+            continue;
+          }
+          if (part.token) {
+            setAskMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantMsg.id && m.orchestrated
+                  ? {
+                      ...m,
+                      orchestrated: m.orchestrated.map((r, i) =>
+                        i === part.modelIndex ? { ...r, content: r.content + part.token! } : r
+                      ),
+                    }
+                  : m
+              )
+            );
+          }
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Network error";
+        setAskMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsg.id && m.orchestrated
+              ? {
+                  ...m,
+                  orchestrated: m.orchestrated.map((r) => ({ ...r, error: message, done: true })),
+                }
+              : m
+          )
+        );
+      }
+      // Mark each model complete (generator ended) unless already errored.
+      setAskMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantMsg.id && m.orchestrated
+            ? {
+                ...m,
+                orchestrated: m.orchestrated.map((r) => ({ ...r, done: true })),
+              }
+            : m
+        )
+      );
+      setAskStreamingId(null);
+      setAskLoading(false);
+      return;
+    }
+
     if (askModelOrch && (!attachments || attachments.length === 0)) {
       try {
         const route = await routeChat(msg, askThinking);
@@ -704,19 +965,6 @@ export default function Workspace() {
         prev.map((m) => (m.id === assistantMsg.id ? { ...m, label: model } : m))
       );
     }
-
-    const roleConfig = getRoleById(askRole);
-    const history: { role: "user" | "assistant" | "system"; content: string }[] = [
-      {
-        role: "system",
-        content: `[SISTEMSKA ULOGA: ${roleConfig.label}]\n${roleConfig.systemPrompt}`,
-      },
-      ...askMessages.map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
-      userMsg,
-    ];
 
     streamChat(provider, model, history, askThinking, {
       onToken: (token) => {
@@ -742,7 +990,7 @@ export default function Workspace() {
         setAskLoading(false);
       },
     }, attachments);
-  }, [askProvider, askModel, askThinking, askRole, askMessages, askModelOrch]);
+  }, [askProvider, askModel, askThinking, askRole, askMessages, askModelOrch, askOrchestratedModels, availableModels]);
 
   // Helper: proceed with tool allow after permission/security check
   const proceedToolAllow = useCallback(
@@ -791,6 +1039,73 @@ export default function Workspace() {
 
     // No VPS connected — fall back to plain model chat (works exactly like the Ask panel).
     if (!agentMachineId) {
+      // FAZA 5: parallel multi-model execution when 2+ models selected.
+      if (agentOrchestratedModels.length >= 2 && (!attachments || attachments.length === 0)) {
+        const systemParts: string[] = [];
+        systemParts.push(`[SISTEMSKA ULOGA: ${roleConfig.label}]\n${roleConfig.systemPrompt}`);
+        for (const p of activePrompts) {
+          systemParts.push(`[${p.name}]\n${p.content}`);
+        }
+        const history: { role: "user" | "assistant" | "system"; content: string }[] = [
+          { role: "system", content: systemParts.join("\n\n") },
+          ...agentMessages.map((m) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content,
+          })),
+          userMsg,
+        ];
+
+        const results: OrchestratedResult[] = agentOrchestratedModels.map((m) => {
+          const providerDef = availableModels.find((p) => p.providerId === m.providerId);
+          const label = providerDef?.models.find((mm) => mm.id === m.modelId)?.name || m.modelId;
+          return { modelId: m.modelId, label, content: "", done: false };
+        });
+        setAgentMessages((prev) =>
+          prev.map((m) => (m.id === assistantMsg.id ? { ...m, orchestrated: results } : m))
+        );
+
+        const models: OrchestrateModel[] = [];
+        for (const sel of agentOrchestratedModels) {
+          const key = await getApiKey(sel.providerId).catch(() => null);
+          models.push({ providerId: sel.providerId, modelId: sel.modelId, apiKey: key || "" });
+        }
+
+        const applyAsk = (updater: (results: OrchestratedResult[]) => OrchestratedResult[]) => {
+          setAgentMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsg.id && m.orchestrated
+                ? { ...m, orchestrated: updater(m.orchestrated) }
+                : m
+            )
+          );
+        };
+
+        try {
+          for await (const part of orchestrateChat(models, history, agentThinking, attachments)) {
+            if (part.error !== undefined) {
+              applyAsk((rs) =>
+                rs.map((r, i) => (i === part.modelIndex ? { ...r, error: part.error!, done: true } : r))
+              );
+              continue;
+            }
+            if (part.token) {
+              applyAsk((rs) =>
+                rs.map((r, i) =>
+                  i === part.modelIndex ? { ...r, content: r.content + part.token! } : r
+                )
+              );
+            }
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Network error";
+          applyAsk((rs) => rs.map((r) => ({ ...r, error: message, done: true })));
+        }
+        applyAsk((rs) => rs.map((r) => ({ ...r, done: true })));
+        setAgentStreamingId(null);
+        setAgentLoading(false);
+        return;
+      }
+
       // Model orkestracija — route to best model for this task's difficulty.
       // Skipped when images are attached (router may pick a non-vision model).
       let provider = agentProvider;
@@ -890,6 +1205,78 @@ export default function Workspace() {
       systemParts.length > 0
         ? `${systemParts.join("\n\n")}\n\n---\n\n${msg}`
         : msg;
+
+    // FAZA 6: background execution — fire-and-forget server-side run + polling.
+    if (agentBackground) {
+      const statusRef = { timeline: [] as BackgroundTimelineEntry[] };
+      const applyTimeline = () => {
+        setAgentMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsg.id
+              ? {
+                  ...m,
+                  content: statusRef.timeline
+                    .filter((e) => e.t === "text")
+                    .map((e) => e.content || "")
+                    .join(""),
+                  toolCalls: statusRef.timeline
+                    .filter((e) => e.t === "tool_call")
+                    .map((e) => ({
+                      id: e.toolId!,
+                      name: e.toolName || "tool",
+                      args: (() => {
+                        try { return JSON.parse(e.content || "{}"); } catch { return e.content || {}; }
+                      })(),
+                      status: e.toolStatus === "completed" || e.toolStatus === "error" ? e.toolStatus : "running",
+                      result: e.content,
+                    })),
+                }
+              : m
+          )
+        );
+      };
+
+      const poll = async (jobId: string, sessionId: string) => {
+        let attempts = 0;
+        const timer = window.setInterval(async () => {
+          if (attempts++ > 2400) { window.clearInterval(timer); setAgentStreamingId(null); setAgentLoading(false); return; }
+          try {
+            const st = await fetchBackgroundStatus(jobId);
+            if (st.timeline.length !== statusRef.timeline.length) {
+              statusRef.timeline = st.timeline;
+              applyTimeline();
+            }
+            if (st.finished) {
+              window.clearInterval(timer);
+              if (st.status === "error" && st.error) {
+                setAgentMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsg.id ? { ...m, content: `[Greška: ${st.error}]` } : m
+                  )
+                );
+              }
+              setAgentStreamingId(null);
+              setAgentLoading(false);
+            }
+          } catch {}
+        }, 1500);
+      };
+
+      try {
+        const started = await startAgentBackground(agentMachineId, fullMsg, agentSessionId, attachments);
+        setAgentSessionId(started.sessionId);
+        statusRef.timeline = [];
+        await poll(started.jobId, started.sessionId);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Network error";
+        setAgentMessages((prev) =>
+          prev.map((m) => (m.id === assistantMsg.id ? { ...m, content: `[Greška: ${message}]` } : m))
+        );
+        setAgentStreamingId(null);
+        setAgentLoading(false);
+      }
+      return;
+    }
 
     streamAgentMessage(agentMachineId, fullMsg, agentSessionId, {
       onSession: (sessionId) => {
@@ -1052,7 +1439,7 @@ export default function Workspace() {
         setAgentLoading(false);
       },
     }, attachments);
-  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch]);
+  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch, agentOrchestratedModels, availableModels, agentBackground]);
 
   // Confirm a step — send message to agent to continue
   const handleConfirmStep = useCallback(
@@ -1567,6 +1954,14 @@ export default function Workspace() {
 
   return (
     <div className="h-full flex flex-col relative">
+      {!stateReady && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-bg/80">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-border-light border-t-accent rounded-full animate-spin" />
+            <span className="text-[13px] text-text-muted">Učitavam radni prostor…</span>
+          </div>
+        </div>
+      )}
       <WorkspaceTopbar
         projectName={projectName}
         template="react"
@@ -1705,8 +2100,11 @@ export default function Workspace() {
                   ...(askPanelHeightPct < 100 ? { marginTop: "auto" } : {}),
                 }
               : {}),
-            ...(askZoom !== 1
-              ? { transform: `scale(${askZoom})`, transformOrigin: "top center" }
+            ...(askZoom !== 1 || askVerticalZoom !== 1
+              ? {
+                  transform: `scale(${askZoom}) scaleY(${askVerticalZoom})`,
+                  transformOrigin: "top center",
+                }
               : {}),
           }}
         >
@@ -1743,6 +2141,8 @@ export default function Workspace() {
             onOpenGitRemote={() => setShowGitRemote(true)}
             zoom={askZoom}
             onZoomChange={handleAskZoomChange}
+            verticalZoom={askVerticalZoom}
+            onVerticalZoomChange={handleAskVerticalZoomChange}
             panelMenuKey="ask"
             role={askRole}
             onRoleChange={setAskRole}
@@ -1761,6 +2161,13 @@ export default function Workspace() {
             isSteerable={isAgentSteerable}
             onSteerSend={handleSteerSend}
             steerStatusText={agentTodos.length > 0 ? t("chat.steer.steps", { n: agentTodos.filter(t => t.status !== "completed").length }) : undefined            }
+            panelAccent={askPanelAccent || undefined}
+            onPanelAccentChange={handleAskPanelAccentChange}
+            orchestratedModels={askOrchestratedModels}
+            onOrchestratedModelsChange={setAskOrchestratedModels}
+            availableModels={availableModels}
+            background={askBackground}
+            onBackgroundChange={setAskBackground}
           />
         </div>
 
@@ -1795,8 +2202,11 @@ export default function Workspace() {
                   ...(agentPanelHeightPct < 100 ? { marginTop: "auto" } : {}),
                 }
               : {}),
-            ...(agentZoom !== 1
-              ? { transform: `scale(${agentZoom})`, transformOrigin: "top center" }
+            ...(agentZoom !== 1 || agentVerticalZoom !== 1
+              ? {
+                  transform: `scale(${agentZoom}) scaleY(${agentVerticalZoom})`,
+                  transformOrigin: "top center",
+                }
               : {}),
           }}
         >
@@ -1830,6 +2240,8 @@ export default function Workspace() {
             onOpenGitRemote={() => setShowGitRemote(true)}
             zoom={agentZoom}
             onZoomChange={handleAgentZoomChange}
+            verticalZoom={agentVerticalZoom}
+            onVerticalZoomChange={handleAgentVerticalZoomChange}
             panelMenuKey="agent"
             role={agentRole}
             onRoleChange={setAgentRole}
@@ -1853,10 +2265,17 @@ export default function Workspace() {
                 onOpenRuntimeManager={() => setShowRuntimeManager(true)}
               />
             }
-            modelOrch={agentModelOrch}
-            onModelOrchChange={setAgentModelOrch}
-            modelOrchHint="Model orkestracija — task se automatski rutira na najbolji model prema težini (kad agent radi kao običan chat)"
-            headerContent={
+modelOrch={agentModelOrch}
+             onModelOrchChange={setAgentModelOrch}
+             modelOrchHint="Model orkestracija — task se automatski rutira na najbolji model prema težini (kad agent radi kao običan chat)"
+             panelAccent={agentPanelAccent || undefined}
+             onPanelAccentChange={handleAgentPanelAccentChange}
+             orchestratedModels={agentOrchestratedModels}
+             onOrchestratedModelsChange={setAgentOrchestratedModels}
+             availableModels={availableModels}
+             background={agentBackground}
+             onBackgroundChange={setAgentBackground}
+             headerContent={
               <>
                 <TodoList
                   steps={agentTodos}

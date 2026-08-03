@@ -36,6 +36,13 @@
       "when": 1785661819473,
       "tag": "0004_chilly_hex",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785777391591,
+      "tag": "0005_flippant_talkback",
+      "breakpoints": true
     }
   ]
 }
