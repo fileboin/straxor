@@ -27,7 +27,7 @@ export const MODEL_PRICING: ModelPricing[] = [
   { providerId: "anthropic", modelId: "claude-opus-4-6", inputPer1M: 15, outputPer1M: 75, maxOutput: 32000, speed: "slow", tier: "premium" },
   { providerId: "anthropic", modelId: "claude-sonnet-4", inputPer1M: 3, outputPer1M: 15, maxOutput: 16000, speed: "medium", tier: "mid" },
   { providerId: "anthropic", modelId: "claude-sonnet-4-5", inputPer1M: 3, outputPer1M: 15, maxOutput: 16000, speed: "medium", tier: "mid" },
-  { providerId: "anthropic", modelId: "claude-haiku-3-5", inputPer1M: 0.8, outputPer1M: 4, maxOutput: 8000, speed: "fast", tier: "budget" },
+  { providerId: "anthropic", modelId: "claude-haiku-4-5", inputPer1M: 0.8, outputPer1M: 4, maxOutput: 8000, speed: "fast", tier: "budget" },
   // OpenAI
   { providerId: "openai", modelId: "gpt-4o", inputPer1M: 2.5, outputPer1M: 10, maxOutput: 16384, speed: "medium", tier: "mid" },
   { providerId: "openai", modelId: "gpt-4o-mini", inputPer1M: 0.15, outputPer1M: 0.6, maxOutput: 16384, speed: "fast", tier: "budget" },
@@ -158,13 +158,13 @@ function recommendModel(
   thinking: ThinkingBudget
 ): { providerId: string; modelId: string; reason: string } {
   if (complexity === "simple") {
-    return { providerId: "anthropic", modelId: "claude-haiku-3-5", reason: "Dovoljno za jednostavna pitanja — najjeftinija opcija" };
+    return { providerId: "anthropic", modelId: "claude-haiku-4-5", reason: "Dovoljno za jednostavna pitanja — najjeftinija opcija" };
   }
   if (complexity === "moderate") {
     if (thinking === "high") {
       return { providerId: "google", modelId: "gemini-2.5-pro", reason: "Odličan balans cijene i reasoning kapaciteta" };
     }
-    return { providerId: "anthropic", modelId: "claude-sonnet-4", reason: "Brz i efikasan za srednje kompleksne zadatke" };
+    return { providerId: "anthropic", modelId: "claude-sonnet-4-6", reason: "Brz i efikasan za srednje kompleksne zadatke" };
   }
   // complex
   if (thinking === "high") {

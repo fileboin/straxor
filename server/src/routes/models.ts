@@ -42,7 +42,6 @@ const ANTHROPIC_MODELS: CatalogModel[] = [
   { id: "claude-3-7-sonnet-20250219", name: "Claude 3.7 Sonnet (2025-02-19)", thinking: true },
   { id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet", thinking: true },
   { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet (2024-10-22)", thinking: true },
-  { id: "claude-3-5-haiku", name: "Claude 3.5 Haiku" },
   { id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku (2024-10-22)" },
   { id: "claude-3-opus", name: "Claude 3 Opus" },
   { id: "claude-3-opus-20240229", name: "Claude 3 Opus (2024-02-29)" },

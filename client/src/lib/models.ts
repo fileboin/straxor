@@ -35,7 +35,7 @@ export const PROVIDERS: Provider[] = [
       { id: "claude-opus-4-6", name: "Claude Opus 4.6", thinking: true },
       { id: "claude-sonnet-4", name: "Claude Sonnet 4", thinking: true },
       { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", thinking: true },
-      { id: "claude-haiku-3-5", name: "Claude 3.5 Haiku" },
+      { id: "claude-haiku-4-5", name: "Claude Haiku 4.5" },
     ],
   },
   {

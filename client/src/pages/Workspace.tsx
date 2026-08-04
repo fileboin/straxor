@@ -138,7 +138,7 @@ export default function Workspace() {
   );
 
   const [askProvider, setAskProvider] = useState("anthropic");
-  const [askModel, setAskModel] = useState("claude-sonnet-4");
+  const [askModel, setAskModel] = useState("claude-haiku-4-5");
   const [askThinking, setAskThinking] = useState<ThinkingBudget>("medium");
 
   const [agentProvider, setAgentProvider] = useState("anthropic");
@@ -1533,7 +1533,7 @@ export default function Workspace() {
       icon: "◆",
       category: "model",
       keywords: ["model", "sonnet", "claude", "anthropic"],
-      action: () => { setAskProvider("anthropic"); setAskModel("claude-sonnet-4"); },
+      action: () => { setAskProvider("anthropic"); setAskModel("claude-sonnet-4-6"); },
     },
     {
       id: "model-opus",
