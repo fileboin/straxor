@@ -6,6 +6,10 @@ export interface CatalogModel {
   id: string;
   name: string;
   thinking?: boolean;
+  // How the provider expects the thinking parameter to be sent. Anthropic is not
+  // uniform here: "always-on" models reject any explicit thinking config,
+  // "adaptive" models reject budget_tokens, and "budget" models require it.
+  thinkingMode?: "always-on" | "adaptive" | "budget";
   free?: boolean;
   vision?: boolean;
 }
@@ -17,21 +21,28 @@ export interface CatalogProvider {
   models: CatalogModel[];
 }
 
+// Full current Anthropic catalog. Every Claude 4.5+ model does support thinking,
+// but the *mechanism* differs per model — see CatalogModel.thinkingMode. The
+// adapter must send the matching shape or the request fails with a 400.
+// claude-mythos-5 is deliberately absent: it is Project Glasswing only and 404s
+// for orgs without access.
 const ANTHROPIC_MODELS: CatalogModel[] = [
-  { id: "claude-fable-5", name: "Claude Fable 5", thinking: true },
-  { id: "claude-mythos-5", name: "Claude Mythos 5", thinking: true },
-  { id: "claude-opus-5", name: "Claude Opus 5", thinking: true },
-  { id: "claude-sonnet-5", name: "Claude Sonnet 5", thinking: true },
-  { id: "claude-opus-4-8", name: "Claude Opus 4.8", thinking: true },
-  { id: "claude-opus-4-7", name: "Claude Opus 4.7", thinking: true },
-  { id: "claude-opus-4-6", name: "Claude Opus 4.6", thinking: true },
-  { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true },
-  { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", thinking: true },
-  { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5 (2025-10-01)", thinking: true },
-  { id: "claude-opus-4-5", name: "Claude Opus 4.5", thinking: true },
-  { id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5 (2025-11-01)", thinking: true },
-  { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", thinking: true },
-  { id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5 (2025-09-29)", thinking: true },
+  // Thinking always on — cannot be disabled or configured.
+  { id: "claude-fable-5", name: "Claude Fable 5", thinking: true, thinkingMode: "always-on", vision: true },
+  // Adaptive thinking (budget_tokens rejected).
+  { id: "claude-opus-5", name: "Claude Opus 5", thinking: true, thinkingMode: "adaptive", vision: true },
+  { id: "claude-opus-4-8", name: "Claude Opus 4.8", thinking: true, thinkingMode: "adaptive", vision: true },
+  { id: "claude-opus-4-7", name: "Claude Opus 4.7", thinking: true, thinkingMode: "adaptive", vision: true },
+  { id: "claude-opus-4-6", name: "Claude Opus 4.6", thinking: true, thinkingMode: "adaptive", vision: true },
+  { id: "claude-sonnet-5", name: "Claude Sonnet 5", thinking: true, thinkingMode: "adaptive", vision: true },
+  { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true, thinkingMode: "adaptive", vision: true },
+  // Fixed thinking budget (budget_tokens required, must be < max_tokens).
+  { id: "claude-opus-4-5", name: "Claude Opus 4.5", thinking: true, thinkingMode: "budget", vision: true },
+  { id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5 (2025-11-01)", thinking: true, thinkingMode: "budget", vision: true },
+  { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", thinking: true, thinkingMode: "budget", vision: true },
+  { id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5 (2025-09-29)", thinking: true, thinkingMode: "budget", vision: true },
+  { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", thinking: true, thinkingMode: "budget", vision: true },
+  { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5 (2025-10-01)", thinking: true, thinkingMode: "budget", vision: true },
 ];
 
 const OPENAI_MODELS: CatalogModel[] = [
@@ -184,6 +195,10 @@ const VERTEX_MODELS: CatalogModel[] = [
   { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", thinking: true },
   { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite" },
   { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+  { id: "claude-opus-5", name: "Claude Opus 5", thinking: true, thinkingMode: "adaptive" },
+  { id: "claude-opus-4-8", name: "Claude Opus 4.8", thinking: true, thinkingMode: "adaptive" },
+  { id: "claude-sonnet-5", name: "Claude Sonnet 5", thinking: true, thinkingMode: "adaptive" },
+  { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true, thinkingMode: "adaptive" },
   { id: "claude-opus-4-6", name: "Claude Opus 4.6", thinking: true },
   { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", thinking: true },
   { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", thinking: true },
@@ -195,6 +210,10 @@ const VERTEX_MODELS: CatalogModel[] = [
 ];
 
 const BEDROCK_MODELS: CatalogModel[] = [
+  { id: "anthropic.claude-opus-5", name: "Claude Opus 5", thinking: true, thinkingMode: "adaptive" },
+  { id: "anthropic.claude-opus-4-8", name: "Claude Opus 4.8", thinking: true, thinkingMode: "adaptive" },
+  { id: "anthropic.claude-opus-4-7", name: "Claude Opus 4.7", thinking: true, thinkingMode: "adaptive" },
+  { id: "anthropic.claude-sonnet-5", name: "Claude Sonnet 5", thinking: true, thinkingMode: "adaptive" },
   { id: "anthropic.claude-opus-4-6", name: "Claude Opus 4.6", thinking: true },
   { id: "anthropic.claude-opus-4-5", name: "Claude Opus 4.5", thinking: true },
   { id: "anthropic.claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true },
@@ -235,6 +254,9 @@ const CUSTOM_MODELS: CatalogModel[] = [
 ];
 
 const OPENROUTER_FALLBACK: CatalogModel[] = [
+  { id: "anthropic/claude-opus-5", name: "Claude Opus 5", thinking: true },
+  { id: "anthropic/claude-opus-4-8", name: "Claude Opus 4.8", thinking: true },
+  { id: "anthropic/claude-sonnet-5", name: "Claude Sonnet 5", thinking: true },
   { id: "anthropic/claude-opus-4-6", name: "Claude Opus 4.6", thinking: true },
   { id: "anthropic/claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true },
   { id: "anthropic/claude-haiku-4-5", name: "Claude Haiku 4.5", thinking: true },

@@ -142,7 +142,7 @@ export default function Workspace() {
   const [askThinking, setAskThinking] = useState<ThinkingBudget>("medium");
 
   const [agentProvider, setAgentProvider] = useState("anthropic");
-  const [agentModel, setAgentModel] = useState("claude-opus-4-6");
+  const [agentModel, setAgentModel] = useState("claude-opus-5");
   const [agentThinking, setAgentThinking] = useState<ThinkingBudget>("high");
 
   const [askMessages, setAskMessages] = useState<ChatMessage[]>(INITIAL_ASK_MESSAGES);
@@ -1542,7 +1542,7 @@ export default function Workspace() {
       icon: "◆",
       category: "model",
       keywords: ["model", "opus", "claude", "anthropic"],
-      action: () => { setAgentProvider("anthropic"); setAgentModel("claude-opus-4-6"); },
+      action: () => { setAgentProvider("anthropic"); setAgentModel("claude-opus-5"); },
     },
     {
       id: "model-gpt4o",

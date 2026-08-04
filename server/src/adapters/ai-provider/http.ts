@@ -58,6 +58,87 @@ function countImageBlocks(messages: ChatMessage[]): number {
   return n;
 }
 
+// ── Anthropic thinking capabilities, per model family ──
+// The thinking parameter is NOT uniform across Claude models:
+//   • Fable/Mythos 5      → thinking is always on; ANY explicit `thinking` config is a 400.
+//                            Depth is controlled only via output_config.effort.
+//   • Opus 5 / 4.8 / 4.7 / 4.6, Sonnet 5 / 4.6
+//                          → adaptive thinking. `budget_tokens` was removed and returns a 400
+//                            on the 5-family; depth comes from output_config.effort.
+//   • Opus 4.5, Sonnet 4.5, Haiku 4.5 and older
+//                          → fixed budget: { type: "enabled", budget_tokens: N },
+//                            and budget_tokens MUST be strictly less than max_tokens.
+function anthropicModelKey(modelId: string): string {
+  // Tolerate provider-prefixed ids (bedrock "anthropic.claude-…", openrouter "anthropic/claude-…").
+  return modelId.replace(/^anthropic[./]/, "");
+}
+
+function thinkingIsAlwaysOn(modelId: string): boolean {
+  return /^claude-(fable|mythos)-5/.test(anthropicModelKey(modelId));
+}
+
+function usesAdaptiveThinking(modelId: string): boolean {
+  return /^claude-(opus-5|opus-4-8|opus-4-7|opus-4-6|sonnet-5|sonnet-4-6)/.test(
+    anthropicModelKey(modelId)
+  );
+}
+
+const ANTHROPIC_EFFORT: Record<string, string> = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+};
+
+const ANTHROPIC_BUDGET_TOKENS: Record<string, number> = {
+  low: 1024, // 1024 is the API minimum
+  medium: 4000,
+  high: 10000,
+};
+
+// Exported for testing — this body shape is model-dependent and easy to regress.
+export function buildAnthropicBody(
+  model: string,
+  messages: ChatMessage[],
+  thinking?: string
+): Record<string, unknown> {
+  const system = messages
+    .filter((m) => m.role === "system")
+    .map((m) => toTextOnlyContent(m.content))
+    .filter(Boolean);
+  const wantsThinking = !!thinking && thinking !== "off";
+  // Thinking tokens share the max_tokens budget, so reasoning runs need headroom.
+  // budget_tokens must stay strictly below max_tokens on pre-4.6 models.
+  const body: Record<string, unknown> = {
+    model,
+    max_tokens: wantsThinking ? 32000 : 8192,
+    stream: true,
+    messages: messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({ role: m.role, content: toAnthropicContent(m.content) })),
+  };
+
+  if (thinkingIsAlwaysOn(model)) {
+    // Omit `thinking` entirely — any explicit config is rejected on these models.
+    body.output_config = { effort: wantsThinking ? ANTHROPIC_EFFORT[thinking!] ?? "high" : "low" };
+  } else if (usesAdaptiveThinking(model)) {
+    if (wantsThinking) {
+      body.thinking = { type: "adaptive", display: "summarized" };
+      body.output_config = { effort: ANTHROPIC_EFFORT[thinking!] ?? "high" };
+    } else {
+      // Leave effort at its default — "disabled" is rejected above effort high.
+      body.thinking = { type: "disabled" };
+    }
+  } else if (wantsThinking) {
+    body.thinking = {
+      type: "enabled",
+      budget_tokens: ANTHROPIC_BUDGET_TOKENS[thinking!] ?? 4000,
+    };
+  }
+
+  if (system.length) body.system = system.join("\n\n");
+  return body;
+}
+
 interface ProviderConfig {
   baseUrl: string | ((model: string) => string);
   buildHeaders: (key: string) => Record<string, string>;
@@ -73,30 +154,11 @@ const PROVIDER_CONFIG: Record<string, ProviderConfig> = {
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     }),
-    buildBody: (model, messages, thinking) => {
-      const system = messages
-        .filter((m) => m.role === "system")
-        .map((m) => toTextOnlyContent(m.content))
-        .filter(Boolean);
-      const body: Record<string, unknown> = {
-        model,
-        max_tokens: 4096,
-        ...(thinking && thinking !== "off" && {
-          thinking: {
-            type: "enabled",
-            budget_tokens: thinking === "high" ? 10000 : thinking === "medium" ? 4000 : 1000,
-          },
-        }),
-        messages: messages
-          .filter((m) => m.role !== "system")
-          .map((m) => ({ role: m.role, content: toAnthropicContent(m.content) })),
-      };
-      if (system.length) body.system = system.join("\n\n");
-      return body;
-    },
+    buildBody: buildAnthropicBody,
     extractStreamLine: (line) => {
+      if (!line.startsWith("data: ")) return null;
       try {
-        const d = JSON.parse(line);
+        const d = JSON.parse(line.slice(6));
         if (d.type === "content_block_delta" && d.delta?.text) return d.delta.text;
       } catch {}
       return null;
@@ -288,6 +350,22 @@ export function createHttpAIProviderAdapter(): AIProviderAdapter {
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed) continue;
+
+          // Providers can report a failure mid-stream (Anthropic sends an
+          // `error` SSE event). Without this the stream just ends silently and
+          // the user sees an empty reply.
+          if (trimmed.startsWith("data: ")) {
+            try {
+              const payload = JSON.parse(trimmed.slice(6));
+              const err = payload?.error;
+              if (err) {
+                const detail = typeof err === "string" ? err : err.message || err.type;
+                console.error(`[ai-provider] ${providerId} stream error: ${detail}`);
+                yield { type: "error" as const, content: detail || "Stream error" };
+                return;
+              }
+            } catch {}
+          }
 
           let token: string | null = null;
 

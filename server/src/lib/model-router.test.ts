@@ -91,7 +91,7 @@ describe("pickModel", () => {
     const available = new Set(["anthropic", "openai"]);
     const result = pickModel("complex", available);
     expect(result?.providerId).toBe("anthropic");
-    expect(result?.modelId).toBe("claude-opus-4-6");
+    expect(result?.modelId).toBe("claude-opus-5");
   });
 
   it("ne puca na thinking parametru (ignoriran)", () => {

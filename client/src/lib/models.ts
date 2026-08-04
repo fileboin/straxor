@@ -22,6 +22,8 @@ export interface Model {
   id: string;
   name: string;
   thinking?: boolean;
+  // Provider-specific shape of the thinking parameter. See server routes/models.ts.
+  thinkingMode?: "always-on" | "adaptive" | "budget";
   free?: boolean;
   vision?: boolean;
 }
@@ -32,20 +34,19 @@ export const PROVIDERS: Provider[] = [
     name: "Anthropic",
     status: "ready",
     models: [
-      { id: "claude-fable-5", name: "Claude Fable 5", thinking: true },
-      { id: "claude-mythos-5", name: "Claude Mythos 5", thinking: true },
-      { id: "claude-opus-5", name: "Claude Opus 5", thinking: true },
-      { id: "claude-sonnet-5", name: "Claude Sonnet 5", thinking: true },
-      { id: "claude-opus-4-8", name: "Claude Opus 4.8", thinking: true },
-      { id: "claude-opus-4-7", name: "Claude Opus 4.7", thinking: true },
-      { id: "claude-opus-4-6", name: "Claude Opus 4.6", thinking: true },
-      { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true },
-      { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", thinking: true },
-      { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5 (2025-10-01)", thinking: true },
-      { id: "claude-opus-4-5", name: "Claude Opus 4.5", thinking: true },
-      { id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5 (2025-11-01)", thinking: true },
-      { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", thinking: true },
-      { id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5 (2025-09-29)", thinking: true },
+      { id: "claude-fable-5", name: "Claude Fable 5", thinking: true, thinkingMode: "always-on", vision: true },
+      { id: "claude-opus-5", name: "Claude Opus 5", thinking: true, thinkingMode: "adaptive", vision: true },
+      { id: "claude-opus-4-8", name: "Claude Opus 4.8", thinking: true, thinkingMode: "adaptive", vision: true },
+      { id: "claude-opus-4-7", name: "Claude Opus 4.7", thinking: true, thinkingMode: "adaptive", vision: true },
+      { id: "claude-opus-4-6", name: "Claude Opus 4.6", thinking: true, thinkingMode: "adaptive", vision: true },
+      { id: "claude-sonnet-5", name: "Claude Sonnet 5", thinking: true, thinkingMode: "adaptive", vision: true },
+      { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true, thinkingMode: "adaptive", vision: true },
+      { id: "claude-opus-4-5", name: "Claude Opus 4.5", thinking: true, thinkingMode: "budget", vision: true },
+      { id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5 (2025-11-01)", thinking: true, thinkingMode: "budget", vision: true },
+      { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", thinking: true, thinkingMode: "budget", vision: true },
+      { id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5 (2025-09-29)", thinking: true, thinkingMode: "budget", vision: true },
+      { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", thinking: true, thinkingMode: "budget", vision: true },
+      { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5 (2025-10-01)", thinking: true, thinkingMode: "budget", vision: true },
     ],
   },
   {

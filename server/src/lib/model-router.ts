@@ -45,14 +45,14 @@ const LADDER: Record<TaskDifficulty, ModelOption[]> = {
     { providerId: "opencode-zen", modelId: "opencode/big-pickle", reason: "Besplatno za jednostavne upite" },
   ],
   moderate: [
-    { providerId: "anthropic", modelId: "claude-sonnet-4-6", reason: "Balans brzine i kvaliteta" },
+    { providerId: "anthropic", modelId: "claude-sonnet-5", reason: "Balans brzine i kvaliteta" },
     { providerId: "google", modelId: "gemini-2.5-flash", reason: "Balans brzine i kvaliteta" },
     { providerId: "openai", modelId: "gpt-4o", reason: "Pouzdan za srednje zadatke" },
     { providerId: "deepseek", modelId: "deepseek-coder", reason: "Dobar za kodiranje" },
     { providerId: "opencode-zen", modelId: "opencode/laguna-s-2.1-free", reason: "Besplatno za srednje zadatke" },
   ],
   complex: [
-    { providerId: "anthropic", modelId: "claude-opus-4-6", reason: "Najsnažniji model za složene zadatke" },
+    { providerId: "anthropic", modelId: "claude-opus-5", reason: "Najsnažniji model za složene zadatke" },
     { providerId: "openai", modelId: "o3", reason: "Dubok reasoning za složene zadatke" },
     { providerId: "google", modelId: "gemini-2.5-pro", reason: "Napredni reasoning" },
     { providerId: "deepseek", modelId: "deepseek-r1", reason: "Dubok reasoning" },
