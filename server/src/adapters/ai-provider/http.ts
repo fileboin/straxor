@@ -238,10 +238,32 @@ export function createHttpAIProviderAdapter(): AIProviderAdapter {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
+        let errorMessage = `${providerId} error (${response.status})`;
+        try {
+          const errorText = await response.text();
+          try {
+            const errorData = JSON.parse(errorText);
+            if (errorData.error) {
+              if (typeof errorData.error === "string") {
+                errorMessage = errorData.error;
+              } else if (errorData.error.message) {
+                errorMessage = errorData.error.message;
+              } else if (errorData.error.type) {
+                errorMessage = errorData.error.type;
+              }
+            }
+          } catch {
+            if (errorText.length > 0 && errorText.length < 500) {
+              errorMessage = errorText;
+            }
+          }
+        } catch {
+          errorMessage += ": Unable to read response";
+        }
+        console.error(`[ai-provider] ${providerId} request failed: ${errorMessage}`);
         yield {
           type: "error" as const,
-          content: `Provider error (${response.status}): ${errorText}`,
+          content: errorMessage,
         };
         return;
       }
