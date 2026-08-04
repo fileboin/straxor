@@ -26,6 +26,20 @@ import {
   openCameraStream,
   capturePhoto,
 } from "../../lib/media.js";
+import type { AccentColor } from "../../lib/theme.js";
+
+const PANEL_BG_COLORS: Record<AccentColor, string> = {
+  burnt: "color-mix(in srgb, #FF4D2E 8%, #0a0e1a)",
+  blue: "color-mix(in srgb, #3B82F6 6%, #0a0e1a)",
+  yellow: "color-mix(in srgb, #F5C842 4%, #0a0e1a)",
+  orange: "color-mix(in srgb, #F97316 8%, #0a0e1a)",
+  red: "color-mix(in srgb, #EF4444 6%, #0a0e1a)",
+  gray: "color-mix(in srgb, #6B7280 10%, #0a0e1a)",
+  green: "color-mix(in srgb, #22C55E 6%, #0a0e1a)",
+  purple: "color-mix(in srgb, #8B5CF6 6%, #0a0e1a)",
+  white: "color-mix(in srgb, #FFFFFF 6%, #0a0e1a)",
+  black: "#000000",
+};
 
 export interface ToolCall {
   id: string;
@@ -710,13 +724,27 @@ export default function ChatPanel({
       onOrchestratedModelsChange={onOrchestratedModelsChange || (() => {})}
       availableModels={availableModels}
     />
-  ) : null;
+   ) : null;
+
+  const panelBgStyle = panelAccent
+    ? {
+        "--panel-accent": panelAccent,
+        "--panel-bg": PANEL_BG_COLORS[panelAccent as AccentColor] ?? panelAccent,
+        ...(panelAccent === "black"
+          ? {
+              "--panel-surface": "#000000",
+              "--panel-surface-2": "#000000",
+              "--panel-surface-3": "#000000",
+            }
+          : {}),
+      } as React.CSSProperties
+    : undefined;
 
   return (
     <div
       className={`flex flex-col h-full min-h-0 overflow-hidden rounded-2xl panel-glass ${isEmpty ? "border border-white/10" : "border border-border shadow-lg shadow-black/30"}`}
-      style={panelAccent ? { "--panel-accent": panelAccent } as React.CSSProperties : undefined}
       data-panel-accent={panelAccent ? "true" : undefined}
+      style={panelBgStyle}
     >
       {isEmpty ? (
         <WelcomeHero

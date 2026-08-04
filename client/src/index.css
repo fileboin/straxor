@@ -254,6 +254,12 @@
   --accent-light: color-mix(in srgb, var(--panel-accent) 60%, #ffffff);
   --accent-dim: color-mix(in srgb, var(--panel-accent) 15%, transparent);
   --accent-border: color-mix(in srgb, var(--panel-accent) 40%, transparent);
+  /* Per-panel background: black/OLED override propagates to inner
+     bg-surface / bg-surface-2 / bg-surface-3 elements. For colored
+     accents the panel-bg stays the glass fallback (dark), keeping text readable. */
+  --surface: var(--panel-surface, var(--surface));
+  --surface-2: var(--panel-surface-2, var(--surface-2));
+  --surface-3: var(--panel-surface-3, var(--surface-3));
 }
 
 /* ═══════════════════════════════════════════
@@ -262,7 +268,7 @@
    + blagi gradient glow rubova u boji accenta.
    ═══════════════════════════════════════════ */
 .panel-glass {
-  background: rgba(10, 14, 26, 0.55);
+  background: var(--panel-bg, rgba(10, 14, 26, 0.55));
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
   border: 1px solid rgba(255, 255, 255, 0.07);
@@ -288,7 +294,7 @@
 
 /* Light tema — glass panel */
 [data-theme="light"] .panel-glass {
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--panel-bg-light, rgba(255, 255, 255, 0.6));
   border-color: rgba(0, 0, 0, 0.06);
 }
 [data-theme="light"] .panel-glass::before {
