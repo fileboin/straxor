@@ -269,6 +269,11 @@ export default function ChatPanel({
   background,
   onBackgroundChange,
   backgroundHint,
+  panelAccent,
+  onPanelAccentChange,
+  orchestratedModels = [],
+  onOrchestratedModelsChange,
+  availableModels = [],
 }: Props) {
   const [input, setInput] = useState("");
   useLang();
@@ -702,7 +707,7 @@ export default function ChatPanel({
       panelAccent={panelAccent}
       onPanelAccentChange={onPanelAccentChange}
       orchestratedModels={orchestratedModels}
-      onOrchestratedModelsChange={onOrchestratedModelsChange}
+      onOrchestratedModelsChange={onOrchestratedModelsChange || (() => {})}
       availableModels={availableModels}
     />
   ) : null;

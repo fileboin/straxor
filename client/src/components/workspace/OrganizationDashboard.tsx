@@ -3,17 +3,17 @@ import {
   listOrganizations,
   createOrganization,
   getOrganization,
-  updateOrganization,
-  deleteOrganization,
   addOrgMember,
   removeOrgMember,
+  listOrgApiKeys,
   addOrgApiKey,
   deleteOrgApiKey,
+  listOrgPolicies,
   addOrgPolicy,
   updateOrgPolicy,
   deleteOrgPolicy,
+  listOrgBudgets,
   addOrgBudget,
-  updateOrgBudget,
   deleteOrgBudget,
   getOrgUsage,
   type Organization,
@@ -320,7 +320,6 @@ function ApiKeysTab({ orgId, canManage, onAction }: { orgId: string; canManage: 
   const loadKeys = useCallback(async () => {
     setLoading(true);
     try {
-      const { listOrgApiKeys } = await import("../../lib/organization");
       const k = await listOrgApiKeys(orgId);
       setKeys(k);
     } catch {}
@@ -332,7 +331,6 @@ function ApiKeysTab({ orgId, canManage, onAction }: { orgId: string; canManage: 
   const handleAdd = async () => {
     if (!keyValue.trim()) return;
     try {
-      const { addOrgApiKey } = await import("../../lib/organization");
       await addOrgApiKey(orgId, provider, keyValue.trim(), label.trim() || undefined);
       setKeyValue("");
       setLabel("");
@@ -343,7 +341,6 @@ function ApiKeysTab({ orgId, canManage, onAction }: { orgId: string; canManage: 
 
   const handleDelete = async (keyId: string) => {
     try {
-      const { deleteOrgApiKey } = await import("../../lib/organization");
       await deleteOrgApiKey(orgId, keyId);
       onAction("Obrisano");
       loadKeys();
@@ -397,7 +394,6 @@ function PoliciesTab({ orgId, canManage, onAction }: { orgId: string; canManage:
   const loadPolicies = useCallback(async () => {
     setLoading(true);
     try {
-      const { listOrgPolicies } = await import("../../lib/organization");
       const p = await listOrgPolicies(orgId);
       setPolicies(p);
     } catch {}
@@ -409,7 +405,6 @@ function PoliciesTab({ orgId, canManage, onAction }: { orgId: string; canManage:
   const handleAdd = async () => {
     if (!name.trim()) return;
     try {
-      const { addOrgPolicy } = await import("../../lib/organization");
       await addOrgPolicy(orgId, { type, name: name.trim(), description: desc.trim() || undefined });
       setName(""); setDesc("");
       setShowAdd(false);
@@ -420,7 +415,6 @@ function PoliciesTab({ orgId, canManage, onAction }: { orgId: string; canManage:
 
   const handleToggle = async (policyId: string, current: boolean) => {
     try {
-      const { updateOrgPolicy } = await import("../../lib/organization");
       await updateOrgPolicy(orgId, policyId, { isEnabled: !current });
       loadPolicies();
     } catch (err: any) { onAction(err.message); }
@@ -428,7 +422,6 @@ function PoliciesTab({ orgId, canManage, onAction }: { orgId: string; canManage:
 
   const handleDelete = async (policyId: string) => {
     try {
-      const { deleteOrgPolicy } = await import("../../lib/organization");
       await deleteOrgPolicy(orgId, policyId);
       onAction("Obrisano");
       loadPolicies();
@@ -509,7 +502,6 @@ function BudgetTab({ orgId, canManage, onAction }: { orgId: string; canManage: b
   const loadBudgets = useCallback(async () => {
     setLoading(true);
     try {
-      const { listOrgBudgets } = await import("../../lib/organization");
       const b = await listOrgBudgets(orgId);
       setBudgets(b);
     } catch {}
@@ -520,7 +512,6 @@ function BudgetTab({ orgId, canManage, onAction }: { orgId: string; canManage: b
 
   const handleAdd = async () => {
     try {
-      const { addOrgBudget } = await import("../../lib/organization");
       await addOrgBudget(orgId, { monthlyLimit });
       setShowAdd(false);
       onAction("Dodato");
@@ -530,7 +521,6 @@ function BudgetTab({ orgId, canManage, onAction }: { orgId: string; canManage: b
 
   const handleDelete = async (budgetId: string) => {
     try {
-      const { deleteOrgBudget } = await import("../../lib/organization");
       await deleteOrgBudget(orgId, budgetId);
       onAction("Obrisano");
       loadBudgets();
