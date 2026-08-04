@@ -73,17 +73,27 @@ const PROVIDER_CONFIG: Record<string, ProviderConfig> = {
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     }),
-    buildBody: (model, messages, thinking) => ({
-      model,
-      max_tokens: 4096,
-      ...(thinking && thinking !== "off" && {
-        thinking: {
-          type: "enabled",
-          budget_tokens: thinking === "high" ? 10000 : thinking === "medium" ? 4000 : 1000,
-        },
-      }),
-      messages: messages.map((m) => ({ role: m.role, content: toAnthropicContent(m.content) })),
-    }),
+    buildBody: (model, messages, thinking) => {
+      const system = messages
+        .filter((m) => m.role === "system")
+        .map((m) => toTextOnlyContent(m.content))
+        .filter(Boolean);
+      const body: Record<string, unknown> = {
+        model,
+        max_tokens: 4096,
+        ...(thinking && thinking !== "off" && {
+          thinking: {
+            type: "enabled",
+            budget_tokens: thinking === "high" ? 10000 : thinking === "medium" ? 4000 : 1000,
+          },
+        }),
+        messages: messages
+          .filter((m) => m.role !== "system")
+          .map((m) => ({ role: m.role, content: toAnthropicContent(m.content) })),
+      };
+      if (system.length) body.system = system.join("\n\n");
+      return body;
+    },
     extractStreamLine: (line) => {
       try {
         const d = JSON.parse(line);
@@ -120,12 +130,23 @@ const PROVIDER_CONFIG: Record<string, ProviderConfig> = {
       "x-goog-api-key": key,
       "Content-Type": "application/json",
     }),
-    buildBody: (_model, messages) => ({
-      contents: messages.map((m) => ({
-        role: m.role === "assistant" ? "model" : m.role,
-        parts: toGoogleParts(m.content),
-      })),
-    }),
+    buildBody: (_model, messages) => {
+      const system = messages
+        .filter((m) => m.role === "system")
+        .map((m) => toTextOnlyContent(m.content))
+        .filter(Boolean)
+        .join("\n\n");
+      const body: Record<string, unknown> = {
+        contents: messages
+          .filter((m) => m.role !== "system")
+          .map((m) => ({
+            role: m.role === "assistant" ? "model" : m.role,
+            parts: toGoogleParts(m.content),
+          })),
+      };
+      if (system) body.systemInstruction = { parts: [{ text: system }] };
+      return body;
+    },
     extractStreamLine: (line) => {
       try {
         if (line.startsWith("data: ")) {
