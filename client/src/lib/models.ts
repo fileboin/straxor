@@ -3,6 +3,14 @@ import { useEffect, useState } from "react";
 
 export type ProviderStatus = "ready" | "needs-setup";
 
+// Providers that work without an API key (e.g. local Ollama). The picker must
+// not gate model selection on a stored key, and chat must not require one.
+export const KEYLESS_PROVIDERS: ReadonlySet<string> = new Set(["ollama"]);
+
+export function needsApiKey(providerId: string): boolean {
+  return !KEYLESS_PROVIDERS.has(providerId);
+}
+
 export interface Provider {
   id: string;
   name: string;
@@ -14,6 +22,10 @@ export interface Model {
   id: string;
   name: string;
   thinking?: boolean;
+  // Provider-specific shape of the thinking parameter. See server routes/models.ts.
+  thinkingMode?: "always-on" | "adaptive" | "budget";
+  free?: boolean;
+  vision?: boolean;
 }
 
 export const PROVIDERS: Provider[] = [
@@ -22,10 +34,19 @@ export const PROVIDERS: Provider[] = [
     name: "Anthropic",
     status: "ready",
     models: [
-      { id: "claude-opus-4-6", name: "Claude Opus 4.6", thinking: true },
-      { id: "claude-sonnet-4", name: "Claude Sonnet 4", thinking: true },
-      { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", thinking: true },
-      { id: "claude-haiku-3-5", name: "Claude 3.5 Haiku" },
+      { id: "claude-fable-5", name: "Claude Fable 5", thinking: true, thinkingMode: "always-on", vision: true },
+      { id: "claude-opus-5", name: "Claude Opus 5", thinking: true, thinkingMode: "adaptive", vision: true },
+      { id: "claude-opus-4-8", name: "Claude Opus 4.8", thinking: true, thinkingMode: "adaptive", vision: true },
+      { id: "claude-opus-4-7", name: "Claude Opus 4.7", thinking: true, thinkingMode: "adaptive", vision: true },
+      { id: "claude-opus-4-6", name: "Claude Opus 4.6", thinking: true, thinkingMode: "adaptive", vision: true },
+      { id: "claude-sonnet-5", name: "Claude Sonnet 5", thinking: true, thinkingMode: "adaptive", vision: true },
+      { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true, thinkingMode: "adaptive", vision: true },
+      { id: "claude-opus-4-5", name: "Claude Opus 4.5", thinking: true, thinkingMode: "budget", vision: true },
+      { id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5 (2025-11-01)", thinking: true, thinkingMode: "budget", vision: true },
+      { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", thinking: true, thinkingMode: "budget", vision: true },
+      { id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5 (2025-09-29)", thinking: true, thinkingMode: "budget", vision: true },
+      { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", thinking: true, thinkingMode: "budget", vision: true },
+      { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5 (2025-10-01)", thinking: true, thinkingMode: "budget", vision: true },
     ],
   },
   {
@@ -57,6 +78,20 @@ export const PROVIDERS: Provider[] = [
       { id: "deepseek-r1", name: "DeepSeek R1", thinking: true },
       { id: "deepseek-v3", name: "DeepSeek V3" },
       { id: "deepseek-coder", name: "DeepSeek Coder" },
+    ],
+  },
+  {
+    id: "opencode-zen",
+    name: "OpenCode Zen",
+    status: "ready",
+    models: [
+      { id: "opencode/big-pickle", name: "Big Pickle", free: true },
+      { id: "opencode/deepseek-v4-flash-free", name: "DeepSeek V4 Flash Free", free: true },
+      { id: "opencode/laguna-s-2.1-free", name: "Laguna S 2.1 Free", free: true },
+      { id: "opencode/ling-3.0-flash-free", name: "Ling-3.0-flash Free", free: true },
+      { id: "opencode/mimo-v2.5-free", name: "MiMo-V2.5 Free", free: true, vision: true },
+      { id: "opencode/nemotron-3-ultra-free", name: "Nemotron 3 Ultra Free", free: true },
+      { id: "opencode/north-mini-code-free", name: "North Mini Code Free", free: true },
     ],
   },
   {

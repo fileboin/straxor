@@ -18,6 +18,7 @@ interface Props {
   onOpenPromptLibrary: () => void;
   onToolbarAction: (actionId: string) => void;
   roleSelector?: ReactNode;
+  panelMenu?: ReactNode;
   micState?: "idle" | "recording" | "processing";
   budgetPopover?: ReactNode;
   micStatusBar?: ReactNode;
@@ -41,6 +42,7 @@ export default function WelcomeHero({
   onOpenPromptLibrary,
   onToolbarAction,
   roleSelector,
+  panelMenu,
   micState,
   budgetPopover,
   micStatusBar,
@@ -61,15 +63,15 @@ export default function WelcomeHero({
   return (
     <div
       className="relative flex-1 flex flex-col min-h-0 overflow-y-auto"
-      style={{ background: "linear-gradient(135deg, #1a3a5c 0%, #2d5f7a 48%, #0d2438 100%)" }}
+      style={{ background: "linear-gradient(150deg, #12182a 0%, #0a0e1a 55%, #1a2130 100%)" }}
     >
       <div
-        className="absolute -top-24 -left-24 w-80 h-80 rounded-full opacity-40 blur-3xl pointer-events-none"
-        style={{ background: "radial-gradient(circle, #3b82f6 0%, transparent 70%)" }}
+        className="absolute -top-24 -left-24 w-80 h-80 rounded-full opacity-25 blur-3xl pointer-events-none"
+        style={{ background: "radial-gradient(circle, #ff4d2e 0%, transparent 70%)" }}
       />
       <div
-        className="absolute -bottom-24 -right-16 w-80 h-80 rounded-full opacity-30 blur-3xl pointer-events-none"
-        style={{ background: "radial-gradient(circle, #1e90ff 0%, transparent 70%)" }}
+        className="absolute -bottom-24 -right-16 w-80 h-80 rounded-full opacity-20 blur-3xl pointer-events-none"
+        style={{ background: "radial-gradient(circle, #3b82f6 0%, transparent 70%)" }}
       />
       <div className="absolute inset-0 bg-black/10 backdrop-blur-[1px] pointer-events-none" />
 
@@ -134,12 +136,13 @@ export default function WelcomeHero({
               >
                 💡 {t("welcome.ideas")}
               </button>
+              {panelMenu}
             </div>
             <button
               type="submit"
               disabled={disabled}
               className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white text-sm sm:text-base transition-opacity hover:opacity-85 disabled:opacity-30 shrink-0"
-              style={{ background: "#2E9EFF", boxShadow: "0 4px 16px rgba(46,158,255,0.45)" }}
+              style={{ background: "var(--accent)", boxShadow: "0 4px 16px color-mix(in srgb, var(--accent) 45%, transparent)" }}
               title={t("welcome.send")}
             >
               ↑

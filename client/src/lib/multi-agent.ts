@@ -72,6 +72,9 @@ export interface AgentTask {
   completedAt: string | null;
   tokens: number;
   costUSD: number;
+  executionLog?: string[];
+  sessionId?: string | null;
+  commitHash?: string | null;
 }
 
 export interface WorkflowDefinition {
@@ -207,6 +210,10 @@ export async function completeTask(taskId: string, output: string, tokens?: numb
     method: "POST",
     body: JSON.stringify({ output, tokens, costUSD }),
   });
+}
+
+export async function runTask(taskId: string): Promise<{ accepted: boolean; taskId: string; status: string }> {
+  return api(`/multi-agent/tasks/${taskId}/run`, { method: "POST" });
 }
 
 export async function listMessages(taskId?: string): Promise<AgentMessage[]> {

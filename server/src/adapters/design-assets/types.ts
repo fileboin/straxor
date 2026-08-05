@@ -170,20 +170,20 @@ export const LUCIDE_ICONS_SAMPLE: DesignAsset[] = [
 // ── Brand Assets ──
 
 export const BRAND_ASSETS: DesignAsset[] = [
-  { id: "brand-logo", name: "Straxor Logo", category: "brand", format: "svg", tags: ["logo", "brand", "main"], description: "Glavni Straxor logo", content: '<svg viewBox="0 0 120 32" xmlns="http://www.w3.org/2000/svg"><text x="0" y="24" font-family="system-ui" font-weight="bold" font-size="24" fill="#6b8c42">straxor</text></svg>', license: "Proprietary", source: "Straxor", createdAt: "2024-01-01" },
-  { id: "brand-icon", name: "Straxor Icon", category: "brand", format: "svg", tags: ["icon", "brand", "favicon"], description: "Straxor favicon/icon", content: '<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="8" fill="#000"/><text x="16" y="22" text-anchor="middle" font-family="system-ui" font-weight="bold" font-size="18" fill="#6b8c42">S</text></svg>', license: "Proprietary", source: "Straxor", createdAt: "2024-01-01" },
+  { id: "brand-logo", name: "Straxor Logo", category: "brand", format: "svg", tags: ["logo", "brand", "main"], description: "Glavni Straxor logo", content: '<svg viewBox="0 0 120 32" xmlns="http://www.w3.org/2000/svg"><text x="0" y="24" font-family="system-ui" font-weight="bold" font-size="24" fill="#ff4d2e">straxor</text></svg>', license: "Proprietary", source: "Straxor", createdAt: "2024-01-01" },
+  { id: "brand-icon", name: "Straxor Icon", category: "brand", format: "svg", tags: ["icon", "brand", "favicon"], description: "Straxor favicon/icon", content: '<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="8" fill="#0a0e1a"/><text x="16" y="22" text-anchor="middle" font-family="system-ui" font-weight="bold" font-size="18" fill="#ff4d2e">S</text></svg>', license: "Proprietary", source: "Straxor", createdAt: "2024-01-01" },
   { id: "brand-wordmark", name: "Straxor Wordmark", category: "brand", format: "svg", tags: ["wordmark", "brand", "text"], description: "Straxor tekstualni logo", content: '<svg viewBox="0 0 200 40" xmlns="http://www.w3.org/2000/svg"><text x="0" y="30" font-family="system-ui" font-weight="800" font-size="32" letter-spacing="-1" fill="#ffffff">straxor</text></svg>', license: "Proprietary", source: "Straxor", createdAt: "2024-01-01" },
 ];
 
 // ── Design Tokens ──
 
 export const DESIGN_TOKENS: DesignToken[] = [
-  { id: "color-accent", name: "Accent (Olive)", category: "color", value: "#6b8c42", cssVar: "--color-accent", tailwindClass: "text-accent", description: "Primarna akcent boja" },
-  { id: "color-bg", name: "Background", category: "color", value: "#000000", cssVar: "--color-bg", tailwindClass: "bg-bg", description: "OLED true black pozadina" },
-  { id: "color-surface", name: "Surface", category: "color", value: "#0a0a0a", cssVar: "--color-surface", tailwindClass: "bg-surface", description: "Površina kartica i panela" },
+  { id: "color-accent", name: "Accent (Burnt Orange)", category: "color", value: "#ff4d2e", cssVar: "--color-accent", tailwindClass: "text-accent", description: "Primarna akcent boja" },
+  { id: "color-bg", name: "Background", category: "color", value: "#0a0e1a", cssVar: "--color-bg", tailwindClass: "bg-bg", description: "Glavna pozadina" },
+  { id: "color-surface", name: "Surface", category: "color", value: "#141824", cssVar: "--color-surface", tailwindClass: "bg-surface", description: "Površina kartica i panela" },
   { id: "color-text", name: "Text", category: "color", value: "#fafafa", cssVar: "--color-text", tailwindClass: "text-text", description: "Glavni tekst" },
   { id: "color-muted", name: "Text Muted", category: "color", value: "#737373", cssVar: "--color-text-muted", tailwindClass: "text-text-muted", description: "Prigušeni tekst" },
-  { id: "color-border", name: "Border", category: "color", value: "#262626", cssVar: "--color-border", tailwindClass: "border-border", description: "Okviri i granice" },
+  { id: "color-border", name: "Border", category: "color", value: "#202838", cssVar: "--color-border", tailwindClass: "border-border", description: "Okviri i granice" },
   { id: "color-blue", name: "Blue", category: "color", value: "#3b82f6", cssVar: "--color-accent-blue", tailwindClass: "text-accent-blue", description: "Plava akcent" },
   { id: "color-red", name: "Red", category: "color", value: "#ef4444", cssVar: "--color-accent-red", tailwindClass: "text-accent-red", description: "Crvena greška" },
   { id: "spacing-xs", name: "XS", category: "spacing", value: "4px", tailwindClass: "p-1", description: "Extra mali razmak" },

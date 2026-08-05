@@ -115,18 +115,20 @@ export default function EnginePicker({
             {mode === "vps" && <span className="ml-auto text-[9px] text-blue-400 shrink-0">●</span>}
           </button>
 
-          {!hasRepo && (
-            <button
-              onClick={() => { setOpen(false); onOpenGitRemote(); }}
-              className="w-full flex items-start gap-2 px-3 py-2.5 text-left hover:bg-surface-2 transition-colors"
-            >
-              <span className="text-base leading-none mt-0.5">🔗</span>
-              <span className="min-w-0">
-                <span className="block text-[11px] font-medium text-text">GitHub repo</span>
-                <span className="block text-[9px] text-text-muted">Poveži repozitorijum za agenta</span>
+          <button
+            onClick={() => { setOpen(false); onOpenGitRemote(); }}
+            className="w-full flex items-start gap-2 px-3 py-2.5 text-left hover:bg-surface-2 transition-colors"
+          >
+            <span className="text-base leading-none mt-0.5">🔗</span>
+            <span className="min-w-0">
+              <span className="block text-[11px] font-medium text-text">GitHub repo</span>
+              <span className="block text-[9px] text-text-muted">
+                {hasRepo
+                  ? "Token, aktivni repo, push sandboxa"
+                  : "Poveži repozitorijum + GitHub token za agenta"}
               </span>
-            </button>
-          )}
+            </span>
+          </button>
 
           <div className="border-t border-border">
             <button

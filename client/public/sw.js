@@ -4,7 +4,9 @@
 
 // Bump this version on every deploy that changes the app shell so stale
 // browser caches are flushed automatically (old caches deleted on activate).
-const CACHE = "straxor-shell-v2";
+// Other copies (v0/v1/v2) are purged here too, ensuring a poisoned cache can
+// never survive a deploy.
+const CACHE = "straxor-shell-v4";
 
 const PRECACHE = [
   "/",
@@ -27,10 +29,15 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
+    // Delete EVERY cache we don't own, including older straxor-shell-* copies.
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+        Promise.all(
+          keys
+            .filter((k) => k !== CACHE)
+            .map((k) => caches.delete(k))
+        )
       )
       .then(() => self.clients.claim())
   );

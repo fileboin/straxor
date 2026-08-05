@@ -16,6 +16,8 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthPayload;
+      /** Backwards-compat alias: set to user.userId by requireAuth. */
+      userId?: string;
     }
   }
 }
@@ -29,6 +31,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const token = authHeader.split(" ")[1];
     req.user = jwt.verify(token, JWT_SECRET) as AuthPayload;
+    req.userId = req.user.userId;
     next();
   } catch {
     return res.status(401).json({ error: "Neispravan token" });

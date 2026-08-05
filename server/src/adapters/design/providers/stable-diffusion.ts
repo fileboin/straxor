@@ -34,7 +34,7 @@ export class StableDiffusionProvider extends BaseImageProvider {
       const base64 = data?.images?.[0];
       const url = base64
         ? `data:image/png;base64,${base64}`
-        : `https://placehold.co/${width}x${height}/1a1a1a/6b8c42?text=SD`;
+        : `https://placehold.co/${width}x${height}/0e1422/ff4d2e?text=SD`;
 
       return {
         id: this.makeId(),
@@ -51,7 +51,7 @@ export class StableDiffusionProvider extends BaseImageProvider {
     } catch {
       return {
         id: this.makeId(),
-        url: `https://placehold.co/${width}x${height}/1a1a1a/6b8c42?text=SD+Error`,
+        url: `https://placehold.co/${width}x${height}/0e1422/ff4d2e?text=SD+Error`,
         provider: "stable-diffusion",
         prompt: req.prompt,
         width,

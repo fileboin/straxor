@@ -302,9 +302,9 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
     <div className="flex h-full overflow-hidden" onClick={() => setContextMenu(null)}>
       {/* File Explorer Sidebar */}
       {showTree && (
-        <div className="w-56 border-r border-[#1a1a1a] bg-[#050505] flex flex-col shrink-0 overflow-hidden">
+        <div className="w-56 border-r border-[#202838] bg-[#0a0e1a] flex flex-col shrink-0 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-2 py-1.5 border-b border-[#1a1a1a]">
+          <div className="flex items-center justify-between px-2 py-1.5 border-b border-[#202838]">
             <span className="text-[10px] font-medium text-text-muted uppercase tracking-wider">
               Explorer
             </span>
@@ -337,13 +337,13 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
 
           {/* Search */}
           {searchOpen && (
-            <div className="px-2 py-1 border-b border-[#1a1a1a]">
+            <div className="px-2 py-1 border-b border-[#202838]">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Filtriraj datoteke..."
-                className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none"
+                className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none"
                 autoFocus
               />
             </div>
@@ -364,11 +364,11 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
       {/* Editor area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Tab bar */}
-        <div className="flex items-center h-8 bg-[#0a0a0a] border-b border-[#1a1a1a] overflow-x-auto shrink-0">
+        <div className="flex items-center h-8 bg-[#0e1422] border-b border-[#202838] overflow-x-auto shrink-0">
           {!showTree && (
             <button
               onClick={() => setShowTree(true)}
-              className="h-full px-2 text-text-muted hover:text-text text-[11px] border-r border-[#1a1a1a] shrink-0"
+              className="h-full px-2 text-text-muted hover:text-text text-[11px] border-r border-[#202838] shrink-0"
               title="Prikaži explorer"
             >📁</button>
           )}
@@ -380,10 +380,10 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
                 e.preventDefault();
                 setContextMenu({ x: e.clientX, y: e.clientY, entry: { ...file, type: "file" as const } });
               }}
-              className={`group flex items-center gap-1.5 h-full px-3 text-[11px] border-r border-[#1a1a1a] cursor-pointer shrink-0 transition-colors ${
+              className={`group flex items-center gap-1.5 h-full px-3 text-[11px] border-r border-[#202838] cursor-pointer shrink-0 transition-colors ${
                 file.path === activeFile
-                  ? "bg-[#111] text-text"
-                  : "text-text-muted hover:bg-[#0d0d0d] hover:text-text-secondary"
+                  ? "bg-[#0e1422] text-text"
+                  : "text-text-muted hover:bg-[#141824] hover:text-text-secondary"
               }`}
             >
               {file.dirty && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />}
@@ -430,7 +430,7 @@ export default function EditorContainer({ machineId }: EditorContainerProps) {
 
         {/* Status bar */}
         {current && (
-          <div className="flex items-center justify-between h-6 px-3 bg-[#0a0a0a] border-t border-[#1a1a1a] text-[10px] text-text-muted shrink-0">
+          <div className="flex items-center justify-between h-6 px-3 bg-[#0e1422] border-t border-[#202838] text-[10px] text-text-muted shrink-0">
             <div className="flex items-center gap-3">
               <span className="text-accent/70">{getLangFromPath(current.path)}</span>
               <span className="truncate max-w-[250px] opacity-60">{current.path}</span>

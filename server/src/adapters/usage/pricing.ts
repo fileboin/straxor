@@ -7,7 +7,7 @@ export const MODEL_PRICING: ModelPricing[] = [
   // Anthropic
   { provider: "anthropic", model: "claude-opus-4-6", inputCostPer1M: 15, outputCostPer1M: 75, label: "Claude Opus 4" },
   { provider: "anthropic", model: "claude-sonnet-4", inputCostPer1M: 3, outputCostPer1M: 15, label: "Claude Sonnet 4" },
-  { provider: "anthropic", model: "claude-haiku-3-5", inputCostPer1M: 0.80, outputCostPer1M: 4, label: "Claude 3.5 Haiku" },
+  { provider: "anthropic", model: "claude-haiku-4-5", inputCostPer1M: 0.80, outputCostPer1M: 4, label: "Claude Haiku 4.5" },
 
   // OpenAI
   { provider: "openai", model: "gpt-4o", inputCostPer1M: 2.50, outputCostPer1M: 10, label: "GPT-4o" },

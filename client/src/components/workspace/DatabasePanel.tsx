@@ -130,7 +130,7 @@ export default function DatabasePanel({ machineId }: Props) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Tab bar */}
-      <div className="flex items-center gap-1 px-2 py-1 border-b border-[#1a1a1a] bg-[#0a0a0a] shrink-0">
+      <div className="flex items-center gap-1 px-2 py-1 border-b border-[#202838] bg-[#0e1422] shrink-0">
         {(["connect", "browser", "query"] as View[]).map((v) => (
           <button
             key={v}
@@ -160,19 +160,19 @@ export default function DatabasePanel({ machineId }: Props) {
           <div className="grid grid-cols-2 gap-2">
             <label className="space-y-0.5">
               <span className="text-[9px] text-text-muted">Host</span>
-              <input value={host} onChange={(e) => setHost(e.target.value)} className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
+              <input value={host} onChange={(e) => setHost(e.target.value)} className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" />
             </label>
             <label className="space-y-0.5">
               <span className="text-[9px] text-text-muted">Port</span>
-              <input value={port} onChange={(e) => setPort(e.target.value)} className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
+              <input value={port} onChange={(e) => setPort(e.target.value)} className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" />
             </label>
             <label className="space-y-0.5">
               <span className="text-[9px] text-text-muted">Korisnik</span>
-              <input value={username} onChange={(e) => setUsername(e.target.value)} className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
+              <input value={username} onChange={(e) => setUsername(e.target.value)} className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" />
             </label>
             <label className="space-y-0.5">
               <span className="text-[9px] text-text-muted">Lozinka</span>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" />
             </label>
           </div>
           <label className="space-y-0.5">
@@ -181,12 +181,12 @@ export default function DatabasePanel({ machineId }: Props) {
               <button onClick={handleLoadDatabases} className="text-[9px] text-accent/60 hover:text-accent">Učitaj liste</button>
             </div>
             {databases.length > 0 ? (
-              <select value={database} onChange={(e) => setDatabase(e.target.value)} className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none">
+              <select value={database} onChange={(e) => setDatabase(e.target.value)} className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none">
                 <option value="">Odaberi bazu…</option>
                 {databases.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             ) : (
-              <input value={database} onChange={(e) => setDatabase(e.target.value)} placeholder="ime_baze" className="w-full px-2 py-1 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none" />
+              <input value={database} onChange={(e) => setDatabase(e.target.value)} placeholder="ime_baze" className="w-full px-2 py-1 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none" />
             )}
           </label>
           {connError && <div className="text-[10px] text-red-400">{connError}</div>}
@@ -203,9 +203,9 @@ export default function DatabasePanel({ machineId }: Props) {
       {view === "browser" && (
         <div className="flex-1 flex min-h-0 overflow-hidden">
           {/* Table list */}
-          <div className="w-44 border-r border-[#1a1a1a] bg-[#050505] overflow-y-auto shrink-0">
+          <div className="w-44 border-r border-[#202838] bg-[#0a0e1a] overflow-y-auto shrink-0">
             {stats && (
-              <div className="px-2 py-1.5 border-b border-[#1a1a1a] text-[9px] text-text-muted space-y-0.5">
+              <div className="px-2 py-1.5 border-b border-[#202838] text-[9px] text-text-muted space-y-0.5">
                 <div>{stats.totalTables} tabela &middot; {stats.totalRows.toLocaleString()} redova</div>
                 <div>{stats.engine} {stats.version?.split(" ")[1] || ""}</div>
               </div>
@@ -242,12 +242,12 @@ export default function DatabasePanel({ machineId }: Props) {
                 {/* Columns */}
                 <div>
                   <div className="text-[9px] text-text-muted uppercase tracking-wider mb-1">Kolone</div>
-                  <div className="bg-[#0d0d0d] rounded border border-[#222] overflow-hidden">
-                    <div className="grid grid-cols-[1fr_100px_60px_60px] gap-0 text-[9px] text-text-muted/60 px-2 py-1 border-b border-[#222]">
+                  <div className="bg-[#141824] rounded border border-[#2d3750] overflow-hidden">
+                    <div className="grid grid-cols-[1fr_100px_60px_60px] gap-0 text-[9px] text-text-muted/60 px-2 py-1 border-b border-[#2d3750]">
                       <span>Naziv</span><span>Tip</span><span>PK</span><span>Null</span>
                     </div>
                     {columns.map((c) => (
-                      <div key={c.name} className="grid grid-cols-[1fr_100px_60px_60px] gap-0 text-[10px] text-text-secondary px-2 py-1 border-b border-[#1a1a1a] hover:bg-surface-2/30">
+                      <div key={c.name} className="grid grid-cols-[1fr_100px_60px_60px] gap-0 text-[10px] text-text-secondary px-2 py-1 border-b border-[#202838] hover:bg-surface-2/30">
                         <span className="font-mono">{c.name}</span>
                         <span className="text-text-muted">{c.type}</span>
                         <span>{c.isPrimaryKey ? "🔑" : ""}</span>
@@ -261,9 +261,9 @@ export default function DatabasePanel({ machineId }: Props) {
                 {indexes.length > 0 && (
                   <div>
                     <div className="text-[9px] text-text-muted uppercase tracking-wider mb-1">Indeksi</div>
-                    <div className="bg-[#0d0d0d] rounded border border-[#222] overflow-hidden">
+                    <div className="bg-[#141824] rounded border border-[#2d3750] overflow-hidden">
                       {indexes.map((idx) => (
-                        <div key={idx.name} className="flex items-center gap-2 px-2 py-1 text-[10px] border-b border-[#1a1a1a]">
+                        <div key={idx.name} className="flex items-center gap-2 px-2 py-1 text-[10px] border-b border-[#202838]">
                           <span className="text-text-secondary font-mono">{idx.name}</span>
                           <span className="text-[8px] text-text-muted">({idx.columns.join(", ")})</span>
                           {idx.unique && <span className="text-[8px] text-accent">UNIQUE</span>}
@@ -278,7 +278,7 @@ export default function DatabasePanel({ machineId }: Props) {
                 {ddl && (
                   <div>
                     <div className="text-[9px] text-text-muted uppercase tracking-wider mb-1">DDL</div>
-                    <pre className="bg-[#0d0d0d] rounded border border-[#222] p-2 text-[10px] text-text-secondary font-mono overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
+                    <pre className="bg-[#141824] rounded border border-[#2d3750] p-2 text-[10px] text-text-secondary font-mono overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
                       {ddl}
                     </pre>
                   </div>
@@ -293,7 +293,7 @@ export default function DatabasePanel({ machineId }: Props) {
       {view === "query" && (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* SQL input */}
-          <div className="p-2 border-b border-[#1a1a1a] space-y-1.5 shrink-0">
+          <div className="p-2 border-b border-[#202838] space-y-1.5 shrink-0">
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-1 text-[9px] text-text-muted cursor-pointer">
                 <input type="checkbox" checked={readOnly} onChange={(e) => setReadOnly(e.target.checked)} className="w-3 h-3 accent-accent" />
@@ -308,7 +308,7 @@ export default function DatabasePanel({ machineId }: Props) {
             <textarea
               value={sql}
               onChange={(e) => setSql(e.target.value)}
-              className="w-full h-20 px-2 py-1 bg-[#111] text-text text-[11px] font-mono rounded border border-[#333] focus:border-accent outline-none resize-none"
+              className="w-full h-20 px-2 py-1 bg-[#0e1422] text-text text-[11px] font-mono rounded border border-[#202838] focus:border-accent outline-none resize-none"
               placeholder="SELECT * FROM table_name LIMIT 100;"
               spellCheck={false}
             />
@@ -325,18 +325,18 @@ export default function DatabasePanel({ machineId }: Props) {
                   {queryResult.rowCount} redova &middot; {queryResult.duration}ms
                   {queryResult.truncated && " (truncirano)"}
                 </div>
-                <div className="bg-[#0d0d0d] rounded border border-[#222] overflow-auto max-h-[300px]">
+                <div className="bg-[#141824] rounded border border-[#2d3750] overflow-auto max-h-[300px]">
                   <table className="text-[10px] w-full">
                     <thead>
-                      <tr className="border-b border-[#333]">
+                      <tr className="border-b border-[#202838]">
                         {queryResult.columns.map((col) => (
-                          <th key={col} className="px-2 py-1 text-left text-text-muted font-medium sticky top-0 bg-[#111]">{col}</th>
+                          <th key={col} className="px-2 py-1 text-left text-text-muted font-medium sticky top-0 bg-[#0e1422]">{col}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {queryResult.rows.map((row, i) => (
-                        <tr key={i} className="border-b border-[#1a1a1a] hover:bg-surface-2/20">
+                        <tr key={i} className="border-b border-[#202838] hover:bg-surface-2/20">
                           {queryResult.columns.map((col) => (
                             <td key={col} className="px-2 py-0.5 text-text-secondary font-mono max-w-[200px] truncate">
                               {String(row[col] ?? "NULL")}

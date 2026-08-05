@@ -9,100 +9,315 @@
 
 /* ── Accent paleta (dostupna za Theme picker) ── */
 :root {
-  --accent-olive: #6b8c42;
-  --accent-olive-hover: #7c9a3e;
-  --accent-olive-dim: rgba(107, 140, 66, 0.12);
-  --accent-olive-border: rgba(107, 140, 66, 0.3);
+  --accent-burnt: #ff4d2e;
+  --accent-burnt-hover: #e63f24;
+  --accent-burnt-light: #ff6b50;
+  --accent-burnt-dim: rgba(255, 77, 46, 0.12);
+  --accent-burnt-border: rgba(255, 77, 46, 0.3);
 
   --accent-blue: #3b82f6;
   --accent-blue-hover: #2563eb;
+  --accent-blue-light: #60a5fa;
   --accent-blue-dim: rgba(59, 130, 246, 0.12);
   --accent-blue-border: rgba(59, 130, 246, 0.3);
 
-  --accent-yellow: #eab308;
-  --accent-yellow-hover: #ca8a04;
-  --accent-yellow-dim: rgba(234, 179, 8, 0.12);
-  --accent-yellow-border: rgba(234, 179, 8, 0.3);
+  --accent-yellow: #f5c842;
+  --accent-yellow-hover: #ddb02e;
+  --accent-yellow-light: #f9d977;
+  --accent-yellow-dim: rgba(245, 200, 66, 0.12);
+  --accent-yellow-border: rgba(245, 200, 66, 0.3);
 
   --accent-orange: #f97316;
   --accent-orange-hover: #ea580c;
+  --accent-orange-light: #fb923c;
   --accent-orange-dim: rgba(249, 115, 22, 0.12);
   --accent-orange-border: rgba(249, 115, 22, 0.3);
 
   --accent-red: #ef4444;
   --accent-red-hover: #dc2626;
+  --accent-red-light: #f87171;
   --accent-red-dim: rgba(239, 68, 68, 0.12);
   --accent-red-border: rgba(239, 68, 68, 0.3);
+
+  --accent-gray: #6b7280;
+  --accent-gray-hover: #4b5563;
+  --accent-gray-light: #9ca3af;
+  --accent-gray-dim: rgba(107, 114, 128, 0.12);
+  --accent-gray-border: rgba(107, 114, 128, 0.3);
+
+  --accent-green: #22c55e;
+  --accent-green-hover: #16a34a;
+  --accent-green-light: #4ade80;
+  --accent-green-dim: rgba(34, 197, 94, 0.12);
+  --accent-green-border: rgba(34, 197, 94, 0.3);
+
+  --accent-purple: #8b5cf6;
+  --accent-purple-hover: #7c3aed;
+  --accent-purple-light: #a78bfa;
+  --accent-purple-dim: rgba(139, 92, 246, 0.12);
+  --accent-purple-border: rgba(139, 92, 246, 0.3);
 }
 
-/* ── Dark tema (default — OLED black) ── */
+/* ── Dark tema (default — tamno teget/plavo-crna) ── */
 [data-theme="dark"], :root {
-  --bg: #000000;
-  --surface: #0a0a0a;
-  --surface-2: #111111;
-  --surface-3: #1a1a1a;
-  --border: #222222;
-  --border-light: #2a2a2a;
-  --text: #e8e8e8;
-  --text-secondary: #888888;
-  --text-muted: #555555;
-  --danger: #c0392b;
+  --bg: #0a0e1a;
+  --surface: #141824;
+  --surface-2: #1a2130;
+  --surface-3: #232b3f;
+  --surface-dim: rgba(255, 255, 255, 0.05);
+  --border: #202838;
+  --border-light: #2d3750;
+  --text: #e8ecf4;
+  --text-secondary: #8b93a8;
+  --text-muted: #5b6377;
+  --danger: #e5484d;
+
+  /* Suptilan grid pattern preko cijele pozadine */
+  --bg-grid:
+    linear-gradient(to right, rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
 
   /* Aktivni accent — token varijabla, ne hardkodovana boja */
-  --accent: var(--accent-olive);
-  --accent-hover: var(--accent-olive-hover);
-  --accent-dim: var(--accent-olive-dim);
-  --accent-border: var(--accent-olive-border);
+  --accent: var(--accent-burnt);
+  --accent-hover: var(--accent-burnt-hover);
+  --accent-light: var(--accent-burnt-light);
+  --accent-dim: var(--accent-burnt-dim);
+  --accent-border: var(--accent-burnt-border);
 }
 
 /* ── Light tema ── */
 [data-theme="light"] {
-  --bg: #f5f5f5;
+  --bg: #fafbfc;
   --surface: #ffffff;
-  --surface-2: #f0f0f0;
-  --surface-3: #e8e8e8;
-  --border: #d4d4d4;
-  --border-light: #e0e0e0;
-  --text: #111111;
-  --text-secondary: #666666;
-  --text-muted: #999999;
-  --danger: #c0392b;
+  --surface-2: #eef0f7;
+  --surface-3: #e4e7f0;
+  --surface-dim: rgba(15, 23, 42, 0.04);
+  --border: #dfe3ef;
+  --border-light: #cfd5e5;
+  --text: #12141d;
+  --text-secondary: #5a6276;
+  --text-muted: #9aa3b5;
+  --danger: #d8352f;
 
-  --accent: var(--accent-olive);
-  --accent-hover: var(--accent-olive-hover);
-  --accent-dim: var(--accent-olive-dim);
-  --accent-border: var(--accent-olive-border);
+  --bg-grid:
+    linear-gradient(to right, rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+
+  --accent: var(--accent-burnt);
+  --accent-hover: var(--accent-burnt-hover);
+  --accent-light: var(--accent-burnt-light);
+  --accent-dim: var(--accent-burnt-dim);
+  --accent-border: var(--accent-burnt-border);
 }
 
 /* ── Accent tema swap (za Theme picker u Fazi 3) ── */
+[data-accent="burnt"] {
+  --accent: var(--accent-burnt);
+  --accent-hover: var(--accent-burnt-hover);
+  --accent-light: var(--accent-burnt-light);
+  --accent-dim: var(--accent-burnt-dim);
+  --accent-border: var(--accent-burnt-border);
+}
+/* Backward-compat: stari korisnici sa straxor-accent=olive u localStorage */
+[data-accent="olive"] {
+  --accent: var(--accent-burnt);
+  --accent-hover: var(--accent-burnt-hover);
+  --accent-light: var(--accent-burnt-light);
+  --accent-dim: var(--accent-burnt-dim);
+  --accent-border: var(--accent-burnt-border);
+}
 [data-accent="blue"] {
   --accent: var(--accent-blue);
   --accent-hover: var(--accent-blue-hover);
+  --accent-light: var(--accent-blue-light);
   --accent-dim: var(--accent-blue-dim);
   --accent-border: var(--accent-blue-border);
 }
 [data-accent="yellow"] {
   --accent: var(--accent-yellow);
   --accent-hover: var(--accent-yellow-hover);
+  --accent-light: var(--accent-yellow-light);
   --accent-dim: var(--accent-yellow-dim);
   --accent-border: var(--accent-yellow-border);
 }
 [data-accent="orange"] {
   --accent: var(--accent-orange);
   --accent-hover: var(--accent-orange-hover);
+  --accent-light: var(--accent-orange-light);
   --accent-dim: var(--accent-orange-dim);
   --accent-border: var(--accent-orange-border);
 }
 [data-accent="red"] {
   --accent: var(--accent-red);
   --accent-hover: var(--accent-red-hover);
+  --accent-light: var(--accent-red-light);
   --accent-dim: var(--accent-red-dim);
   --accent-border: var(--accent-red-border);
 }
+[data-accent="gray"] {
+  --accent: var(--accent-gray);
+  --accent-hover: var(--accent-gray-hover);
+  --accent-light: var(--accent-gray-light);
+  --accent-dim: var(--accent-gray-dim);
+  --accent-border: var(--accent-gray-border);
+}
+[data-accent="green"] {
+  --accent: var(--accent-green);
+  --accent-hover: var(--accent-green-hover);
+  --accent-light: var(--accent-green-light);
+  --accent-dim: var(--accent-green-dim);
+  --accent-border: var(--accent-green-border);
+}
+[data-accent="purple"] {
+  --accent: var(--accent-purple);
+  --accent-hover: var(--accent-purple-hover);
+  --accent-light: var(--accent-purple-light);
+  --accent-dim: var(--accent-purple-dim);
+  --accent-border: var(--accent-purple-border);
+}
+
+/* ── Bijela tema (monohrom, čista bela + tamni tekst) ── */
+[data-accent="white"] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f3f4f6;
+  --surface-3: #e6e8ef;
+  --surface-dim: rgba(15, 23, 42, 0.04);
+  --border: #e2e5ee;
+  --border-light: #d0d6e4;
+  --text: #111111;
+  --text-secondary: #4b5563;
+  --text-muted: #9aa3b5;
+  --danger: #d8352f;
+  --bg-grid:
+    linear-gradient(to right, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
+  --accent: #111111;
+  --accent-hover: #000000;
+  --accent-light: #3f3f46;
+  --accent-dim: rgba(17, 17, 17, 0.08);
+  --accent-border: rgba(17, 17, 17, 0.25);
+}
+
+/* ── OLED crna tema (true black, AMOLED) ── */
+[data-accent="black"] {
+  --bg: #000000;
+  --surface: #000000;
+  --surface-2: #0d0d10;
+  --surface-3: #16161a;
+  --surface-dim: rgba(255, 255, 255, 0.04);
+  --border: #1a1a1f;
+  --border-light: #2a2a30;
+  --text: #f5f5f7;
+  --text-secondary: #a1a1aa;
+  --text-muted: #63636b;
+  --danger: #f05252;
+  --bg-grid:
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  --accent: #f5f5f7;
+  --accent-hover: #ffffff;
+  --accent-light: #d4d4d8;
+  --accent-dim: rgba(245, 245, 247, 0.1);
+  --accent-border: rgba(245, 245, 247, 0.28);
+}
+
+/* ── Accent opacity utiliti (color-mix) ──
+   Tailwind NE generiše /<n> varijante za var()-bazirane boje
+   (bg-accent/15 i sl. su bile tiho prazne). Definišemo ih ručno:
+   unlayered CSS ima prednost nad @tailwind utilities slojem. */
+.bg-accent\/5 { background-color: color-mix(in srgb, var(--accent) 5%, transparent); }
+.bg-accent\/10 { background-color: color-mix(in srgb, var(--accent) 10%, transparent); }
+.bg-accent\/15 { background-color: color-mix(in srgb, var(--accent) 15%, transparent); }
+.bg-accent\/20 { background-color: color-mix(in srgb, var(--accent) 20%, transparent); }
+.bg-accent\/30 { background-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.bg-accent\/40 { background-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.bg-accent\/70 { background-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+.bg-accent\/90 { background-color: color-mix(in srgb, var(--accent) 90%, transparent); }
+.border-accent\/20 { border-color: color-mix(in srgb, var(--accent) 20%, transparent); }
+.border-accent\/30 { border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.border-accent\/40 { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.border-accent\/50 { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.text-accent\/50 { color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.text-accent\/60 { color: color-mix(in srgb, var(--accent) 60%, transparent); }
+.text-accent\/70 { color: color-mix(in srgb, var(--accent) 70%, transparent); }
+
+/* ═══════════════════════════════════════════
+   FAZA 4 — Per-panel accent override
+   `[data-panel-accent]` na panel wrapperu
+   preklapa globalne `--accent` varijable
+   za sve potomke tog panela.
+   ═══════════════════════════════════════════ */
+[data-panel-accent] {
+  --accent: var(--panel-accent);
+  --accent-hover: color-mix(in srgb, var(--panel-accent) 80%, #ffffff);
+  --accent-light: color-mix(in srgb, var(--panel-accent) 60%, #ffffff);
+  --accent-dim: color-mix(in srgb, var(--panel-accent) 15%, transparent);
+  --accent-border: color-mix(in srgb, var(--panel-accent) 40%, transparent);
+  /* Per-panel background: black/OLED override propagates to inner
+     bg-surface / bg-surface-2 / bg-surface-3 elements. For colored
+     accents the panel-bg stays the glass fallback (dark), keeping text readable. */
+  --surface: var(--panel-surface, var(--surface));
+  --surface-2: var(--panel-surface-2, var(--surface-2));
+  --surface-3: var(--panel-surface-3, var(--surface-3));
+}
+
+/* ═══════════════════════════════════════════
+   FAZA 4 — Glassmorphism panel
+   Semi-transparentna pozadina + backdrop blur
+   + blagi gradient glow rubova u boji accenta.
+   ═══════════════════════════════════════════ */
+.panel-glass {
+  background: var(--panel-bg, rgba(10, 14, 26, 0.55));
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  position: relative;
+  overflow: hidden;
+}
+.panel-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 15% 0%, var(--panel-accent, var(--accent)) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 85% 100%, var(--panel-accent, var(--accent)) 0%, transparent 50%);
+  opacity: 0.12;
+}
+.panel-glass > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Light tema — glass panel */
+[data-theme="light"] .panel-glass {
+  background: var(--panel-bg-light, rgba(255, 255, 255, 0.6));
+  border-color: rgba(0, 0, 0, 0.06);
+}
+[data-theme="light"] .panel-glass::before {
+  opacity: 0.06;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
 
 body {
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: var(--bg-grid);
+  background-size: 34px 34px;
   color: var(--text);
+}
+
+#root {
+  background-color: var(--bg);
+  background-image: var(--bg-grid);
+  background-size: 34px 34px;
 }
 
 /* ── Scrollbar ── */
@@ -297,7 +512,7 @@ body {
 }
 
 .detail-info { flex: 1; }
-.detail-info h2 { font-size: 24px; font-weight: 700; margin: 0 0 8px; }
+.detail-info h2 { font-size: 24px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.02em; }
 
 .detail-meta {
   display: flex;
@@ -535,8 +750,9 @@ body {
 
 .page-header h1 {
   font-size: 28px;
-  font-weight: 700;
+  font-weight: 800;
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
 .text-secondary {
@@ -565,17 +781,17 @@ body {
 
 .stat-item {
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: 2px;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid var(--border-color, #ddd);
   background: var(--surface-2, #f5f5f5);
   min-width: 100px;
 }
 
-.stat-value { font-size: 24px; font-weight: 700; }
-.stat-label { font-size: 11px; opacity: 0.6; }
+.stat-value { font-size: 30px; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; }
+.stat-label { font-size: 11px; opacity: 0.55; text-transform: uppercase; letter-spacing: 0.05em; }
 .stats-green { color: #22c55e; }
 .stats-red { color: #ef4444; }
 

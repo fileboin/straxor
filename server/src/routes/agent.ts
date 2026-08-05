@@ -2,6 +2,9 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { getAdapters } from "../adapters/registry.js";
 import { requireAuth } from "../middleware/auth.js";
+import { resolveAttachments, type AttachmentRef } from "../lib/attachments.js";
+import { isLocalMachineId } from "../runtime/local/engine.js";
+import { withSharedWorkspace } from "../runtime/local/shared-workspace.js";
 
 const CONNECTION_TIMEOUT_MS = 30 * 60 * 1000; // 30 min hard timeout
 const router = Router();
@@ -11,12 +14,13 @@ router.use(requireAuth);
 // POST /api/agent/send — send message to OpenCode via adapter
 router.post("/send", async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  const { machineId, sessionId, text, message, mode } = req.body as {
+  const { machineId, sessionId, text, message, mode, attachments } = req.body as {
     machineId: string;
     sessionId?: string;
     text?: string;
     message?: string;
     mode?: "sync" | "async";
+    attachments?: AttachmentRef[];
   };
 
   // Support both `text` and `message` field names
@@ -25,6 +29,40 @@ router.post("/send", async (req: Request, res: Response) => {
   if (!machineId || !msgText) {
     res.status(400).json({ error: "Missing required fields: machineId, text/message" });
     return;
+  }
+
+  // Resolve attached files (images → base64 file parts, other → text note).
+  const { engineAttachments, notes } = await resolveAttachments(attachments);
+  let fullText =
+    notes.length > 0 ? [msgText, ...notes].filter(Boolean).join("\n\n") : msgText;
+  if (engineAttachments.length > 0) {
+    console.log(
+      `[agent:debug] machineId=${machineId} attachments=${attachments?.length ?? 0} imageParts=${engineAttachments.length}`
+    );
+  }
+
+  // The normal Agent panel must use exactly the same prepared clone as the
+  // multi-agent runner. Explicit context prevents OpenCode from answering as
+  // if it were in an empty directory, while the registry serializes workspace
+  // preparation with any other active agent.
+  if (isLocalMachineId(machineId)) {
+    try {
+      const workspace = await withSharedWorkspace(userId, async (context) => context);
+      fullText = [
+        "[STRAXOR GITHUB CONTEXT]",
+        `Active repository: ${workspace.repo}`,
+        `Active branch: ${workspace.branch}`,
+        `Workspace directory: ${workspace.dir}`,
+        "You are already running inside this workspace. Inspect its files before answering. Use this repository for all reads, edits, tests, and git operations; never use /tmp or another clone. Do not claim a repository is unavailable unless a tool call proves it.",
+        "[/STRAXOR GITHUB CONTEXT]",
+        fullText,
+      ].join("\n");
+      console.log(`[agent:workspace] user=${userId} repo=${workspace.repo} branch=${workspace.branch}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Active GitHub workspace unavailable";
+      res.status(409).json({ error: message });
+      return;
+    }
   }
 
   // Auto-create session if none provided
@@ -50,14 +88,18 @@ router.post("/send", async (req: Request, res: Response) => {
     res.setHeader("X-Accel-Buffering", "no");
     res.write(`data: ${JSON.stringify({ type: "session", sessionId: activeSessionId })}\n\n`);
 
+    // Subscribe before the prompt so the first tool call and its repo context
+    // cannot be missed on a fast local OpenCode turn.
+    const stream = await adapter.openEventStream(machineId);
+
     // Try async first (prompt_async)
     const effectiveMode = mode || "async";
     let result;
     try {
-      result = await adapter.sendMessage(machineId, activeSessionId, msgText, effectiveMode);
+      result = await adapter.sendMessage(machineId, activeSessionId, fullText, effectiveMode, engineAttachments);
     } catch {
       // prompt_async may not be supported, fall back to sync
-      result = await adapter.sendMessage(machineId, activeSessionId, msgText, "sync");
+      result = await adapter.sendMessage(machineId, activeSessionId, fullText, "sync", engineAttachments);
     }
 
     // If we got parts back from sync, forward them as events
@@ -69,8 +111,6 @@ router.post("/send", async (req: Request, res: Response) => {
       }
     }
 
-    // Now open event stream to capture ongoing events
-    const stream = await adapter.openEventStream(machineId);
     let buffer = "";
     let sawDelta = false;
     let finished = false;
@@ -196,6 +236,29 @@ router.post("/send", async (req: Request, res: Response) => {
                 id: part.callID,
                 content: part.content,
               });
+            } else if (part?.type === "tool") {
+              // Current opencode (>=1.16): tool parts are `type: "tool"` with
+              // state.status pending|running|completed|error, state.input args,
+              // state.output result. Forward state transitions as call/result.
+              const status = part.state?.status;
+              if (status === "pending" || status === "running") {
+                send({
+                  type: "tool_call",
+                  id: part.callID,
+                  name: part.tool,
+                  args: part.state?.input || {},
+                });
+              } else if (status === "completed" || status === "error") {
+                send({
+                  type: "tool_result",
+                  id: part.callID,
+                  result:
+                    part.state?.output ||
+                    part.state?.error ||
+                    (status === "error" ? "Alat nije uspio" : ""),
+                  status: status === "completed" ? "completed" : "error",
+                });
+              }
             }
           }
 
@@ -360,9 +423,21 @@ router.post("/reject", async (req: Request, res: Response) => {
 router.get("/file/:machineId/:sessionId/:encodedPath", async (req: Request, res: Response) => {
   const userId = req.user!.userId as string;
   const machineId = req.params.machineId as string;
-  const sessionId = req.params.sessionId as string;
   const path = decodeURIComponent(req.params.encodedPath as string);
   const side = (req.query.side as string) || "after";
+
+  // The runtime executes these commands in the active workspace. Keep the
+  // requested path repository-relative so it cannot escape that workspace or
+  // become shell syntax.
+  if (
+    !path ||
+    path.includes("\0") ||
+    path.split(/[\\/]+/).includes("..") ||
+    !/^[A-Za-z0-9._/@%+=, -]+$/.test(path)
+  ) {
+    res.status(400).json({ error: "Invalid repository-relative path" });
+    return;
+  }
 
   try {
     const adapter = getAdapters().runtime(userId);
@@ -370,10 +445,10 @@ router.get("/file/:machineId/:sessionId/:encodedPath", async (req: Request, res:
     let command: string;
     if (side === "before") {
       // Get file content before agent changes — use git show HEAD:path
-      command = `cd /tmp && git show HEAD:${path} 2>/dev/null || echo ""`;
+      command = `git show HEAD:${JSON.stringify(path)} 2>/dev/null || echo ""`;
     } else {
       // Get current file content
-      command = `cat ${path} 2>/dev/null || echo ""`;
+      command = `cat -- ${JSON.stringify(path)} 2>/dev/null || echo ""`;
     }
 
     const result = await adapter.executeCommand(machineId, command);
@@ -382,6 +457,246 @@ router.get("/file/:machineId/:sessionId/:encodedPath", async (req: Request, res:
     // Fallback — return empty content
     res.json({ content: "" });
   }
+});
+
+// ---------------------------------------------------------------------------
+// FAZA 6: Background execution.
+// The agent already runs server-side (opencode serve). "Radi u pozadini" lets
+// mobile clients start a turn without holding an SSE connection open: we fire
+// the message async in the background, persist real-time progress in an
+// in-memory job, and the client polls GET /api/agent/background/:jobId.
+// ---------------------------------------------------------------------------
+
+interface BackgroundJob {
+  id: string;
+  userId: string;
+  machineId: string;
+  sessionId: string;
+  timeline: BackgroundTimelineEntry[];
+  status: "running" | "done" | "error";
+  error?: string;
+  finished: boolean;
+}
+
+interface BackgroundTimelineEntry {
+  t: string; // message type forwarded to client (text/tool_call/...)
+  content?: string;
+  toolId?: string;
+  toolName?: string;
+  toolStatus?: "running" | "completed" | "error";
+}
+
+const backgroundJobs = new Map<string, BackgroundJob>();
+
+// POST /api/agent/background — start the agent fire-and-forget. Returns the
+// job id immediately; status is polled via GET /:id. Works on mobile even when
+// the tab is backgrounded because the work happens entirely server-side.
+router.post("/background", async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const { machineId, message, text, sessionId, attachments } = req.body as {
+    machineId: string;
+    sessionId?: string;
+    message?: string;
+    text?: string;
+    attachments?: AttachmentRef[];
+  };
+
+  const msgText = message || text;
+  if (!machineId || !msgText) {
+    res.status(400).json({ error: "Missing required fields: machineId, message/text" });
+    return;
+  }
+
+  let job: BackgroundJob;
+  try {
+    const adapter = getAdapters().runtime(userId);
+
+    // Auto-create session if none provided.
+    let activeSessionId = sessionId;
+    if (!activeSessionId) {
+      const created = await adapter.createSession(machineId, "Straxor Session");
+      activeSessionId = created.id;
+    }
+
+    const { engineAttachments, notes } = await resolveAttachments(attachments);
+    const fullText =
+      notes.length > 0 ? [msgText, ...notes].filter(Boolean).join("\n\n") : msgText;
+
+    job = {
+      id: `bg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      userId,
+      machineId,
+      sessionId: activeSessionId,
+      timeline: [],
+      status: "running",
+      finished: false,
+    };
+    backgroundJobs.set(job.id, job);
+
+    res.json({ jobId: job.id, sessionId: activeSessionId, status: "running" });
+
+    // Fire-and-forget: run the send + event stream detached from the request.
+    runBackground(job.id, adapter, activeSessionId, fullText, engineAttachments).catch(() => {});
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+async function runBackground(
+  jobId: string,
+  adapter: any,
+  sessionId: string,
+  fullText: string,
+  engineAttachments: unknown[]
+): Promise<void> {
+  const job = backgroundJobs.get(jobId);
+  if (!job) return;
+  const { machineId } = job;
+
+  try {
+    // Send async first, fall back to sync if unsupported.
+    let result;
+    try {
+      result = await adapter.sendMessage(machineId, sessionId, fullText, "async", engineAttachments);
+    } catch {
+      result = await adapter.sendMessage(machineId, sessionId, fullText, "sync", engineAttachments);
+    }
+    if (result?.parts) {
+      for (const part of result.parts as any[]) {
+        if (part.type === "text" && part.text) job.timeline.push({ t: "text", content: part.text });
+      }
+    }
+
+    // Watch the event stream to capture real-time progress until the session
+    // goes idle. Reuses the same parsing as the SSE /send route.
+    const stream = await adapter.openEventStream(machineId);
+    let buffer = "";
+    let sawDelta = false;
+    let finished = false;
+
+    const ourSession = (event: unknown): boolean => {
+      const sid = (event as any)?.properties?.sessionID;
+      return !sid || sid === sessionId;
+    };
+
+    const setDone = () => {
+      if (finished) return;
+      finished = true;
+      job.finished = true;
+      job.status = job.timeline.some((e) => e.t === "error") ? "error" : "done";
+      try { stream.destroy(); } catch {}
+    };
+
+    stream.on("data", (chunk: Buffer) => {
+      if (finished) return;
+      buffer += chunk.toString();
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data: ")) continue;
+        const data = trimmed.slice(6);
+        try {
+          const event = JSON.parse(data);
+          const eventType = event.type || event.properties?.type;
+
+          if (eventType === "session.error" && ourSession(event)) {
+            const err =
+              event.properties?.properties?.error ||
+              event.properties?.error?.message ||
+              event.properties?.error ||
+              "Agent error";
+            job.timeline.push({
+              t: "error",
+              content: typeof err === "string" ? err : JSON.stringify(err),
+            });
+            job.error = typeof err === "string" ? err : JSON.stringify(err);
+            setDone();
+            return;
+          }
+
+          if (eventType === "message.part.delta") {
+            if (!ourSession(event)) continue;
+            const p = event.properties || {};
+            if (p.field === "text" && typeof p.delta === "string" && p.delta.length > 0) {
+              sawDelta = true;
+              job.timeline.push({ t: "text", content: p.delta });
+            }
+            continue;
+          }
+
+          if (eventType === "message.part.updated" || eventType === "part.updated") {
+            if (!ourSession(event)) continue;
+            const part = event.properties?.part || event.properties?.properties;
+            if (!part) continue;
+            if (part?.type === "text" && part?.text && !sawDelta) {
+              job.timeline.push({ t: "text", content: part.text });
+            } else if (part?.type === "tool-call") {
+              job.timeline.push({
+                t: "tool_call",
+                toolId: part.callID,
+                toolName: part.state?.tool || part.name,
+                content: typeof part.state?.params === "string" ? part.state.params : JSON.stringify(part.state?.params || {}),
+              });
+            } else if (part?.type === "tool-result") {
+              job.timeline.push({ t: "tool_result", toolId: part.callID, content: part.content });
+            } else if (part?.type === "tool") {
+              const status = part.state?.status;
+              job.timeline.push({
+                t: status === "pending" || status === "running" ? "tool_call" : "tool_result",
+                toolId: part.callID,
+                toolName: status === "pending" || status === "running" ? part.tool : undefined,
+                toolStatus: status,
+                content:
+                  status === "completed"
+                    ? part.state?.output || ""
+                    : status === "error"
+                    ? part.state?.error || "Alat nije uspio"
+                    : typeof part.state?.input === "string"
+                    ? part.state.input
+                    : JSON.stringify(part.state?.input || {}),
+              });
+            }
+            continue;
+          }
+
+          if (eventType === "session.idle" && ourSession(event)) {
+            setDone();
+            return;
+          }
+        } catch {}
+      }
+    });
+
+    stream.on("error", () => setDone());
+    stream.on("close", () => setDone());
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    job.timeline.push({ t: "error", content: message });
+    job.error = message;
+    job.finished = true;
+    job.status = "error";
+  }
+}
+
+// GET /api/agent/background/:jobId — poll progress of a background job.
+router.get("/background/:jobId", (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const jobId = req.params.jobId as string;
+  const job = backgroundJobs.get(jobId);
+  if (!job || job.userId !== userId) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  res.json({
+    jobId: job.id,
+    sessionId: job.sessionId,
+    status: job.status,
+    error: job.error,
+    finished: job.finished,
+    timeline: job.timeline,
+  });
 });
 
 export default router;

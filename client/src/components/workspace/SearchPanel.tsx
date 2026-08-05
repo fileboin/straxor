@@ -89,19 +89,19 @@ export default function SearchPanel({ machineId, open, onClose, onFileSelect }: 
   if (!open) return null;
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col bg-[#0a0a0a]">
+    <div className="absolute inset-0 z-40 flex flex-col bg-[#0e1422]">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[#1a1a1a] shrink-0">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-[#202838] shrink-0">
         <span className="text-text-muted text-[11px] font-medium">Pretraga</span>
         <div className="flex-1" />
         <button onClick={onClose} className="text-text-muted hover:text-text text-[11px] px-1">✕</button>
       </div>
 
       {/* Search controls */}
-      <div className="px-3 py-2 border-b border-[#1a1a1a] space-y-2 shrink-0">
+      <div className="px-3 py-2 border-b border-[#202838] space-y-2 shrink-0">
         {/* Mode tabs + input */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center bg-[#111] rounded-md border border-[#222] overflow-hidden shrink-0">
+          <div className="flex items-center bg-[#0e1422] rounded-md border border-[#2d3750] overflow-hidden shrink-0">
             {MODES.map((m) => (
               <button
                 key={m}
@@ -128,7 +128,7 @@ export default function SearchPanel({ machineId, open, onClose, onFileSelect }: 
               mode === "regex" ? "Regex uzorak..." :
               "Tekst za pretragu..."
             }
-            className="flex-1 min-w-0 px-2 py-1 bg-[#111] text-text text-[12px] rounded border border-[#333] focus:border-accent outline-none"
+            className="flex-1 min-w-0 px-2 py-1 bg-[#0e1422] text-text text-[12px] rounded border border-[#202838] focus:border-accent outline-none"
           />
           <button
             onClick={doSearch}
@@ -157,7 +157,7 @@ export default function SearchPanel({ machineId, open, onClose, onFileSelect }: 
               value={filePattern}
               onChange={(e) => setFilePattern(e.target.value)}
               placeholder="*.tsx"
-              className="w-16 px-1 py-0.5 bg-[#111] text-text text-[10px] rounded border border-[#222] focus:border-accent outline-none"
+              className="w-16 px-1 py-0.5 bg-[#0e1422] text-text text-[10px] rounded border border-[#2d3750] focus:border-accent outline-none"
             />
           </label>
           {stats && (
@@ -185,7 +185,7 @@ export default function SearchPanel({ machineId, open, onClose, onFileSelect }: 
             key={`${r.path}:${r.line}:${i}`}
             data-idx={i}
             onClick={() => onFileSelect(r.path, r.line)}
-            className={`group flex items-start gap-2 px-3 py-1.5 cursor-pointer border-b border-[#111] transition-colors ${
+            className={`group flex items-start gap-2 px-3 py-1.5 cursor-pointer border-b border-[#202838] transition-colors ${
               i === selectedIdx
                 ? "bg-accent/10 text-text"
                 : "text-text-secondary hover:bg-surface-2"
@@ -210,7 +210,7 @@ export default function SearchPanel({ machineId, open, onClose, onFileSelect }: 
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-1.5 border-t border-[#1a1a1a] text-[9px] text-text-muted/50 flex items-center gap-3 shrink-0">
+      <div className="px-3 py-1.5 border-t border-[#202838] text-[9px] text-text-muted/50 flex items-center gap-3 shrink-0">
         <span>↑↓ navigacija</span>
         <span>Enter otvori</span>
         <span>Esc zatvori</span>

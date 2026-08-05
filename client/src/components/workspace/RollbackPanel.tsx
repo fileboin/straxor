@@ -162,11 +162,11 @@ export default function RollbackPanel({ machineId, projectPath, onClose }: Props
                 <span className="w-2 h-2 rounded-full bg-accent/30" />
                 {date}
               </div>
-              <div className="space-y-1.5 ml-1 border-l border-[#222] pl-3">
+              <div className="space-y-1.5 ml-1 border-l border-[#2d3750] pl-3">
                 {snaps.map((snap) => (
                   <div
                     key={snap.id}
-                    className="group relative bg-[#0d0d0d] rounded-lg border border-[#222] p-2.5 hover:border-accent/30 transition-colors"
+                    className="group relative bg-[#141824] rounded-lg border border-[#2d3750] p-2.5 hover:border-accent/30 transition-colors"
                   >
                     {/* Dot on timeline */}
                     <div className="absolute -left-[17px] top-3 w-2.5 h-2.5 rounded-full bg-surface border-2 border-accent/40" />
@@ -237,7 +237,7 @@ export default function RollbackPanel({ machineId, projectPath, onClose }: Props
                 value={createName}
                 onChange={(e) => setCreateName(e.target.value)}
                 placeholder="npr. Prije refaktoriranja"
-                className="w-full px-2 py-1.5 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none"
+                className="w-full px-2 py-1.5 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none"
               />
             </label>
             <label className="space-y-0.5">
@@ -246,7 +246,7 @@ export default function RollbackPanel({ machineId, projectPath, onClose }: Props
                 value={createDesc}
                 onChange={(e) => setCreateDesc(e.target.value)}
                 placeholder="Kratki opis promjena…"
-                className="w-full px-2 py-1.5 bg-[#111] text-text text-[11px] rounded border border-[#333] focus:border-accent outline-none"
+                className="w-full px-2 py-1.5 bg-[#0e1422] text-text text-[11px] rounded border border-[#202838] focus:border-accent outline-none"
               />
             </label>
             <label className="space-y-0.5">
@@ -259,7 +259,7 @@ export default function RollbackPanel({ machineId, projectPath, onClose }: Props
                     className={`px-2 py-1 text-[9px] rounded-lg border transition-colors ${
                       createType === t
                         ? "border-accent bg-accent/10 text-accent"
-                        : "border-[#333] text-text-muted hover:border-[#555]"
+                        : "border-[#202838] text-text-muted hover:border-[#2d3750]"
                     }`}
                   >
                     {RESTORE_TYPE_ICONS[t]} {RESTORE_TYPE_LABELS[t]}
@@ -302,7 +302,7 @@ export default function RollbackPanel({ machineId, projectPath, onClose }: Props
                   )}
                 </div>
                 {diffResult.filesAdded.length > 0 && (
-                  <div className="bg-[#0d0d0d] rounded-lg border border-[#222] p-2">
+                  <div className="bg-[#141824] rounded-lg border border-[#2d3750] p-2">
                     <div className="text-[9px] text-green-400 font-medium mb-1">+ {diffResult.filesAdded.length} novih datoteka</div>
                     {diffResult.filesAdded.slice(0, 20).map((f) => (
                       <div key={f} className="text-[9px] text-green-400/80 font-mono truncate">+ {f}</div>
@@ -313,7 +313,7 @@ export default function RollbackPanel({ machineId, projectPath, onClose }: Props
                   </div>
                 )}
                 {diffResult.filesRemoved.length > 0 && (
-                  <div className="bg-[#0d0d0d] rounded-lg border border-[#222] p-2">
+                  <div className="bg-[#141824] rounded-lg border border-[#2d3750] p-2">
                     <div className="text-[9px] text-red-400 font-medium mb-1">- {diffResult.filesRemoved.length} uklonjenih datoteka</div>
                     {diffResult.filesRemoved.slice(0, 20).map((f) => (
                       <div key={f} className="text-[9px] text-red-400/80 font-mono truncate">- {f}</div>
@@ -321,7 +321,7 @@ export default function RollbackPanel({ machineId, projectPath, onClose }: Props
                   </div>
                 )}
                 {diffResult.filesModified.length > 0 && (
-                  <div className="bg-[#0d0d0d] rounded-lg border border-[#222] p-2">
+                  <div className="bg-[#141824] rounded-lg border border-[#2d3750] p-2">
                     <div className="text-[9px] text-yellow-400 font-medium mb-1">~ {diffResult.filesModified.length} modificiranih datoteka</div>
                     {diffResult.filesModified.slice(0, 20).map((f) => (
                       <div key={f} className="text-[9px] text-yellow-400/80 font-mono truncate">~ {f}</div>
@@ -347,7 +347,7 @@ export default function RollbackPanel({ machineId, projectPath, onClose }: Props
             <div className="text-[11px] text-text-secondary">
               Vratit ćeš cijeli projekt na stanje:
             </div>
-            <div className="bg-[#0d0d0d] rounded-lg border border-[#222] p-2.5 text-[10px]">
+            <div className="bg-[#141824] rounded-lg border border-[#2d3750] p-2.5 text-[10px]">
               <div className="flex items-center gap-1.5">
                 <span>{RESTORE_TYPE_ICONS[confirmRestore.type]}</span>
                 <span className="font-medium text-text">{confirmRestore.name}</span>
@@ -382,7 +382,7 @@ export default function RollbackPanel({ machineId, projectPath, onClose }: Props
             <div className="text-[11px] text-text-secondary">
               Ova radnja se ne može poništiti.
             </div>
-            <div className="bg-[#0d0d0d] rounded-lg border border-[#222] p-2 text-[10px] font-medium text-text">
+            <div className="bg-[#141824] rounded-lg border border-[#2d3750] p-2 text-[10px] font-medium text-text">
               {confirmDelete.name}
             </div>
             <div className="flex justify-end gap-2 pt-1">

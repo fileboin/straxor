@@ -81,7 +81,7 @@ export class DesignOrchestrator {
       : q.includes("purple") ? "#a855f7"
       : q.includes("red") ? "#ef4444"
       : q.includes("orange") ? "#f97316"
-      : "#6b8c42";
+      : "#ff4d2e";
 
     const html = `<!DOCTYPE html>
 <html lang="en">

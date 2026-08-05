@@ -9,7 +9,7 @@ import {
   getGitRemoteToken,
 } from "../adapters/git/remote/registry.js";
 import type { GitPlatformId } from "../adapters/git/remote/adapter.js";
-import { ensureWorkspace, getRepoWorkspaceDir, hasGitBinary } from "../runtime/local/workspace.js";
+import { ensureWorkspace, getRepoWorkspaceDir, hasGitBinary, pushWorkspace, commitWorkspace } from "../runtime/local/workspace.js";
 import { stopLocalEnginesForUser } from "../runtime/local/engine.js";
 
 const router = Router();
@@ -75,6 +75,7 @@ router.post("/connect", async (req, res) => {
         .set({
           cloneUrl: repo.cloneUrl,
           defaultBranch: repo.defaultBranch || "main",
+          connectionType: "token",
           updatedAt: new Date(),
         })
         .where(and(eq(repoConnections.userId, userId), eq(repoConnections.platform, platform), eq(repoConnections.fullName, fullName)));
@@ -91,6 +92,7 @@ router.post("/connect", async (req, res) => {
           cloneUrl: repo.cloneUrl,
           defaultBranch: repo.defaultBranch || "main",
           isActive: true,
+          connectionType: "token",
         })
         .returning();
       connectionId = inserted[0].id;
@@ -199,8 +201,10 @@ router.post("/prepare", async (req, res) => {
     }
 
     const conn = active[0];
-    const token = await getGitRemoteToken(userId, conn.platform as GitPlatformId);
-    if (!token) {
+    // URL (read-only) connections clone via the plain public URL — no token.
+    const isUrlReadOnly = conn.connectionType === "url";
+    const token = isUrlReadOnly ? undefined : await getGitRemoteToken(userId, conn.platform as GitPlatformId);
+    if (!token && !isUrlReadOnly) {
       res.status(401).json({ error: "Platform token missing — save a token first" });
       return;
     }
@@ -250,7 +254,95 @@ router.get("/workspace", async (req, res) => {
       branch: conn.defaultBranch,
       sandboxDir: dir,
       cloned: ready,
+      readOnly: conn.connectionType === "url",
       gitBinary: await hasGitBinary(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/repos/push — push the active repo's sandbox to the remote.
+// The server decrypts the stored token internally and refreshes the sandbox
+// origin URL before pushing, so the raw token never leaves the server.
+router.post("/push", async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const active = await db
+      .select()
+      .from(repoConnections)
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+      .limit(1);
+
+    if (active.length === 0) {
+      res.status(404).json({ error: "No active repo — connect one first" });
+      return;
+    }
+
+    const conn = active[0];
+
+    // Read-only URL connections can never push — token required.
+    if (conn.connectionType === "url") {
+      res.status(403).json({ error: "Read-only — connect with token to enable push" });
+      return;
+    }
+
+    const token = await getGitRemoteToken(userId, conn.platform as GitPlatformId);
+    if (!token) {
+      res.status(401).json({ error: "Platform token missing — save a token first" });
+      return;
+    }
+
+    const info = await ensureWorkspace({
+      userId,
+      platform: conn.platform,
+      owner: conn.owner,
+      name: conn.name,
+      fullName: conn.fullName,
+      cloneUrl: conn.cloneUrl,
+      defaultBranch: conn.defaultBranch,
+      token,
+    });
+
+    const output = await pushWorkspace(userId, conn.owner, conn.name, conn.defaultBranch);
+
+    res.json({ success: true, repo: conn.fullName, branch: conn.defaultBranch, lastCommit: info.lastCommit, output });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/repos/commit — stage + commit the active repo's sandbox changes as
+// the Straxor Agent identity (Straxor Agent <agent@straxor.dev>).
+router.post("/commit", async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const message: string = (req.body?.message as string) || "Straxor Agent commit";
+
+    const active = await db
+      .select()
+      .from(repoConnections)
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+      .limit(1);
+
+    if (active.length === 0) {
+      res.status(404).json({ error: "No active repo — connect one first" });
+      return;
+    }
+
+    const conn = active[0];
+
+    const result = await commitWorkspace(userId, conn.owner, conn.name, message, conn.defaultBranch);
+
+    res.json({
+      success: true,
+      repo: conn.fullName,
+      branch: conn.defaultBranch,
+      hash: result.hash,
+      committed: result.committed,
+      message: result.message,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

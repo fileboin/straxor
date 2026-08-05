@@ -5,12 +5,20 @@ import {
   setGitRemoteConfig,
   getGitRemoteConfig,
   hydrateGitRemoteConfig,
+  listGitTokens,
+  addGitToken,
+  renameGitToken,
+  activateGitToken,
+  deleteGitToken,
+  getGitTokenById,
+  getGitAdapterForSlot,
 } from "../adapters/git/remote/registry.js";
+import type { GitTokenSlot } from "../adapters/git/remote/registry.js";
 import type { GitPlatformId } from "../adapters/git/remote/adapter.js";
 
 const router = Router();
 
-// ── Config ──
+// ── Config (legacy single-token) ──
 
 // GET /api/git-remote/config/:platform — get platform config
 router.get("/config/:platform", requireAuth, async (req: any, res) => {
@@ -44,6 +52,162 @@ router.post("/config/:platform", requireAuth, async (req: any, res) => {
   }
 });
 
+// ── Token slots (multi-token) ──
+
+// GET /api/git-remote/:platform/tokens — list token slots (no raw tokens)
+router.get("/:platform/tokens", requireAuth, async (req: any, res) => {
+  try {
+    const userId = req.user!.userId;
+    const platform = req.params.platform as GitPlatformId;
+    await hydrateGitRemoteConfig(userId);
+    const tokens = await listGitTokens(userId, platform);
+    res.json({ platform, tokens });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to list tokens" });
+  }
+});
+
+// POST /api/git-remote/:platform/tokens/validate — validate a token via /user
+router.post("/:platform/tokens/validate", requireAuth, async (req: any, res) => {
+  try {
+    const userId = req.user!.userId;
+    const platform = req.params.platform as GitPlatformId;
+    const { token, baseUrl } = req.body;
+    if (!token) return res.status(400).json({ error: "Token is required" });
+
+    const slot: GitTokenSlot = {
+      id: "",
+      platform,
+      name: "validate",
+      isDefault: false,
+      token,
+      baseUrl: baseUrl || null,
+    };
+    const adapter = getGitAdapterForSlot(userId, platform, slot);
+
+    let username: string | null = null;
+    let valid = true;
+    let scopeHint: string | undefined;
+    try {
+      if (adapter.validateToken) {
+        const r = await adapter.validateToken();
+        valid = !!r && r.canReadRepos;
+        username = r?.username || null;
+        if (!valid) scopeHint = "repo access denied";
+      } else if (adapter.getUser) {
+        const user = await adapter.getUser();
+        username = user?.username || null;
+        valid = !!user;
+      } else {
+        await adapter.listRepos();
+      }
+    } catch (e: any) {
+      valid = false;
+      scopeHint = e?.message || "invalid token";
+    }
+
+    res.json({ valid, scopeHint, username, platform });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to validate token" });
+  }
+});
+
+// POST /api/git-remote/:platform/tokens — add a new token slot
+router.post("/:platform/tokens", requireAuth, async (req: any, res) => {
+  try {
+    const userId = req.user!.userId;
+    const platform = req.params.platform as GitPlatformId;
+    const { name, token, baseUrl } = req.body;
+    if (!token) return res.status(400).json({ error: "Token is required" });
+
+    // Validate before persisting
+    let username: string | null = null;
+    const slot: GitTokenSlot = {
+      id: "",
+      platform,
+      name: "validate",
+      isDefault: false,
+      token,
+      baseUrl: baseUrl || null,
+    };
+    const adapter = getGitAdapterForSlot(userId, platform, slot);
+    try {
+      if (adapter.validateToken) {
+        const r = await adapter.validateToken();
+        if (!r || !r.canReadRepos) {
+          return res.status(400).json({ error: "Token nema pristup repozitorijumima — provjeri opseg (classic: repo+read:org, fine-grained: Contents+Metadata read)" });
+        }
+        username = r.username;
+      } else if (adapter.getUser) {
+        const user = await adapter.getUser();
+        if (!user) {
+          return res.status(400).json({ error: "Token nije validan — GitHub je odbio zahtjev" });
+        }
+        username = user.username;
+      } else {
+        await adapter.listRepos();
+      }
+    } catch (e: any) {
+      // Surface the adapter's precise 401/403 message so the user sees why.
+      const msg = e?.message || "Token nije validan — GitHub je odbio zahtjev";
+      return res.status(400).json({ error: msg });
+    }
+
+    const saved = await addGitToken(userId, platform, {
+      name: name || "GitHub",
+      token,
+      baseUrl,
+      username,
+    });
+
+    res.status(201).json({ token: { ...saved, token: undefined } });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to add token" });
+  }
+});
+
+// PATCH /api/git-remote/:platform/tokens/:id — rename a slot
+router.patch("/:platform/tokens/:id", requireAuth, async (req: any, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: "Name is required" });
+    await renameGitToken(userId, id, String(name));
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to rename token" });
+  }
+});
+
+// POST /api/git-remote/:platform/tokens/:id/activate — set default slot
+router.post("/:platform/tokens/:id/activate", requireAuth, async (req: any, res) => {
+  try {
+    const userId = req.user!.userId;
+    const platform = req.params.platform as GitPlatformId;
+    const { id } = req.params;
+    const slot = await getGitTokenById(userId, id);
+    if (!slot) return res.status(404).json({ error: "Token not found" });
+    await activateGitToken(userId, id, platform);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to activate token" });
+  }
+});
+
+// DELETE /api/git-remote/:platform/tokens/:id — remove a slot
+router.delete("/:platform/tokens/:id", requireAuth, async (req: any, res) => {
+  try {
+    const userId = req.user!.userId;
+    const platform = req.params.platform as GitPlatformId;
+    const { id } = req.params;
+    await deleteGitToken(userId, id, platform);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete token" });
+  }
+});
+
 // ── Repositories ──
 
 // GET /api/git-remote/:platform/repos — list repos
@@ -55,7 +219,11 @@ router.get("/:platform/repos", requireAuth, async (req: any, res) => {
     const repos = await adapter.listRepos();
     res.json(repos);
   } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to list repos" });
+    const message = error.message || "Failed to list repos";
+    // Map adapter errors to real HTTP codes so the client can act on them
+    // (401 = bad token, 403 = missing scope, 404 = no access).
+    const status = /\(401\)/.test(message) ? 401 : /\(403\)/.test(message) ? 403 : /\(404\)/.test(message) ? 404 : 500;
+    res.status(status).json({ error: message });
   }
 });
 

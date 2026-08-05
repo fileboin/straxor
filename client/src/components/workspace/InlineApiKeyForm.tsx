@@ -10,6 +10,22 @@ interface Props {
   onCancel?: () => void;
 }
 
+// OpenRouter keys always start with "sk-or-v1-" and have a variable length, so
+// we validate the prefix + a reasonable minimum instead of a strict length.
+function validateApiKey(providerId: string, rawKey: string): string | null {
+  const key = rawKey.trim();
+  if (!key) return null;
+  if (providerId === "openrouter") {
+    if (!key.startsWith("sk-or-v1-")) {
+      return t("models.keyOpenRouterPrefix");
+    }
+    if (key.length < 20) {
+      return t("models.keyTooShort");
+    }
+  }
+  return null;
+}
+
 export default function InlineApiKeyForm({
   providerId,
   providerName,
@@ -30,6 +46,11 @@ export default function InlineApiKeyForm({
   const handleSave = async () => {
     const k = key.trim();
     if (!k) return;
+    const validationError = validateApiKey(providerId, k);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setSaving(true);
     setError("");
     try {

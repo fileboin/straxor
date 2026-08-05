@@ -7,23 +7,37 @@ import {
 } from "react";
 
 export type Theme = "dark" | "light";
-export type AccentColor = "olive" | "blue" | "yellow" | "orange" | "red";
+export type AccentColor =
+  | "burnt"
+  | "blue"
+  | "yellow"
+  | "orange"
+  | "red"
+  | "gray"
+  | "green"
+  | "purple"
+  | "white"
+  | "black";
 
 interface ThemeContextType {
   theme: Theme;
   accent: AccentColor;
   toggleTheme: () => void;
+  setTheme: (t: Theme) => void;
   setAccent: (accent: AccentColor) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
 
 export const ACCENT_COLORS: { id: AccentColor; label: string; color: string }[] = [
-  { id: "olive", label: "Maslinasto-zelena", color: "#6b8c42" },
-  { id: "blue", label: "Plava", color: "#3b82f6" },
-  { id: "yellow", label: "Žuta", color: "#eab308" },
-  { id: "orange", label: "Narandžasta", color: "#f97316" },
-  { id: "red", label: "Crvena", color: "#ef4444" },
+  { id: "yellow", label: "Žuta", color: "#F5C842" },
+  { id: "burnt", label: "Narandžasta", color: "#FF4D2E" },
+  { id: "blue", label: "Plava", color: "#3B82F6" },
+  { id: "gray", label: "Siva", color: "#6B7280" },
+  { id: "green", label: "Zelena", color: "#22C55E" },
+  { id: "purple", label: "Ljubičasta", color: "#8B5CF6" },
+  { id: "white", label: "Bijela", color: "#FFFFFF" },
+  { id: "black", label: "OLED crna", color: "#000000" },
 ];
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -31,7 +45,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return (localStorage.getItem("straxor-theme") as Theme) || "dark";
   });
   const [accent, setAccentState] = useState<AccentColor>(() => {
-    return (localStorage.getItem("straxor-accent") as AccentColor) || "olive";
+    const stored = localStorage.getItem("straxor-accent");
+    if (stored === "olive") return "burnt";
+    return (stored as AccentColor) || "burnt";
   });
 
   useEffect(() => {
@@ -48,7 +64,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setAccent = (a: AccentColor) => setAccentState(a);
 
   return (
-    <ThemeContext.Provider value={{ theme, accent, toggleTheme, setAccent }}>
+    <ThemeContext.Provider
+      value={{ theme, accent, toggleTheme, setTheme, setAccent }}
+    >
       {children}
     </ThemeContext.Provider>
   );

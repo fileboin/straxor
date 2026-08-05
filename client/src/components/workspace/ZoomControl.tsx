@@ -6,19 +6,34 @@ interface Props {
   onZoomChange: (z: number) => void;
 }
 
-export const ZOOM_MIN = 0.6;
-export const ZOOM_MAX = 1.25;
+export const ZOOM_MIN = 0.7;
+export const ZOOM_MAX = 1.5;
 const ZOOM_STEP = 0.05;
 
 export const ZOOM_PRESETS = [
   { id: "tiny", value: 0.7, labelKey: "zoom.tiny" },
   { id: "small", value: 0.85, labelKey: "zoom.small" },
   { id: "medium", value: 1, labelKey: "zoom.medium" },
-  { id: "large", value: 1.15, labelKey: "zoom.large" },
+  { id: "large", value: 1.25, labelKey: "zoom.large" },
+  { id: "xlarge", value: 1.5, labelKey: "zoom.xlarge" },
 ] as const;
 
 export function clampZoom(z: number) {
   return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(z * 20) / 20));
+}
+
+export const VZOOM_MIN = 0.5;
+export const VZOOM_MAX = 1.5;
+export const VZOOM_PRESETS = [
+  { id: "v-squeeze", value: 0.6, labelKey: "vzoom.squeeze" },
+  { id: "v-compact", value: 0.8, labelKey: "vzoom.compact" },
+  { id: "v-normal", value: 1, labelKey: "vzoom.normal" },
+  { id: "v-tall", value: 1.25, labelKey: "vzoom.tall" },
+  { id: "v-full", value: 1.5, labelKey: "vzoom.full" },
+] as const;
+
+export function clampVerticalZoom(z: number) {
+  return Math.max(VZOOM_MIN, Math.min(VZOOM_MAX, Math.round(z * 20) / 20));
 }
 
 export default function ZoomControl({ zoom, onZoomChange }: Props) {

@@ -1,4 +1,7 @@
 import type { Duplex } from "stream";
+import type { EngineAttachment } from "../../lib/attachments.js";
+
+export type { EngineAttachment };
 
 export interface TodoItem {
   id: string;
@@ -35,7 +38,8 @@ export interface RuntimeAdapter {
     machineId: string,
     sessionId: string,
     text: string,
-    mode?: "sync" | "async"
+    mode?: "sync" | "async",
+    attachments?: EngineAttachment[]
   ): Promise<{ parts?: unknown[] }>;
   listSessions(machineId: string): Promise<unknown[]>;
   getTodos(machineId: string, sessionId: string): Promise<TodoItem[]>;

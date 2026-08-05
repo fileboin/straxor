@@ -64,7 +64,7 @@ export class ComfyUIProvider extends BaseImageProvider {
 
       const url = output
         ? `${this.baseUrl}/view?filename=${output.filename}&subfolder=${output.subfolder || ""}&type=output`
-        : `https://placehold.co/${width}x${height}/1a1a1a/6b8c42?text=ComfyUI`;
+        : `https://placehold.co/${width}x${height}/0e1422/ff4d2e?text=ComfyUI`;
 
       return {
         id: this.makeId(),
@@ -81,7 +81,7 @@ export class ComfyUIProvider extends BaseImageProvider {
     } catch {
       return {
         id: this.makeId(),
-        url: `https://placehold.co/${width}x${height}/1a1a1a/6b8c42?text=ComfyUI+Error`,
+        url: `https://placehold.co/${width}x${height}/0e1422/ff4d2e?text=ComfyUI+Error`,
         provider: "comfy-ui",
         prompt: req.prompt,
         width,

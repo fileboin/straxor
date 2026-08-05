@@ -95,6 +95,18 @@ const DICT: Record<string, { en: string; bs: string }> = {
     en: "Agent is active — send an instruction to steer",
     bs: "Agent je aktivan — pošalji instrukciju za preusmjeravanje",
   },
+  "chat.background.on": {
+    en: "Background execution on",
+    bs: "Rad u pozadini uključen",
+  },
+  "chat.background.off": {
+    en: "Background execution off",
+    bs: "Rad u pozadini isključen",
+  },
+  "chat.background.hint": {
+    en: "Run the agent server-side and poll progress — works when the tab/app is in the background",
+    bs: "Agent radi server-side, progres se prati pollingom — radi i kad je tab/aplikacija u pozadini",
+  },
   "chat.plan.title": {
     en: "Plan Preview",
     bs: "Pregled plana",
@@ -178,6 +190,14 @@ const DICT: Record<string, { en: string; bs: string }> = {
   "models.addApiKey": { en: "Add API key", bs: "Dodaj API ključ" },
   "models.keyReady": { en: "Key configured", bs: "Ključ konfigurisan" },
   "models.keyNeeded": { en: "API key required", bs: "API ključ je potreban" },
+  "models.keyOpenRouterPrefix": {
+    en: "OpenRouter keys start with sk-or-v1-",
+    bs: "OpenRouter ključevi počinju sa sk-or-v1-",
+  },
+  "models.keyTooShort": {
+    en: "Key is too short",
+    bs: "Ključ je prekratak",
+  },
   "models.keyPlaceholder": {
     en: "Paste {provider} API key...",
     bs: "Zalijepi {provider} API ključ...",
@@ -211,6 +231,28 @@ const DICT: Record<string, { en: string; bs: string }> = {
   "zoom.small": { en: "Small", bs: "Mali" },
   "zoom.medium": { en: "Medium", bs: "Srednji" },
   "zoom.large": { en: "Large", bs: "Veliki" },
+  "zoom.xlarge": { en: "Extra large", bs: "Ekstra veliki" },
+  "vzoom.title": { en: "Vertical zoom", bs: "Vertikalni zoom" },
+  "vzoom.squeeze": { en: "Squeeze", bs: "Stisnuto" },
+  "vzoom.compact": { en: "Compact", bs: "Kompaktno" },
+  "vzoom.normal": { en: "Normal", bs: "Normalno" },
+  "vzoom.tall": { en: "Tall", bs: "Visoko" },
+  "vzoom.full": { en: "Full", bs: "Puno" },
+  "panelMenu.title": { en: "Panel settings", bs: "Podešavanja panela" },
+  "panelMenu.theme": { en: "Theme", bs: "Tema" },
+  "panelMenu.panelAccent": { en: "Panel accent", bs: "Boja panela" },
+  "panelMenu.orchestrator": { en: "Orchestrator", bs: "Orkestar" },
+  "panelMenu.orchestratorEmpty": { en: "Select 2+ models for parallel execution", bs: "Odaberi 2+ modela za paralelno izvršavanje" },
+  "panelMenu.role": { en: "Agent role", bs: "Uloga agenta" },
+  "panelMenu.model": { en: "Choose model", bs: "Izaberi model" },
+  "panelMenu.prompts": { en: "Ideas & templates", bs: "Ideje i šabloni" },
+  "panelMenu.gitOpen": { en: "Git platforms", bs: "Git platforme" },
+  "panelMenu.gitActivate": { en: "Activate this token", bs: "Aktiviraj ovaj token" },
+  "panelMenu.gitRename": { en: "Rename", bs: "Preimenuj" },
+  "panelMenu.gitDelete": { en: "Delete", bs: "Obriši" },
+  "panelMenu.gitAdd": { en: "Add token", bs: "Dodaj token" },
+  "panelMenu.gitName": { en: "Label (e.g. Work / Personal)", bs: "Naziv (npr. Posao / Osobno)" },
+  "panelMenu.noTokens": { en: "No tokens yet", bs: "Još nema tokena" },
   "layout.side": {
     en: "Side-by-side (Ask | Agent)",
     bs: "Jedan pored drugog (Ask | Agent)",
@@ -230,6 +272,10 @@ const DICT: Record<string, { en: string; bs: string }> = {
   "layout.resize": {
     en: "Drag to resize panels",
     bs: "Povuci za promjenu širine panela",
+  },
+  "layout.resizeHeight": {
+    en: "Drag to resize panel height",
+    bs: "Povuci za promjenu visine panela",
   },
 
   // ── Auth pages ──

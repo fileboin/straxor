@@ -5,9 +5,10 @@ import ModelPickerModal from "./ModelPickerModal.js";
 import InputToolbar from "./InputToolbar.js";
 import InfoTip from "./InfoTip.js";
 import WelcomeHero from "./WelcomeHero.js";
-import ZoomControl from "./ZoomControl.js";
+import PanelMenu from "./PanelMenu.js";
 import InlineApiKeyForm from "./InlineApiKeyForm.js";
 import { useModelCatalog, type ThinkingBudget } from "../../lib/models.js";
+import type { AgentRole } from "../../lib/roles.js";
 import { t, useLang } from "../../lib/i18n.js";
 import { estimatePlan, formatCost, formatTokens } from "../../lib/plan-preview.js";
 import {
@@ -25,6 +26,20 @@ import {
   openCameraStream,
   capturePhoto,
 } from "../../lib/media.js";
+import type { AccentColor } from "../../lib/theme.js";
+
+const PANEL_BG_COLORS: Record<AccentColor, string> = {
+  burnt: "color-mix(in srgb, #FF4D2E 8%, #0a0e1a)",
+  blue: "color-mix(in srgb, #3B82F6 6%, #0a0e1a)",
+  yellow: "color-mix(in srgb, #F5C842 4%, #0a0e1a)",
+  orange: "color-mix(in srgb, #F97316 8%, #0a0e1a)",
+  red: "color-mix(in srgb, #EF4444 6%, #0a0e1a)",
+  gray: "color-mix(in srgb, #6B7280 10%, #0a0e1a)",
+  green: "color-mix(in srgb, #22C55E 6%, #0a0e1a)",
+  purple: "color-mix(in srgb, #8B5CF6 6%, #0a0e1a)",
+  white: "color-mix(in srgb, #FFFFFF 6%, #0a0e1a)",
+  black: "#000000",
+};
 
 export interface ToolCall {
   id: string;
@@ -34,6 +49,14 @@ export interface ToolCall {
   status: "pending" | "running" | "completed" | "error";
 }
 
+export interface OrchestratedResult {
+  modelId: string;
+  label: string;
+  content: string;
+  error?: string;
+  done: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -41,6 +64,7 @@ export interface ChatMessage {
   label?: string;
   toolCalls?: ToolCall[];
   attachments?: Attachment[];
+  orchestrated?: OrchestratedResult[];
 }
 
 interface Props {
@@ -72,11 +96,28 @@ interface Props {
   onToggleExpand?: () => void;
   zoom?: number;
   onZoomChange?: (z: number) => void;
+  verticalZoom?: number;
+  onVerticalZoomChange?: (z: number) => void;
+  panelMenuKey?: string;
+  role?: AgentRole;
+  onRoleChange?: (role: AgentRole) => void;
   onOpenPromptLibrary?: () => void;
   isSteerable?: boolean;
   onSteerSend?: (message: string) => void;
   steerStatusText?: string;
   runtimeControl?: React.ReactNode;
+  modelOrch?: boolean;
+  onModelOrchChange?: (value: boolean) => void;
+  modelOrchDisabled?: boolean;
+  modelOrchHint?: string;
+  background?: boolean;
+  onBackgroundChange?: (value: boolean) => void;
+  backgroundHint?: string;
+  panelAccent?: string;
+  onPanelAccentChange?: (color: string) => void;
+  orchestratedModels?: { providerId: string; modelId: string }[];
+  onOrchestratedModelsChange?: (models: { providerId: string; modelId: string }[]) => void;
+  availableModels?: { providerId: string; name: string; models: { id: string; name: string }[] }[];
 }
 
 const ACCEPTED_EXT_RE = /\.(jpe?g|png|webp|gif|avif|mp3|wav|ogg|webm|m4a|pdf|txt|md|csv|json)$/i;
@@ -225,11 +266,28 @@ export default function ChatPanel({
   onToggleExpand,
   zoom = 1,
   onZoomChange,
+  verticalZoom = 1,
+  onVerticalZoomChange,
+  panelMenuKey = "ask",
+  role,
+  onRoleChange,
   onOpenPromptLibrary,
   isSteerable,
   onSteerSend,
   steerStatusText,
   runtimeControl,
+  modelOrch,
+  onModelOrchChange,
+  modelOrchDisabled,
+  modelOrchHint,
+  background,
+  onBackgroundChange,
+  backgroundHint,
+  panelAccent,
+  onPanelAccentChange,
+  orchestratedModels = [],
+  onOrchestratedModelsChange,
+  availableModels = [],
 }: Props) {
   const [input, setInput] = useState("");
   useLang();
@@ -247,6 +305,13 @@ export default function ChatPanel({
   const { providers: catalogProviders, loading: catalogLoading } = useModelCatalog();
   const providerName =
     catalogProviders.find((p) => p.id === providerId)?.name || providerId;
+
+  // Vision capability check for gating image/camera uploads.
+  // Default true: assume vision for providers where metadata is unknown.
+  const supportsVision =
+    catalogProviders
+      .find((p) => p.id === providerId)
+      ?.models.find((m) => m.id === modelId)?.vision ?? true;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -463,6 +528,7 @@ export default function ChatPanel({
       return;
     }
     if (actionId === "camera") {
+      if (!supportsVision) return;
       setCameraOpen(true);
       return;
     }
@@ -471,6 +537,7 @@ export default function ChatPanel({
       return;
     }
     if (actionId === "image") {
+      if (!supportsVision) return;
       imageInputRef.current?.click();
       return;
     }
@@ -639,8 +706,46 @@ export default function ChatPanel({
     />
   );
 
+  const panelMenuNode = onZoomChange ? (
+    <PanelMenu
+      role={role || "developer"}
+      onRoleChange={(r) => onRoleChange?.(r)}
+      zoom={zoom}
+      onZoomChange={onZoomChange}
+      verticalZoom={verticalZoom}
+      onVerticalZoomChange={onVerticalZoomChange || (() => {})}
+      onOpenModelPicker={() => setShowModelPicker(true)}
+      onOpenPromptLibrary={() => onOpenPromptLibrary?.()}
+      onOpenGitRemote={() => onOpenGitRemote?.()}
+      storageKey={panelMenuKey}
+      panelAccent={panelAccent}
+      onPanelAccentChange={onPanelAccentChange}
+      orchestratedModels={orchestratedModels}
+      onOrchestratedModelsChange={onOrchestratedModelsChange || (() => {})}
+      availableModels={availableModels}
+    />
+   ) : null;
+
+  const panelBgStyle = panelAccent
+    ? {
+        "--panel-accent": panelAccent,
+        "--panel-bg": PANEL_BG_COLORS[panelAccent as AccentColor] ?? panelAccent,
+        ...(panelAccent === "black"
+          ? {
+              "--panel-surface": "#000000",
+              "--panel-surface-2": "#000000",
+              "--panel-surface-3": "#000000",
+            }
+          : {}),
+      } as React.CSSProperties
+    : undefined;
+
   return (
-    <div className={`flex flex-col h-full min-h-0 overflow-hidden rounded-2xl ${isEmpty ? "border border-white/10" : "border border-border bg-surface shadow-lg shadow-black/30"}`}>
+    <div
+      className={`flex flex-col h-full min-h-0 overflow-hidden rounded-2xl panel-glass ${isEmpty ? "border border-white/10" : "border border-border shadow-lg shadow-black/30"}`}
+      data-panel-accent={panelAccent ? "true" : undefined}
+      style={panelBgStyle}
+    >
       {isEmpty ? (
         <WelcomeHero
           icon={icon}
@@ -658,6 +763,7 @@ export default function ChatPanel({
           onOpenPromptLibrary={() => onOpenPromptLibrary?.()}
           onToolbarAction={handleToolbarAction}
           roleSelector={headerLeft}
+          panelMenu={panelMenuNode}
           micState={micState}
           budgetPopover={budgetPopover}
           micStatusBar={micStatusBar}
@@ -692,6 +798,45 @@ export default function ChatPanel({
         </div>
         <div className="flex items-center gap-1 shrink-0 sm:gap-2">
           {runtimeControl}
+          {onBackgroundChange && (
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => onBackgroundChange(!background)}
+                className={`flex items-center gap-1 px-1.5 h-7 rounded-md border text-[10px] font-medium transition-colors ${
+                  background
+                    ? "border-accent/50 bg-accent/10 text-accent"
+                    : "border-border bg-transparent text-text-muted hover:text-text-secondary hover:border-border-light"
+                }`}
+                title={backgroundHint || (background ? t("chat.background.on") : t("chat.background.off"))}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${background ? "bg-accent animate-pulse" : "bg-text-muted"}`} />
+                <span className="hidden lg:inline">Bg</span>
+                <span className="lg:hidden">Bg</span>
+              </button>
+              <InfoTip text={backgroundHint || t("chat.background.hint")} placement="bottom" />
+            </div>
+          )}
+          {onModelOrchChange && (
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => !modelOrchDisabled && onModelOrchChange(!modelOrch)}
+                disabled={modelOrchDisabled}
+                className={`flex items-center gap-1 px-1.5 h-7 rounded-md border text-[10px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                  modelOrch
+                    ? "border-accent/50 bg-accent/10 text-accent"
+                    : "border-border bg-transparent text-text-muted hover:text-text-secondary hover:border-border-light"
+                }`}
+                title={modelOrchHint || (modelOrch ? "Model orkestracija uključena" : "Model orkestracija isključena")}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${modelOrch ? "bg-accent" : "bg-text-muted"}`} />
+                <span className="hidden lg:inline">M-Orch</span>
+                <span className="lg:hidden">M</span>
+              </button>
+              <InfoTip text={modelOrchHint || "Model orkestracija — task se automatski rutira na najbolji model prema težini"} placement="bottom" />
+            </div>
+          )}
           {onToggleExpand && (
             <div className="flex items-center gap-0.5">
               <button
@@ -704,9 +849,7 @@ export default function ChatPanel({
               <InfoTip text={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")} placement="bottom" />
             </div>
           )}
-          {onZoomChange && (
-            <ZoomControl zoom={zoom} onZoomChange={onZoomChange} />
-          )}
+          {panelMenuNode}
           <button
             onClick={() => setShowModelPicker(true)}
             className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
@@ -755,6 +898,34 @@ export default function ChatPanel({
                 <span className="inline-block w-2 h-4 ml-0.5 bg-accent animate-pulse" />
               )}
             </div>
+            {msg.orchestrated && msg.orchestrated.length > 0 && (
+              <div className="grid gap-2 mt-1.5 grid-cols-1 sm:grid-cols-2">
+                {msg.orchestrated.map((res) => (
+                  <div
+                    key={res.modelId}
+                    className="rounded-xl border border-border bg-surface/60 p-2.5"
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[10px] font-semibold text-text-muted truncate">
+                        {res.label}
+                      </span>
+                      {!res.done && (
+                        <span className="inline-block w-1.5 h-3 bg-accent animate-pulse shrink-0" />
+                      )}
+                      {res.done && res.error && (
+                        <span className="text-[10px] text-red-400 ml-auto shrink-0">✗</span>
+                      )}
+                      {res.done && !res.error && (
+                        <span className="text-[10px] text-green-500 ml-auto shrink-0">✓</span>
+                      )}
+                    </div>
+                    <div className="text-[12px] whitespace-pre-wrap break-words text-text/90">
+                      {res.error || res.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {/* Missing API key error → inline "Add key" action */}
             {msg.role === "assistant" &&
               msg.content.includes("API key not configured") && (
@@ -834,6 +1005,7 @@ export default function ChatPanel({
           <InputToolbar
             onAction={handleToolbarAction}
             micState={micState}
+            disabledActions={supportsVision ? [] : ["camera", "image"]}
           />
           <input
             type="text"

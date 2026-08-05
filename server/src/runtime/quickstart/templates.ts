@@ -155,7 +155,7 @@ createRoot(document.getElementById("root")!).render(
     content: `@import "tailwindcss";
 
 :root {
-  --accent: #6b8c42;
+  --accent: #ff4d2e;
 }
 
 body {
@@ -185,13 +185,13 @@ export default function App() {
       <nav className="fixed top-0 w-full z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <span className="text-xl font-bold">
-            <span className="text-[#6b8c42]">Logo</span>
+            <span className="text-[#ff4d2e]">Logo</span>
           </span>
           <div className="hidden md:flex items-center gap-8 text-sm text-white/60">
             <a href="#features" className="hover:text-white transition">Značajke</a>
             <a href="#pricing" className="hover:text-white transition">Cijene</a>
             <a href="#contact" className="hover:text-white transition">Kontakt</a>
-            <button className="px-4 py-2 bg-[#6b8c42] text-white rounded-lg text-sm font-medium hover:bg-[#5a7a38] transition">
+            <button className="px-4 py-2 bg-[#ff4d2e] text-white rounded-lg text-sm font-medium hover:bg-[#e63f24] transition">
               Počni
             </button>
           </div>
@@ -204,12 +204,12 @@ export default function App() {
       {/* Hero */}
       <section className="pt-32 pb-20 px-4 text-center">
         <div className="max-w-4xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#6b8c42]/30 bg-[#6b8c42]/10 text-[#6b8c42] text-sm mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#ff4d2e]/30 bg-[#ff4d2e]/10 text-[#ff4d2e] text-sm mb-6">
             <Sparkles className="w-4 h-4" /> Nova era razvoja
           </div>
           <h1 className="text-5xl md:text-7xl font-bold leading-tight mb-6">
             Stvorite{" "}
-            <span className="bg-gradient-to-r from-[#6b8c42] to-[#8fba5c] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#ff4d2e] to-[#ff8a5c] bg-clip-text text-transparent">
               nešto izvanredno
             </span>
           </h1>
@@ -218,7 +218,7 @@ export default function App() {
             jedan projekat po jedan.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <button className="px-6 py-3 bg-[#6b8c42] text-white rounded-xl font-medium hover:bg-[#5a7a38] transition flex items-center gap-2">
+            <button className="px-6 py-3 bg-[#ff4d2e] text-white rounded-xl font-medium hover:bg-[#e63f24] transition flex items-center gap-2">
               Započni besplatno <ArrowRight className="w-4 h-4" />
             </button>
             <button className="px-6 py-3 border border-white/20 rounded-xl text-white/70 hover:text-white transition">
@@ -235,7 +235,7 @@ export default function App() {
           <div className="grid md:grid-cols-3 gap-6">
             {features.map((f) => (
               <div key={f.title} className="p-6 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition">
-                <f.icon className="w-8 h-8 text-[#6b8c42] mb-4" />
+                <f.icon className="w-8 h-8 text-[#ff4d2e] mb-4" />
                 <h3 className="text-lg font-semibold mb-2">{f.title}</h3>
                 <p className="text-sm text-white/50">{f.desc}</p>
               </div>
@@ -246,10 +246,10 @@ export default function App() {
 
       {/* CTA */}
       <section className="py-20 px-4 text-center">
-        <div className="max-w-2xl mx-auto p-8 rounded-3xl border border-[#6b8c42]/30 bg-[#6b8c42]/5">
+        <div className="max-w-2xl mx-auto p-8 rounded-3xl border border-[#ff4d2e]/30 bg-[#ff4d2e]/5">
           <h2 className="text-3xl font-bold mb-4">Spremni za početak?</h2>
           <p className="text-white/50 mb-6">Pridružite se hiljadama zadovoljnih korisnika.</p>
-          <button className="px-6 py-3 bg-[#6b8c42] text-white rounded-xl font-medium hover:bg-[#5a7a38] transition">
+          <button className="px-6 py-3 bg-[#ff4d2e] text-white rounded-xl font-medium hover:bg-[#e63f24] transition">
             Započni odmah
           </button>
         </div>
@@ -379,7 +379,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-950 text-white flex">
       {/* Sidebar */}
       <aside className="hidden md:flex flex-col w-56 border-r border-white/10 p-4 gap-2">
-        <span className="text-lg font-bold text-[#6b8c42] mb-6">Dashboard</span>
+        <span className="text-lg font-bold text-[#ff4d2e] mb-6">Dashboard</span>
         {["Overview", "Analytics", "Users", "Orders", "Settings"].map((item) => (
           <button key={item} className="text-left px-3 py-2 rounded-lg text-sm text-white/60 hover:text-white hover:bg-white/5 transition">
             {item}
@@ -427,7 +427,7 @@ export default function App() {
                 <XAxis dataKey="month" stroke="rgba(255,255,255,0.3)" fontSize={12} />
                 <YAxis stroke="rgba(255,255,255,0.3)" fontSize={12} />
                 <Tooltip />
-                <Bar dataKey="value" fill="#6b8c42" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill="#ff4d2e" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -548,7 +548,7 @@ export default function App() {
             <h1 className="text-2xl font-bold">CRM</h1>
             <p className="text-sm text-white/50">Upravljajte kontaktima</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#6b8c42] text-white rounded-xl text-sm font-medium hover:bg-[#5a7a38] transition">
+          <button className="flex items-center gap-2 px-4 py-2 bg-[#ff4d2e] text-white rounded-xl text-sm font-medium hover:bg-[#e63f24] transition">
             <Plus className="w-4 h-4" /> Dodaj kontakt
           </button>
         </div>
@@ -707,8 +707,8 @@ export default function App() {
                 <span className="text-xs text-white/50">{p.rating}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="font-bold text-[#6b8c42]">\${p.price.toFixed(2)}</span>
-                <button className="p-1.5 rounded-lg hover:bg-[#6b8c42]/20 text-[#6b8c42] transition"><Heart className="w-4 h-4" /></button>
+                <span className="font-bold text-[#ff4d2e]">\${p.price.toFixed(2)}</span>
+                <button className="p-1.5 rounded-lg hover:bg-[#ff4d2e]/20 text-[#ff4d2e] transition"><Heart className="w-4 h-4" /></button>
               </div>
             </div>
           ))}
@@ -732,7 +732,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-950 text-white flex">
       <aside className="w-56 border-r border-white/10 p-4 flex flex-col gap-1">
-        <span className="text-lg font-bold text-[#6b8c42] mb-6">SaaS</span>
+        <span className="text-lg font-bold text-[#ff4d2e] mb-6">SaaS</span>
         {sidebarItems.map((item) => (
           <button key={item.label} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/60 hover:text-white hover:bg-white/5 transition">
             <item.icon className="w-4 h-4" /> {item.label}
@@ -786,7 +786,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-950 text-white">
       <header className="border-b border-white/10 p-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <h1 className="text-xl font-bold text-[#6b8c42]">Blog</h1>
+          <h1 className="text-xl font-bold text-[#ff4d2e]">Blog</h1>
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} className="bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-sm w-48" placeholder="Pretraži..." />
@@ -797,7 +797,7 @@ export default function App() {
         {filtered.map((post) => (
           <article key={post.title} className="p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition cursor-pointer">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs px-2 py-0.5 rounded-full bg-[#6b8c42]/10 text-[#6b8c42]">{post.tag}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-[#ff4d2e]/10 text-[#ff4d2e]">{post.tag}</span>
               <span className="text-xs text-white/30 flex items-center gap-1"><Calendar className="w-3 h-3" />{post.date}</span>
               <span className="text-xs text-white/30 flex items-center gap-1"><Clock className="w-3 h-3" />{post.readTime}</span>
             </div>
@@ -825,7 +825,7 @@ export default function App() {
       <div className="max-w-4xl mx-auto p-6">
         {/* Hero */}
         <section className="text-center py-16">
-          <div className="w-20 h-20 rounded-full bg-[#6b8c42]/20 mx-auto mb-4 flex items-center justify-center text-3xl">👤</div>
+          <div className="w-20 h-20 rounded-full bg-[#ff4d2e]/20 mx-auto mb-4 flex items-center justify-center text-3xl">👤</div>
           <h1 className="text-4xl font-bold mb-2">Ime Prezime</h1>
           <p className="text-white/50 mb-4">Full-Stack Developer & UI/UX Designer</p>
           <div className="flex items-center justify-center gap-3">
@@ -857,7 +857,7 @@ export default function App() {
                 </div>
                 <p className="text-sm text-white/50 mb-3">{p.desc}</p>
                 <div className="flex flex-wrap gap-1">
-                  {p.tech.map((t) => (<span key={t} className="text-xs px-2 py-0.5 rounded-full bg-[#6b8c42]/10 text-[#6b8c42]">{t}</span>))}
+                  {p.tech.map((t) => (<span key={t} className="text-xs px-2 py-0.5 rounded-full bg-[#ff4d2e]/10 text-[#ff4d2e]">{t}</span>))}
                 </div>
               </div>
             ))}
@@ -917,11 +917,11 @@ export default function App() {
         {tabs.map((tab, i) => (
           <button key={tab.label} onClick={() => setActiveTab(i)} className={\`flex flex-col items-center gap-0.5 \${tab.center ? "relative -top-3" : ""}\`}>
             {tab.center ? (
-              <div className="w-12 h-12 rounded-full bg-[#6b8c42] flex items-center justify-center"><tab.icon className="w-5 h-5 text-white" /></div>
+              <div className="w-12 h-12 rounded-full bg-[#ff4d2e] flex items-center justify-center"><tab.icon className="w-5 h-5 text-white" /></div>
             ) : (
-              <tab.icon className={\`w-5 h-5 \${activeTab === i ? "text-[#6b8c42]" : "text-white/40"}\`} />
+              <tab.icon className={\`w-5 h-5 \${activeTab === i ? "text-[#ff4d2e]" : "text-white/40"}\`} />
             )}
-            {!tab.center && <span className={\`text-[10px] \${activeTab === i ? "text-[#6b8c42]" : "text-white/40"}\`}>{tab.label}</span>}
+            {!tab.center && <span className={\`text-[10px] \${activeTab === i ? "text-[#ff4d2e]" : "text-white/40"}\`}>{tab.label}</span>}
           </button>
         ))}
       </nav>

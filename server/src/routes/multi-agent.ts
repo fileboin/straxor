@@ -8,6 +8,8 @@ import {
   createWorkflow, getAllWorkflows, getWorkflow, deleteWorkflow,
   getStats,
 } from "../adapters/multi-agent/orchestrator.js";
+import { executeTaskWithOpenCode } from "../adapters/multi-agent/opencode-runner.js";
+import { getSharedWorkspaceStatus } from "../runtime/local/shared-workspace.js";
 
 const router = Router();
 
@@ -21,6 +23,16 @@ router.get("/frameworks", requireAuth, (_req, res) => {
 // GET /api/multi-agent/roles — list all roles
 router.get("/roles", requireAuth, (_req, res) => {
   res.json(AGENT_ROLES);
+});
+
+// One global GitHub context for every panel and every multi-agent task of the
+// signed-in user. It reports the same active repo used by the local engine.
+router.get("/context", requireAuth, async (req, res) => {
+  try {
+    res.json(await getSharedWorkspaceStatus(req.user!.userId));
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Context unavailable" });
+  }
 });
 
 // ── Agent Instances ──
@@ -111,6 +123,16 @@ router.post("/tasks/:id/complete", requireAuth, (req, res) => {
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
+});
+
+// POST /api/multi-agent/tasks/:id/run — execute the assigned role through the
+// same local OpenCode engine and repository as the main Agent panel.
+router.post("/tasks/:id/run", requireAuth, async (req, res) => {
+  const task = getTask(req.params.id as string);
+  if (!task) return res.status(404).json({ error: "Task not found" });
+  if (task.status === "running") return res.status(409).json({ error: "Task is already running" });
+  res.status(202).json({ accepted: true, taskId: task.id, status: "running" });
+  executeTaskWithOpenCode(req.user!.userId, task.id).catch(() => {});
 });
 
 // ── Messages ──

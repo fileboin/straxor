@@ -173,6 +173,25 @@ export function completeTask(taskId: string, output: string, tokens = 0, costUSD
   return task;
 }
 
+// Execution audit is attached to the task so the workspace UI can show the
+// exact OpenCode -> git hand-off without exposing provider or GitHub tokens.
+export function appendTaskLog(taskId: string, line: string): AgentTask | null {
+  const task = tasks.get(taskId);
+  if (!task) return null;
+  task.executionLog = [...(task.executionLog || []), `${new Date().toISOString()} ${line}`].slice(-120);
+  tasks.set(taskId, task);
+  return task;
+}
+
+export function setTaskExecution(taskId: string, sessionId: string, commitHash?: string | null): AgentTask | null {
+  const task = tasks.get(taskId);
+  if (!task) return null;
+  task.sessionId = sessionId;
+  if (commitHash !== undefined) task.commitHash = commitHash;
+  tasks.set(taskId, task);
+  return task;
+}
+
 // ── Auto-assign ──
 
 export function autoAssignTask(taskId: string): AgentTask | null {

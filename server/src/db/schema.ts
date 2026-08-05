@@ -104,6 +104,10 @@ export const gitConnections = pgTable("git_connections", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   platform: varchar("platform", { length: 50 }).notNull(),
+  name: varchar("name", { length: 120 }).notNull().default("GitHub"),
+  username: varchar("username", { length: 120 }),
+  isDefault: boolean("is_default").notNull().default(false),
+  connectionType: varchar("connection_type", { length: 20 }).notNull().default("token"),
   encryptedToken: text("encrypted_token").notNull(),
   baseUrl: text("base_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -126,6 +130,7 @@ export const repoConnections = pgTable("repo_connections", {
   cloneUrl: text("clone_url").notNull(),
   defaultBranch: varchar("default_branch", { length: 255 }).notNull().default("main"),
   isActive: boolean("is_active").notNull().default(false),
+  connectionType: varchar("connection_type", { length: 20 }).notNull().default("token"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1344,3 +1349,19 @@ export const verificationTasks = pgTable("verification_tasks", {
 });
 
 export const verificationTasksRelations = relations(verificationTasks, () => ({}));
+
+// ── Global App State Persistence (Block 74) ──
+
+export const userAppState = pgTable("user_app_state", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  state: jsonb("state").notNull().default({}),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const userAppStateRelations = relations(userAppState, ({ one }) => ({
+  user: one(users, { fields: [userAppState.userId], references: [users.id] }),
+}));

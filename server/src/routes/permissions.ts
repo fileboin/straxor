@@ -1,16 +1,19 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import type { Request, Response } from "express";
 import { db } from "../db/index.js";
 import { userPermissions } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
+router.use(requireAuth);
+
 const DEFAULT_LEVEL = "ask";
 
-// GET /api/permissions — get all permissions for user
+// GET /api/permissions â€” get all permissions for user
 router.get("/", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
 
   try {
     const rows = await db
@@ -30,9 +33,9 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/permissions — update all permissions for user
+// PUT /api/permissions â€” update all permissions for user
 router.put("/", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const config = req.body as Record<string, string>;
 
   if (!config || typeof config !== "object") {
@@ -64,9 +67,9 @@ router.put("/", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/permissions/check/:toolId — check if a tool is allowed
+// GET /api/permissions/check/:toolId â€” check if a tool is allowed
 router.get("/check/:toolId", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.userId as string;
   const toolId = req.params.toolId as string;
 
   try {

@@ -1,4 +1,6 @@
 import { api } from "./api.js";
+import { needsApiKey } from "./models.js";
+import type { Attachment } from "./attachments.js";
 
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -48,11 +50,12 @@ export async function streamChat(
   modelId: string,
   messages: ChatMessage[],
   thinking: string,
-  callbacks: StreamCallbacks
+  callbacks: StreamCallbacks,
+  attachments?: Attachment[]
 ): Promise<void> {
   // First check if we have an API key for this provider
   const key = await getApiKey(providerId);
-  if (!key) {
+  if (!key && needsApiKey(providerId)) {
     callbacks.onError("API key not configured for this provider");
     return;
   }
@@ -69,8 +72,9 @@ export async function streamChat(
         providerId,
         modelId,
         messages,
-        apiKey: key,
+        apiKey: key || "",
         thinking,
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
       }),
     });
 

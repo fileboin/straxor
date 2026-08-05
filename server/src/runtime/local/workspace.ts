@@ -20,7 +20,7 @@ export interface WorkspaceRepo {
   fullName: string;
   cloneUrl: string;
   defaultBranch: string;
-  token: string;
+  token?: string;
 }
 
 export interface WorkspaceInfo {
@@ -56,7 +56,7 @@ export async function hasGitBinary(): Promise<boolean> {
   return gitBinaryCheck;
 }
 
-function tokenizedCloneUrl(cloneUrl: string, token: string): string {
+function tokenizedCloneUrl(cloneUrl: string, token?: string): string {
   if (!token) return cloneUrl;
   try {
     const url = new URL(cloneUrl);
@@ -124,6 +124,43 @@ async function ensureIsomorphic(cwd: string, repo: WorkspaceRepo): Promise<void>
   }
   await g.setConfig({ fs: fsP, dir: cwd, path: "user.name", value: "Straxor Agent" }).catch(() => {});
   await g.setConfig({ fs: fsP, dir: cwd, path: "user.email", value: "agent@straxor.dev" }).catch(() => {});
+}
+
+// Push the local sandbox to the remote origin (requires git binary).
+export async function pushWorkspace(
+  userId: string,
+  owner: string,
+  name: string,
+  branch?: string
+): Promise<string> {
+  const dir = getRepoWorkspaceDir(userId, owner, name);
+  const target = branch || "main";
+  return gitExec(dir, ["push", "origin", `HEAD:refs/heads/${target}`]);
+}
+
+// Stage all changes and create a commit in the sandbox clone, authored as the
+// Straxor Agent identity. Returns the short commit hash. No-op if nothing changed.
+export async function commitWorkspace(
+  userId: string,
+  owner: string,
+  name: string,
+  message: string,
+  branch?: string
+): Promise<{ hash: string; committed: boolean; message: string }> {
+  const dir = getRepoWorkspaceDir(userId, owner, name);
+  await gitExec(dir, ["config", "user.name", "Straxor Agent"]).catch(() => {});
+  await gitExec(dir, ["config", "user.email", "agent@straxor.dev"]).catch(() => {});
+  await gitExec(dir, ["add", "-A"]).catch(() => {});
+  const status = await gitExec(dir, ["status", "--porcelain"]).catch(() => "");
+  if (!status.trim()) {
+    return { hash: await gitExec(dir, ["rev-parse", "--short", "HEAD"]).catch(() => ""), committed: false, message };
+  }
+  // Do not swallow a failed commit. Reporting success here would make the
+  // following push look like an agent/GitHub failure even though no commit was
+  // created (for example a hook or git identity error).
+  await gitExec(dir, ["commit", "-m", message]);
+  const hash = await gitExec(dir, ["rev-parse", "--short", "HEAD"]);
+  return { hash, committed: true, message };
 }
 
 export async function ensureWorkspace(repo: WorkspaceRepo): Promise<WorkspaceInfo> {

@@ -82,16 +82,16 @@ function signToken(user: PublicUser): string {
 function verificationEmailHtml(link: string): string {
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
-      <div style="background: #0a0a0a; border-radius: 12px; padding: 24px; border: 1px solid #222;">
+      <div style="background: #0a0e1a; border-radius: 12px; padding: 24px; border: 1px solid #202838;">
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
-          <div style="width: 8px; height: 8px; border-radius: 50%; background: #6b8c42;"></div>
+          <div style="width: 8px; height: 8px; border-radius: 50%; background: #ff4d2e;"></div>
           <span style="color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Email verifikacija</span>
         </div>
         <h2 style="color: #fff; font-size: 18px; margin: 0 0 12px 0;">Potvrdite svoju email adresu</h2>
         <p style="color: #aaa; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">
           Kliknite na dugme ispod da potvrdite svoju email adresu i aktivirate svoj Straxor račun.
         </p>
-        <a href="${link}" style="display: inline-block; background: #6b8c42; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600;">
+        <a href="${link}" style="display: inline-block; background: #ff4d2e; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600;">
           Potvrdi email
         </a>
         <p style="color: #666; font-size: 12px; margin: 16px 0 0 0;">Ako dugme ne radi, kopirajte link: ${link}</p>
@@ -103,7 +103,7 @@ function verificationEmailHtml(link: string): string {
 function resetPasswordEmailHtml(link: string): string {
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
-      <div style="background: #0a0a0a; border-radius: 12px; padding: 24px; border: 1px solid #222;">
+      <div style="background: #0a0e1a; border-radius: 12px; padding: 24px; border: 1px solid #202838;">
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
           <div style="width: 8px; height: 8px; border-radius: 50%; background: #f39c12;"></div>
           <span style="color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Reset lozinke</span>
@@ -113,7 +113,7 @@ function resetPasswordEmailHtml(link: string): string {
           Primili ste zahtjev za promjenu lozinke. Kliknite na dugme ispod da postavite novu lozinku.
           Ovaj link važi 1 sat.
         </p>
-        <a href="${link}" style="display: inline-block; background: #6b8c42; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600;">
+        <a href="${link}" style="display: inline-block; background: #ff4d2e; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600;">
           Resetuj lozinku
         </a>
         <p style="color: #666; font-size: 12px; margin: 16px 0 0 0;">Ako dugme ne radi, kopirajte link: ${link}</p>

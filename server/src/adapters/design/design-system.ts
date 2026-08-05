@@ -25,7 +25,7 @@ export class DesignSystemGenerator {
   private generateTokens(prompt: string): DesignSystemToken[] {
     const q = prompt.toLowerCase();
 
-    const accent = this.extractColor(prompt, ["accent", "primary"]) || "#6b8c42";
+    const accent = this.extractColor(prompt, ["accent", "primary"]) || "#ff4d2e";
     const bg = this.extractColor(prompt, ["background", "bg", "dark"]) || "#000000";
     const surface = this.lighten(bg, 0.04);
     const text = this.isDark(bg) ? "#fafafa" : "#0a0a0a";
@@ -61,7 +61,7 @@ export class DesignSystemGenerator {
 
   private extractColor(text: string, keywords: string[]): string | null {
     const colorMap: Record<string, string> = {
-      olive: "#6b8c42",
+      olive: "#ff4d2e",
       green: "#22c55e",
       emerald: "#10b981",
       teal: "#14b8a6",
@@ -119,7 +119,7 @@ export class DesignSystemGenerator {
 
   private buildPreview(tokens: DesignSystemToken[]): string {
     const find = (name: string) => tokens.find((t) => t.name === name);
-    const accent = find("Accent")?.value || "#6b8c42";
+    const accent = find("Accent")?.value || "#ff4d2e";
     const bg = find("Background")?.value || "#000";
     const text = find("Text")?.value || "#fafafa";
     const surface = find("Surface")?.value || "#0a0a0a";

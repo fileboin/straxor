@@ -102,7 +102,7 @@ export default function PreviewPanel({ machineId }: Props) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#1a1a1a] bg-[#0a0a0a] shrink-0">
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#202838] bg-[#0e1422] shrink-0">
         {/* Start / Stop */}
         {status?.running ? (
           <button
@@ -143,7 +143,7 @@ export default function PreviewPanel({ machineId }: Props) {
         <div className="flex-1" />
 
         {/* Device toggle */}
-        <div className="flex items-center bg-[#111] rounded border border-[#222] overflow-hidden">
+        <div className="flex items-center bg-[#0e1422] rounded border border-[#2d3750] overflow-hidden">
           {DEVICE_PRESETS.map((d) => (
             <button
               key={d.id}
@@ -178,10 +178,10 @@ export default function PreviewPanel({ machineId }: Props) {
       {/* Content area */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Iframe */}
-        <div className="flex-1 flex items-start justify-center bg-[#0d0d0d] overflow-auto p-2">
+        <div className="flex-1 flex items-start justify-center bg-[#141824] overflow-auto p-2">
           {status?.running && status.url ? (
             <div
-              className="bg-white rounded-lg overflow-hidden shadow-2xl shadow-black/40 border border-[#222] transition-all duration-300"
+              className="bg-white rounded-lg overflow-hidden shadow-2xl shadow-black/40 border border-[#2d3750] transition-all duration-300"
               style={{
                 width: device === "desktop" ? "100%" : `${preset.width}px`,
                 maxWidth: "100%",
@@ -214,8 +214,8 @@ export default function PreviewPanel({ machineId }: Props) {
 
         {/* Logs sidebar */}
         {showLogs && (
-          <div className="w-64 border-l border-[#1a1a1a] bg-[#0a0a0a] flex flex-col overflow-hidden shrink-0">
-            <div className="px-2 py-1 border-b border-[#1a1a1a] text-[9px] text-text-muted uppercase tracking-wider">
+          <div className="w-64 border-l border-[#202838] bg-[#0e1422] flex flex-col overflow-hidden shrink-0">
+            <div className="px-2 py-1 border-b border-[#202838] text-[9px] text-text-muted uppercase tracking-wider">
               Preview logovi
             </div>
             <div className="flex-1 overflow-y-auto font-mono text-[10px] leading-relaxed p-2">
@@ -247,7 +247,7 @@ export default function PreviewPanel({ machineId }: Props) {
 
       {/* URL bar */}
       {status?.running && status.url && (
-        <div className="flex items-center gap-2 px-3 py-1 border-t border-[#1a1a1a] bg-[#0a0a0a] text-[10px] shrink-0">
+        <div className="flex items-center gap-2 px-3 py-1 border-t border-[#202838] bg-[#0e1422] text-[10px] shrink-0">
           <span className="text-text-muted/40">URL:</span>
           <a
             href={status.url}

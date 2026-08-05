@@ -14,7 +14,7 @@ export class GPTImageProvider extends BaseImageProvider {
     if (!apiKey) {
       return {
         id: this.makeId(),
-        url: `https://placehold.co/${width}x${height}/1a1a1a/6b8c42?text=DALL-E+${encodeURIComponent(req.prompt.slice(0, 30))}`,
+        url: `https://placehold.co/${width}x${height}/0e1422/ff4d2e?text=DALL-E+${encodeURIComponent(req.prompt.slice(0, 30))}`,
         provider: "gpt-image",
         prompt: req.prompt,
         width,
@@ -44,7 +44,7 @@ export class GPTImageProvider extends BaseImageProvider {
       }),
     });
     const data: any = await resp.json();
-    const url = data?.data?.[0]?.url || `https://placehold.co/${width}x${height}/1a1a1a/6b8c42?text=DALL-E`;
+    const url = data?.data?.[0]?.url || `https://placehold.co/${width}x${height}/0e1422/ff4d2e?text=DALL-E`;
 
     return {
       id: this.makeId(),

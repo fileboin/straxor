@@ -84,7 +84,7 @@ export class PresentonGenerator {
 <style>
   body { margin: 0; background: #000; color: #fafafa; font-family: system-ui; }
   .slide { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; padding: 4rem; text-align: center; border-bottom: 1px solid #262626; }
-  .slide h1 { font-size: 3rem; font-weight: 800; margin-bottom: 1rem; background: linear-gradient(135deg, #6b8c42, #8bc34a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .slide h1 { font-size: 3rem; font-weight: 800; margin-bottom: 1rem; background: linear-gradient(135deg, #ff4d2e, #ff8a5c); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
   .slide p { font-size: 1.25rem; color: #a3a3a3; max-width: 600px; line-height: 1.6; }
   .slide-num { position: fixed; bottom: 2rem; right: 2rem; font-size: 0.75rem; color: #525252; }
 </style></head><body>

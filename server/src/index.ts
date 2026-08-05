@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./env.js";
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
@@ -46,6 +46,7 @@ import webResearchRoutes from "./routes/web-research.js";
 import acpRoutes from "./routes/acp.js";
 import gitRemoteRoutes from "./routes/git-remote.js";
 import repoRoutes from "./routes/repos.js";
+import githubConnectRoutes from "./routes/github-connect.js";
 import kanbanRoutes from "./routes/kanban.js";
 import mcpMarketplaceRoutes from "./routes/mcp-marketplace.js";
 import infrastructureRoutes from "./routes/infrastructure.js";
@@ -69,9 +70,15 @@ import { createMarketplaceRouter } from "./marketplace/api/routes.js";
 import { createConnectionsRouter } from "./connections/api/routes.js";
 import { imageAgentRoutes } from "./agents/image-agent/api/routes.js";
 import { verificationRoutes } from "./verification/api/routes.js";
+import appStateRoutes from "./routes/app-state.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Behind a reverse proxy (Render) that sets X-Forwarded-For. Required for
+// express-rate-limit to resolve the real client IP instead of throwing
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on every request.
+app.set("trust proxy", 1);
 
 // ── CORS: same-origin since Express serves both API and client ──
 app.use(cors({
@@ -173,6 +180,7 @@ app.use("/api/web-research", webResearchRoutes);
 app.use("/api/acp", acpRoutes);
 app.use("/api/git-remote", gitRemoteRoutes);
 app.use("/api/repos", repoRoutes);
+app.use("/api/github", githubConnectRoutes);
 app.use("/api/kanban", kanbanRoutes);
 app.use("/api/mcp-marketplace", mcpMarketplaceRoutes);
 app.use("/api/infrastructure", infrastructureRoutes);
@@ -203,14 +211,21 @@ app.use("/api/connections", connectionsRouter);
 
 app.use("/api/image-agent", imageAgentRoutes);
 app.use("/api/verification", verificationRoutes);
+app.use("/api/app-state", appStateRoutes);
 
 // ── Serve client build in production ──
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientDist = path.join(__dirname, "../../client/dist");
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  // SPA fallback: serve index.html for all non-API routes
+  // SPA fallback: serve index.html for all non-API routes. Never cache the
+  // hash-free index.html so navigations always fetch the latest shell (which
+  // references the newest hashed JS/CSS). Hashed /assets/* are immutable and
+  // cached normally by express.static.
   app.get("*", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.sendFile(path.join(clientDist, "index.html"));
   });
   console.log("Serving client from", clientDist);

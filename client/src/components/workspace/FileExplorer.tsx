@@ -354,7 +354,7 @@ function TreeNode({
             onKeyDown={handleRenameKeyDown}
             onBlur={() => onRename(entry, renameValue.trim())}
             onClick={(e) => e.stopPropagation()}
-            className="flex-1 min-w-0 ml-1 px-0.5 -my-0.5 bg-[#111] text-text text-[11px] border border-accent outline-none rounded-sm"
+            className="flex-1 min-w-0 ml-1 px-0.5 -my-0.5 bg-[#0e1422] text-text text-[11px] border border-accent outline-none rounded-sm"
           />
         ) : (
           <span className="flex-1 min-w-0 ml-1 truncate">{entry.name}</span>
@@ -394,7 +394,7 @@ function TreeNode({
               else setCreatingIn(null);
             }}
             placeholder={creatingIn.type === "file" ? "ime-datoteke.ext" : "ime-mapa"}
-            className="flex-1 min-w-0 ml-1 px-0.5 -my-0.5 bg-[#111] text-text text-[11px] border border-accent outline-none rounded-sm placeholder:text-text-muted/40"
+            className="flex-1 min-w-0 ml-1 px-0.5 -my-0.5 bg-[#0e1422] text-text text-[11px] border border-accent outline-none rounded-sm placeholder:text-text-muted/40"
           />
         </div>
       )}
@@ -476,12 +476,12 @@ export function FileContextMenu({
   return (
     <div
       ref={ref}
-      className="fixed z-[100] bg-[#111] border border-[#333] rounded-md shadow-xl shadow-black/50 py-1 min-w-[140px] text-[11px]"
+      className="fixed z-[100] bg-[#0e1422] border border-[#202838] rounded-md shadow-xl shadow-black/50 py-1 min-w-[140px] text-[11px]"
       style={{ left: menu.x, top: menu.y }}
     >
       {items.map((item, i) => {
         if ("divider" in item && item.divider) {
-          return <div key={i} className="my-1 border-t border-[#333]" />;
+          return <div key={i} className="my-1 border-t border-[#202838]" />;
         }
         const it = item as { label: string; icon: string; action: string; danger?: boolean };
         return (

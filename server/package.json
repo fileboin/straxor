@@ -9,14 +9,15 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test": "vitest run"
   },
   "dependencies": {
     "archiver": "^8.0.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "drizzle-orm": "^0.36.0",
+    "drizzle-orm": "^0.45.2",
     "express": "^4.21.0",
     "express-rate-limit": "^8.6.1",
     "isomorphic-git": "^1.40.0",
@@ -35,8 +36,12 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^22.0.0",
     "@types/ssh2": "^1.15.5",
-    "drizzle-kit": "^0.28.0",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.19.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "esbuild": "^0.25.0"
   }
 }

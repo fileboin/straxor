@@ -14,7 +14,7 @@ export class FluxProvider extends BaseImageProvider {
     if (!apiKey) {
       return {
         id: this.makeId(),
-        url: `https://placehold.co/${width}x${height}/1a1a1a/6b8c42?text=FLUX+${encodeURIComponent(req.prompt.slice(0, 30))}`,
+        url: `https://placehold.co/${width}x${height}/0e1422/ff4d2e?text=FLUX+${encodeURIComponent(req.prompt.slice(0, 30))}`,
         provider: "flux",
         prompt: req.prompt,
         width,
@@ -38,7 +38,7 @@ export class FluxProvider extends BaseImageProvider {
       }),
     });
     const data: any = await resp.json();
-    const outputUrl = data?.output?.[0] || `https://placehold.co/${width}x${height}/1a1a1a/6b8c42?text=FLUX`;
+    const outputUrl = data?.output?.[0] || `https://placehold.co/${width}x${height}/0e1422/ff4d2e?text=FLUX`;
 
     return {
       id: this.makeId(),
