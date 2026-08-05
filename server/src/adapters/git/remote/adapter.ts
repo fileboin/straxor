@@ -71,6 +71,11 @@ export interface GitRemoteAdapter {
   // platforms that don't implement it are validated by a light API call instead.
   getUser?(): Promise<{ username: string } | null>;
 
+  // Ownership check (Repo access scope). Optional — GitHub implements it to
+  // confirm the token can read repositories, not just that it's syntactically
+  // valid. Throws a clear 401/403 error when scope/credentials are insufficient.
+  validateToken?(): Promise<{ username: string; canReadRepos: boolean } | null>;
+
   // Repositories
   listRepos(): Promise<GitRemoteRepo[]>;
   getRepo(owner: string, repo: string): Promise<GitRemoteRepo>;

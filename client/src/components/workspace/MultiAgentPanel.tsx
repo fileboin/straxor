@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import {
   listFrameworks, listRoles, listInstances, createInstance, deleteInstance,
   listTasks, createTask, assignTask, updateTaskStatus, completeTask,
+  runTask,
   listWorkflows, createWorkflow, deleteWorkflow,
   getStats,
   type AgentFramework, type AgentRoleDef, type AgentInstance, type AgentTask,
@@ -106,6 +107,11 @@ export default function MultiAgentPanel({ onClose }: Props) {
   // ── Complete task ──
   const handleComplete = useCallback(async (taskId: string) => {
     await completeTask(taskId, "Task completed by agent");
+    load();
+  }, [load]);
+
+  const handleRun = useCallback(async (taskId: string) => {
+    await runTask(taskId);
     load();
   }, [load]);
 
@@ -293,10 +299,20 @@ export default function MultiAgentPanel({ onClose }: Props) {
                       <span>Status: {tk.status}</span>
                       {tk.output && <span className="text-green-400">✓ Output</span>}
                       {tk.error && <span className="text-red-400">✕ Error</span>}
+                      {tk.commitHash && <span className="text-green-400">Git {tk.commitHash}</span>}
                     </div>
+                    {!!tk.executionLog?.length && (
+                      <pre className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap rounded bg-black/20 p-2 text-[9px] text-text-muted">{tk.executionLog.slice(-6).join("\n")}</pre>
+                    )}
                     <div className="flex items-center gap-1.5 mt-2">
                       {tk.status === "pending" && (
-                        <button onClick={() => handleAssign(tk.id)} className="text-[9px] text-accent hover:text-accent-light px-2 py-0.5 rounded bg-accent/10 transition-colors">Assign</button>
+                        <>
+                          <button onClick={() => handleAssign(tk.id)} className="text-[9px] text-accent hover:text-accent-light px-2 py-0.5 rounded bg-accent/10 transition-colors">Assign</button>
+                          <button onClick={() => handleRun(tk.id)} className="text-[9px] text-green-400 hover:text-green-300 px-2 py-0.5 rounded bg-green-500/10 transition-colors">▶ OpenCode</button>
+                        </>
+                      )}
+                      {tk.status === "assigned" && (
+                        <button onClick={() => handleRun(tk.id)} className="text-[9px] text-green-400 hover:text-green-300 px-2 py-0.5 rounded bg-green-500/10 transition-colors">▶ OpenCode</button>
                       )}
                       {(tk.status === "assigned" || tk.status === "running") && (
                         <>

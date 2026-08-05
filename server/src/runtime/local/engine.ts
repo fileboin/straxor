@@ -15,6 +15,7 @@ import { repoConnections } from "../../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import { getGitRemoteToken } from "../../adapters/git/remote/registry.js";
 import { ensureWorkspace, type WorkspaceInfo } from "./workspace.js";
+import { buildOpenCodeModelConfig } from "./opencode-model.js";
 import type { GitPlatformId } from "../../adapters/git/remote/adapter.js";
 
 export type LocalEngineId = "opencode" | "crush";
@@ -112,7 +113,11 @@ export async function ensureLocalEngine(userId: string, engine: string): Promise
   const repo = await getActiveRepo(userId);
   if (!repo) throw new Error("No active repo — connect a GitHub repo first");
 
-  const token = await getGitRemoteToken(userId, repo.platform as GitPlatformId);
+  // TEST ONLY: allow overriding the stored (encrypted) token with a temporary
+  // PAT via env, so the agent↔repo pipeline can be verified without touching
+  // the DB or existing tokens. Remove once real token flow is confirmed.
+  const testToken = process.env.STRAXOR_TEST_GITHUB_TOKEN;
+  const token = testToken || (await getGitRemoteToken(userId, repo.platform as GitPlatformId));
   if (!token) throw new Error("Platform token missing — save a token first");
 
   const ws: WorkspaceInfo = await ensureWorkspace({
@@ -131,10 +136,35 @@ export async function ensureLocalEngine(userId: string, engine: string): Promise
   const args = normalized === "crush" ? ["serve", "--port", String(port)] : ["serve", "--port", String(port)];
   const logFile = path.join(ws.dir, ".straxor-engine.log");
 
+  // Feed the OpenCode engine an active AI model from the user's stored keys.
+  // Without this the engine is spawned with NO provider -> "empty gap".
+  const modelCfg = await buildOpenCodeModelConfig(userId);
+  if (normalized === "opencode" && modelCfg.provider === "none") {
+    throw new Error(
+      "No AI provider key configured for this account. Add an OpenRouter, DeepSeek, Anthropic, OpenAI, or Google key before starting the agent."
+    );
+  }
+  const modelEnv = {
+    ...process.env,
+    PORT: String(port),
+    OPENCODE_SERVER_PORT: String(port),
+    OPENCODE_MODEL: `${modelCfg.provider}/${modelCfg.model}`,
+    OPENCODE_SMALL_MODEL: `${modelCfg.provider}/${modelCfg.model}`,
+    OPENCODE_CONFIG_CONTENT: modelCfg.configContent,
+    GIT_AUTHOR_NAME: "Straxor Agent",
+    GIT_AUTHOR_EMAIL: "agent@straxor.dev",
+    GIT_COMMITTER_NAME: "Straxor Agent",
+    GIT_COMMITTER_EMAIL: "agent@straxor.dev",
+    ...modelCfg.env,
+  };
+  if (normalized === "opencode" && modelCfg.provider !== "none") {
+    log(key, `[opencode-model] ${modelCfg.reason}`);
+  }
+
   const child = spawn(bin, args, {
     cwd: ws.dir,
     shell: true,
-    env: { ...process.env, PORT: String(port), OPENCODE_SERVER_PORT: String(port) },
+    env: modelEnv,
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });

@@ -9,7 +9,7 @@ import {
   getGitRemoteToken,
 } from "../adapters/git/remote/registry.js";
 import type { GitPlatformId } from "../adapters/git/remote/adapter.js";
-import { ensureWorkspace, getRepoWorkspaceDir, hasGitBinary, pushWorkspace } from "../runtime/local/workspace.js";
+import { ensureWorkspace, getRepoWorkspaceDir, hasGitBinary, pushWorkspace, commitWorkspace } from "../runtime/local/workspace.js";
 import { stopLocalEnginesForUser } from "../runtime/local/engine.js";
 
 const router = Router();
@@ -308,6 +308,42 @@ router.post("/push", async (req, res) => {
     const output = await pushWorkspace(userId, conn.owner, conn.name, conn.defaultBranch);
 
     res.json({ success: true, repo: conn.fullName, branch: conn.defaultBranch, lastCommit: info.lastCommit, output });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/repos/commit — stage + commit the active repo's sandbox changes as
+// the Straxor Agent identity (Straxor Agent <agent@straxor.dev>).
+router.post("/commit", async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const message: string = (req.body?.message as string) || "Straxor Agent commit";
+
+    const active = await db
+      .select()
+      .from(repoConnections)
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+      .limit(1);
+
+    if (active.length === 0) {
+      res.status(404).json({ error: "No active repo — connect one first" });
+      return;
+    }
+
+    const conn = active[0];
+
+    const result = await commitWorkspace(userId, conn.owner, conn.name, message, conn.defaultBranch);
+
+    res.json({
+      success: true,
+      repo: conn.fullName,
+      branch: conn.defaultBranch,
+      hash: result.hash,
+      committed: result.committed,
+      message: result.message,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({ error: message });

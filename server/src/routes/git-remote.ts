@@ -87,19 +87,26 @@ router.post("/:platform/tokens/validate", requireAuth, async (req: any, res) => 
 
     let username: string | null = null;
     let valid = true;
+    let scopeHint: string | undefined;
     try {
-      if (adapter.getUser) {
+      if (adapter.validateToken) {
+        const r = await adapter.validateToken();
+        valid = !!r && r.canReadRepos;
+        username = r?.username || null;
+        if (!valid) scopeHint = "repo access denied";
+      } else if (adapter.getUser) {
         const user = await adapter.getUser();
         username = user?.username || null;
         valid = !!user;
       } else {
         await adapter.listRepos();
       }
-    } catch {
+    } catch (e: any) {
       valid = false;
+      scopeHint = e?.message || "invalid token";
     }
 
-    res.json({ valid, username, platform });
+    res.json({ valid, scopeHint, username, platform });
   } catch (error) {
     res.status(500).json({ error: "Failed to validate token" });
   }
@@ -125,7 +132,13 @@ router.post("/:platform/tokens", requireAuth, async (req: any, res) => {
     };
     const adapter = getGitAdapterForSlot(userId, platform, slot);
     try {
-      if (adapter.getUser) {
+      if (adapter.validateToken) {
+        const r = await adapter.validateToken();
+        if (!r || !r.canReadRepos) {
+          return res.status(400).json({ error: "Token nema pristup repozitorijumima — provjeri opseg (classic: repo+read:org, fine-grained: Contents+Metadata read)" });
+        }
+        username = r.username;
+      } else if (adapter.getUser) {
         const user = await adapter.getUser();
         if (!user) {
           return res.status(400).json({ error: "Token nije validan — GitHub je odbio zahtjev" });
@@ -134,8 +147,10 @@ router.post("/:platform/tokens", requireAuth, async (req: any, res) => {
       } else {
         await adapter.listRepos();
       }
-    } catch {
-      return res.status(400).json({ error: "Token nije validan — GitHub je odbio zahtjev" });
+    } catch (e: any) {
+      // Surface the adapter's precise 401/403 message so the user sees why.
+      const msg = e?.message || "Token nije validan — GitHub je odbio zahtjev";
+      return res.status(400).json({ error: msg });
     }
 
     const saved = await addGitToken(userId, platform, {
@@ -204,7 +219,11 @@ router.get("/:platform/repos", requireAuth, async (req: any, res) => {
     const repos = await adapter.listRepos();
     res.json(repos);
   } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to list repos" });
+    const message = error.message || "Failed to list repos";
+    // Map adapter errors to real HTTP codes so the client can act on them
+    // (401 = bad token, 403 = missing scope, 404 = no access).
+    const status = /\(401\)/.test(message) ? 401 : /\(403\)/.test(message) ? 403 : /\(404\)/.test(message) ? 404 : 500;
+    res.status(status).json({ error: message });
   }
 });
 

@@ -72,6 +72,9 @@ export interface AgentTask {
   completedAt: string | null;
   tokens: number;
   costUSD: number;
+  executionLog?: string[];
+  sessionId?: string | null;
+  commitHash?: string | null;
 }
 
 export interface WorkflowDefinition {

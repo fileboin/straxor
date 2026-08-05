@@ -395,9 +395,21 @@ router.post("/reject", async (req: Request, res: Response) => {
 router.get("/file/:machineId/:sessionId/:encodedPath", async (req: Request, res: Response) => {
   const userId = req.user!.userId as string;
   const machineId = req.params.machineId as string;
-  const sessionId = req.params.sessionId as string;
   const path = decodeURIComponent(req.params.encodedPath as string);
   const side = (req.query.side as string) || "after";
+
+  // The runtime executes these commands in the active workspace. Keep the
+  // requested path repository-relative so it cannot escape that workspace or
+  // become shell syntax.
+  if (
+    !path ||
+    path.includes("\0") ||
+    path.split(/[\\/]+/).includes("..") ||
+    !/^[A-Za-z0-9._/@%+=, -]+$/.test(path)
+  ) {
+    res.status(400).json({ error: "Invalid repository-relative path" });
+    return;
+  }
 
   try {
     const adapter = getAdapters().runtime(userId);
@@ -405,10 +417,10 @@ router.get("/file/:machineId/:sessionId/:encodedPath", async (req: Request, res:
     let command: string;
     if (side === "before") {
       // Get file content before agent changes — use git show HEAD:path
-      command = `cd /tmp && git show HEAD:${path} 2>/dev/null || echo ""`;
+      command = `git show HEAD:${JSON.stringify(path)} 2>/dev/null || echo ""`;
     } else {
       // Get current file content
-      command = `cat ${path} 2>/dev/null || echo ""`;
+      command = `cat -- ${JSON.stringify(path)} 2>/dev/null || echo ""`;
     }
 
     const result = await adapter.executeCommand(machineId, command);
