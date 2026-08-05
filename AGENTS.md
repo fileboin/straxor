@@ -3,6 +3,17 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot.
 
+## Zadnji zadatak — GitHub repo servis (centralizacija, KORACI 1–5, urađeno)
+- **Arhitektura je već centralizovana**: repo pristup NE zavisi od AI providera. Svi pozivi idu preko `getGitRemoteAdapter(userId, platform)` (`adapters/git/remote/registry.ts:32`) → jedini `GitRemoteAdapter` po platformi. Nijedan AI-provider adapter (anthropic/http, direct-providers, model-router, ollama) ne zove repo servis — verifikovano grepfom u `server/src/adapters`.
+- **`providers/github.ts` unapređen**:
+  - `listRepos()` (linija 134): `affiliation=owner,collaborator,organization_member` + **puna pagination** preko Link header `rel="next"` (petlja dok ne pokupi sve stranice) + poseban poziv `/orgs/{org}/repos?type=all` za svaku org iz `/user/orgs` + dedup po `full_name`. Greške na jednoj org ne ruše cijelu listu.
+  - `parseLinkHeader` NIJE smio split-ovati po zarezu jer URL-ovi sadrže `,` (affiliation param) — sada koristi regex `/rel="…"/g` i uhvati sve rel-ove.
+  - `githubErrorMessage(status, body)` — jasne poruke: 401="token nije validan", 403+scope="nema dovoljan opseg (classic=repo+read:org, fine-grained=Contents+Metadata read)", 404, rate-limit.
+  - `validateToken()` (nova, adapter.ts:77 opciona) — provjera da token ZAISTA može čitati repoe (`/user/repos?per_page=1`), ne samo da je sintaksički OK. Preživljava 401 na `/user` (fine-grained na jedan repo).
+- **`routes/git-remote.ts`**: `GET /:platform/repos` sada mapira greške na realne HTTP kodove (401/403/404 umjesto 500). `POST /:platform/tokens/validate` i `POST /:platform/tokens` koriste `validateToken` i vraćaju `scopeHint`/preciznu poruku.
+- **Testovi**: `github.test.ts` 14 testova (pag + org dedup + 401/403 poruke + validateToken). Ukupno vitest **53/53**, server `tsc --noEmit` čist, client build prolazi.
+- **Status tokena u bazi (1c)**: `shots` token je dummy (`ghp_TEST_PHASE1_DUMMY` → GitHub 401). **telgram@tutamail.com (admin) ima PRAVI token koji radi na produkciji (Render)** ali se **ne može dekriptovati lokalno** — `ENCRYPTION_KEY` mismatch: primary daje "Unsupported state or unable to authenticate data", legacy "Invalid key length". Znači taj red je enkriptovan pod drugim ključem (produkcioni), a lokalni `.env` ima drugi. Baza je zajednička (Neon) pa se red vidi ali ga lokalni server ne može otvoriti → `hydrateGitRemoteConfig` tiho preskoči red (`token=undefined`) → `NO TOKEN`. NIJE bug u repo servisu (kod verifikovan testovima); blokada je isključivo enkripcija/okruženje. Da bi se lokalno testiralo: unijeti token kroz UI na LOKALNOM serveru (sa lokalnim `.env` ključem).
+
 ## Important Details
 - **Render deploy**: Single Web Service serves both API and client. `server/package.json` builds `client/` then compiles server. Express serves `client/dist/` static files with SPA fallback.
 - **No CORS needed** between frontend and backend — same origin.
@@ -43,9 +54,10 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
 - **Model orkestracija UI verifikacija (Korak B)**: backend + route + klijent gotovi i build prolazi, route endpoint potvrđen curl-om. Preostaje vizuelna potvrda kroz UI (M-Orch toggle u oba panela).
 - **PanelMenu + per-panel zoom verifikacija**: backend multi-token + PanelMenu + per-panel zoom gotovi (build prolazi, tsc čist, vitest 12/12, endpoint-i potvrđeni curl-om, DOM verifikacija: transformi scale(1.15)/scale(0.8) na panelima, menu sadrži Uloga/Model/Zoom/GitHub token/aktivni status). Screenshot-i `verification-screenshots/panelmenu-ask.png` + `panelmenu-agent.png` čekaju vizuelnu potvrdu korisnika.
 - **FAZA 6**: Verifikovano do push-a — agent čita/pisne/commituje u sandbox klonu (commit `6507db3`), tool eventi (`tool_call`/`tool_result`) stižu kroz SSE, `/api/repos/push` radi (server dekriptuje token interno, GitHub odbija samo dummy token). Preostaje: korisnik unese PRAVI token kroz UI → `POST /api/repos/push` → 200/OK → screenshot.
+- **GitHub repo servis (centralizacija)**: KORACI 1–5 urađeni (vidi "Zadnji zadatak" gore). Jedina stvarna blokada je što su SVI tokeni u bazi nevažeći — lista repoa kroz UI će pokazati 401 dok korisnik ne unese pravi token. Pagination+org+opseg validiran u `github.test.ts` (14 testova), tsc čist, build prolazi.
 
 ### Blocked
-- **(push test)** — čeka korisnikov pravi GitHub token unesen LIČNO kroz UI (GitRemotePanel → 🔑 Token → "GitHub Personal Access Token" polje). Agent nikad ne rukuje sirovim tokenom.
+- **(push test + puna lista repoa)** — čeka korisnikov pravi GitHub token unesen LIČNO kroz UI (GitRemotePanel → 🔑 Token → "GitHub Personal Access Token" polje; ili ⚙ PanelMenu → "GitHub token" → "+ Dodaj token"). Agent nikad ne rukuje sirovim tokenom. Nakon unosa: `/api/git-remote/github/repos` treba da vrati 200 + sve repoe (ne 401), i `POST /api/repos/push` → 200/OK → screenshot.
 
 ## Next Move
 1. **TODO #2 (memorisano, kad bude vremena)**: nadograditi `drizzle-orm` 0.36→0.45.x da reši HIGH (GHSA-gpj5-g38j-94v9). Major bump — prvo proučiti breaking changes (`relations()`, `postgres-js` binding), popraviti tipove, pa build + testovi. Stvarni rizik trenutno NIZAK (nema dinamičkih SQL identifikatora u kodu).
