@@ -3,9 +3,10 @@ import type { Request, Response } from "express";
 import { getAdapters } from "../adapters/registry.js";
 import { requireAuth } from "../middleware/auth.js";
 import { db } from "../db/index.js";
-import { userApiKeys } from "../db/schema.js";
+import { userApiKeys, repoConnections } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import { classifyComplexity, pickModel } from "../lib/model-router.js";
+import { getSharedWorkspaceStatus } from "../runtime/local/shared-workspace.js";
 import {
   resolveAttachments,
   countImageBlocks,
@@ -153,7 +154,7 @@ router.post("/route", requireAuth, async (req: Request, res: Response) => {
 });
 
 // POST /api/chat — streaming SSE proxy via AIProviderAdapter
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", requireAuth, async (req: Request, res: Response) => {
   const { providerId, modelId, messages, apiKey, thinking, attachments } = req.body as {
     providerId: string;
     modelId: string;
@@ -189,6 +190,13 @@ router.post("/", async (req: Request, res: Response) => {
       );
     }
 
+    // Inject the active GitHub repository context (Ask panel). The Agent panel
+    // already gets this via /api/agent/send; this makes Ask aware of the repo too.
+    const context = await buildRepoContext(req);
+    if (context) {
+      finalMessages = prependContextToLastUser(finalMessages, context);
+    }
+
     const adapter = getAdapters().aiProvider;
     const stream = adapter.streamChat({ providerId, modelId, messages: finalMessages, apiKey, thinking });
 
@@ -210,6 +218,55 @@ router.post("/", async (req: Request, res: Response) => {
     res.end();
   }
 });
+
+// Build the [STRAXOR GITHUB CONTEXT] block for the Ask panel when the user has
+// an active repository. Returns undefined when nothing is connected.
+async function buildRepoContext(req: Request): Promise<string | undefined> {
+  if (!req.user?.userId) return undefined;
+  try {
+    const [repo] = await db
+      .select()
+      .from(repoConnections)
+      .where(and(eq(repoConnections.userId, req.user.userId), eq(repoConnections.isActive, true)))
+      .limit(1);
+    if (!repo) return undefined;
+    const status = await getSharedWorkspaceStatus(req.user.userId);
+    const dir = status.connected ? status.workspace : "";
+    return [
+      "[STRAXOR GITHUB CONTEXT]",
+      `Active repository: ${repo.fullName}`,
+      `Active branch: ${repo.defaultBranch}`,
+      dir ? `Workspace directory: ${dir}` : null,
+      "You are connected to a GitHub repository. Answer questions about this repository and its code when relevant. Do not claim a repository is unavailable unless you have verified it.",
+      "[/STRAXOR GITHUB CONTEXT]",
+    ]
+      .filter((l): l is string => !!l)
+      .join("\n");
+  } catch {
+    return undefined;
+  }
+}
+
+// Prepend the context block to the last user message (before any attachments).
+function prependContextToLastUser(
+  messages: { role: "user" | "assistant" | "system"; content: string | ContentBlock[] }[],
+  context: string
+): { role: "user" | "assistant" | "system"; content: string | ContentBlock[] }[] {
+  const out = messages.map((m) => ({ ...m }));
+  for (let i = out.length - 1; i >= 0; i--) {
+    const cur = out[i];
+    if (cur.role === "user") {
+      const text = typeof cur.content === "string" ? cur.content : "";
+      const blocks = typeof cur.content === "string" ? [] : (cur.content as ContentBlock[]);
+      out[i] = {
+        ...cur,
+        content: [{ type: "text", text: `${context}\n\n${text}` }, ...blocks],
+      };
+      break;
+    }
+  }
+  return out;
+}
 
 // Attach image/text blocks to the last user message so the model receives them
 // as part of the same message as the user's text.
