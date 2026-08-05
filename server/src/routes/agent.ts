@@ -3,6 +3,8 @@ import type { Request, Response } from "express";
 import { getAdapters } from "../adapters/registry.js";
 import { requireAuth } from "../middleware/auth.js";
 import { resolveAttachments, type AttachmentRef } from "../lib/attachments.js";
+import { isLocalMachineId } from "../runtime/local/engine.js";
+import { withSharedWorkspace } from "../runtime/local/shared-workspace.js";
 
 const CONNECTION_TIMEOUT_MS = 30 * 60 * 1000; // 30 min hard timeout
 const router = Router();
@@ -31,12 +33,36 @@ router.post("/send", async (req: Request, res: Response) => {
 
   // Resolve attached files (images → base64 file parts, other → text note).
   const { engineAttachments, notes } = await resolveAttachments(attachments);
-  const fullText =
+  let fullText =
     notes.length > 0 ? [msgText, ...notes].filter(Boolean).join("\n\n") : msgText;
   if (engineAttachments.length > 0) {
     console.log(
       `[agent:debug] machineId=${machineId} attachments=${attachments?.length ?? 0} imageParts=${engineAttachments.length}`
     );
+  }
+
+  // The normal Agent panel must use exactly the same prepared clone as the
+  // multi-agent runner. Explicit context prevents OpenCode from answering as
+  // if it were in an empty directory, while the registry serializes workspace
+  // preparation with any other active agent.
+  if (isLocalMachineId(machineId)) {
+    try {
+      const workspace = await withSharedWorkspace(userId, async (context) => context);
+      fullText = [
+        "[STRAXOR GITHUB CONTEXT]",
+        `Active repository: ${workspace.repo}`,
+        `Active branch: ${workspace.branch}`,
+        `Workspace directory: ${workspace.dir}`,
+        "You are already running inside this workspace. Inspect its files before answering. Use this repository for all reads, edits, tests, and git operations; never use /tmp or another clone. Do not claim a repository is unavailable unless a tool call proves it.",
+        "[/STRAXOR GITHUB CONTEXT]",
+        fullText,
+      ].join("\n");
+      console.log(`[agent:workspace] user=${userId} repo=${workspace.repo} branch=${workspace.branch}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Active GitHub workspace unavailable";
+      res.status(409).json({ error: message });
+      return;
+    }
   }
 
   // Auto-create session if none provided
@@ -62,6 +88,10 @@ router.post("/send", async (req: Request, res: Response) => {
     res.setHeader("X-Accel-Buffering", "no");
     res.write(`data: ${JSON.stringify({ type: "session", sessionId: activeSessionId })}\n\n`);
 
+    // Subscribe before the prompt so the first tool call and its repo context
+    // cannot be missed on a fast local OpenCode turn.
+    const stream = await adapter.openEventStream(machineId);
+
     // Try async first (prompt_async)
     const effectiveMode = mode || "async";
     let result;
@@ -81,8 +111,6 @@ router.post("/send", async (req: Request, res: Response) => {
       }
     }
 
-    // Now open event stream to capture ongoing events
-    const stream = await adapter.openEventStream(machineId);
     let buffer = "";
     let sawDelta = false;
     let finished = false;
