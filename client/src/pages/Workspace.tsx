@@ -1137,7 +1137,7 @@ export default function Workspace() {
       typeof window !== "undefined" &&
       ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
     const localEngineOnRemote = !!agentMachineId?.startsWith("local:") && !isLocalHost;
-    if (!agentMachineId || localEngineOnRemote) {
+    if (!agentMachineId || localEngineOnRemote || agentDirectFallbackRef.current) {
       // FAZA 5: parallel multi-model execution when 2+ models selected.
       if (agentOrchestratedModels.length >= 2 && (!attachments || attachments.length === 0)) {
         const systemParts: string[] = [];
@@ -1532,7 +1532,6 @@ export default function Workspace() {
         // silently switch this panel to plain AI chat instead of leaving it silent.
         if (agentMachineId?.startsWith("local:") && !agentDirectFallbackRef.current) {
           agentDirectFallbackRef.current = true;
-          setAgentMachineId(null);
           setAgentLoading(false);
           handleAgentSend(msg, attachments);
           return;
