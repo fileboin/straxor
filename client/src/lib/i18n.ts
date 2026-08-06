@@ -76,8 +76,8 @@ const DICT: Record<string, { en: string; bs: string }> = {
   "budget.duration": { en: "Duration", bs: "Trajanje" },
   "budget.send": { en: "Send detailed budget request", bs: "Pošalji detaljan zahtjev za proračun" },
   "budget.close": { en: "Close", bs: "Zatvori" },
-  "agent.panel1": { en: "Agent 1", bs: "Agent 1" },
-  "agent.panel2": { en: "Agent 2", bs: "Agent 2" },
+  "agent.panel1": { en: "Ask", bs: "Ask" },
+  "agent.panel2": { en: "Agent", bs: "Agent" },
   "chat.copy.other": { en: "Copy to other panel", bs: "Kopiraj u drugi panel" },
   "chat.placeholder": {
     en: "Ask Straxor anything...",
