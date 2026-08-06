@@ -155,6 +155,9 @@ export default function Workspace() {
 
   const [askLoading, setAskLoading] = useState(false);
   const [agentLoading, setAgentLoading] = useState(false);
+  // Once the local engine has failed and we switched to plain chat, avoid
+  // retrying the (always-failing) local engine for subsequent messages.
+  const agentDirectFallbackRef = useRef(false);
 
   // VPS state
   const [showSshModal, setShowSshModal] = useState(false);
@@ -1127,14 +1130,9 @@ export default function Workspace() {
     setAgentLoading(true);
     setAgentPrefill("");
 
-    // No VPS connected — fall back to plain model chat (works exactly like the Ask panel).
-    // Local engines (local:opencode) only exist on the local machine; on a remote
-    // host (Render / phone) they can't run, so use plain AI chat there too.
-    const isLocalHost =
-      typeof window !== "undefined" &&
-      ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
-    const localEngineOnRemote = !!agentMachineId?.startsWith("local:") && !isLocalHost;
-    if (!agentMachineId || localEngineOnRemote) {
+    // No VPS / local engine connected — fall back to plain model chat (works
+    // exactly like the Ask panel) everywhere (localhost or remote/Render).
+    if (!agentMachineId || agentDirectFallbackRef.current) {
       // FAZA 5: parallel multi-model execution when 2+ models selected.
       if (agentOrchestratedModels.length >= 2 && (!attachments || attachments.length === 0)) {
         const systemParts: string[] = [];
@@ -1524,6 +1522,16 @@ export default function Workspace() {
         }
       },
       onError: (error) => {
+        // If a *local* engine (local:opencode) couldn't start — e.g. opencode isn't
+        // installed, the GitHub token can't be decrypted, or there are no API keys —
+        // silently switch this panel to plain AI chat instead of leaving it silent.
+        if (agentMachineId?.startsWith("local:") && !agentDirectFallbackRef.current) {
+          agentDirectFallbackRef.current = true;
+          setAgentMachineId(null);
+          setAgentLoading(false);
+          handleAgentSend(msg, attachments);
+          return;
+        }
         setAgentMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsg.id

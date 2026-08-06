@@ -69,10 +69,15 @@ function resolveBin(engine: LocalEngineId): string {
   const envBin = process.env.OPENCODE_BIN || process.env.ENGINE_BIN;
   if (envBin) return envBin;
   if (engine === "crush") return process.platform === "win32" ? "crush.cmd" : "crush";
+
+  // The `opencode-ai` npm package ships a per-platform binary. Prefer the copy
+  // installed as a local dependency (node_modules/.bin/opencode) so the engine
+  // works on Render / Linux without a global install, then fall back to PATH.
+  const localBin = path.join(process.cwd(), "node_modules", ".bin", "opencode" + (process.platform === "win32" ? ".cmd" : ""));
+  if (fs.existsSync(localBin)) return localBin;
   if (process.platform === "win32") {
     const candidate = path.join(process.env.APPDATA || "", "npm", "opencode.cmd");
     if (fs.existsSync(candidate)) return candidate;
-    return "opencode";
   }
   return "opencode";
 }
