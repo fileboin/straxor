@@ -438,17 +438,28 @@ export default function Workspace() {
     agentProvider, agentModel, agentThinking, agentRole, agentModelOrch,
     panelMode, panelsLayout, panelWidthPct, askZoom, agentZoom, askVerticalZoom, agentVerticalZoom, askPanelHeightPct, agentPanelHeightPct]);
 
-  // When an active repo exists, point the agent at the local engine unless a
-  // VPS machine is already selected. When the repo goes away, drop local.
+  // Resolve the real host once.
+  const isLocalHost =
+    typeof window !== "undefined" &&
+    ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+
+  // When an active repo exists, point the agent at the local engine (so it can
+  // run opencode/tools/git push) UNLESS we are on a remote host (Render/phone),
+  // where there is no local runtime — in that case force local:opencode so the
+  // localEngineOnRemote guard turns the panel into plain AI chat. We must NOT
+  // keep a stale VPS machineId from a restored session here, otherwise the
+  // agent panel would hang on a VPS that doesn't exist on this host.
   useEffect(() => {
     if (activeRepo) {
-      setAgentMachineId((prev) => (prev && !prev.startsWith("local:") ? prev : "local:opencode"));
-      console.log("[machine-debug] agent activeRepo=", activeRepo.fullName, "-> local:opencode");
+      setAgentMachineId((prev) =>
+        !isLocalHost || prev?.startsWith("local:") ? "local:opencode" : prev
+      );
+      console.log("[machine-debug] agent activeRepo=", activeRepo.fullName, "-> local:opencode", isLocalHost ? "(localhost)" : "(remote)");
     } else {
       setAgentMachineId((prev) => (prev && prev.startsWith("local:") ? null : prev));
       console.log("[machine-debug] agent no activeRepo -> clearing local");
     }
-  }, [activeRepo]);
+  }, [activeRepo, isLocalHost]);
 
   // Ask panel is a full independent agent on its own slot. When an active
   // repo exists for the ask slot, point it at the local engine (:ask).
@@ -1133,9 +1144,6 @@ export default function Workspace() {
     // On a remote host (Render / phone) there is no local opencode runtime, so
     // the Agent panel must run as plain AI chat (exactly like the Ask panel).
     // The local `opencode` engine is only used when served from localhost.
-    const isLocalHost =
-      typeof window !== "undefined" &&
-      ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
     const localEngineOnRemote = !!agentMachineId?.startsWith("local:") && !isLocalHost;
     if (!agentMachineId || localEngineOnRemote || agentDirectFallbackRef.current) {
       // FAZA 5: parallel multi-model execution when 2+ models selected.
