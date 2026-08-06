@@ -18,6 +18,7 @@ import { PROVIDERS } from "../lib/models.js";
 import { streamChat, hasApiKey, getApiKey } from "../lib/chat.js";
 import { routeChat, orchestrateChat, type OrchestrateModel } from "../lib/orchestrator.js";
 import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges, sendSteerInstruction, startAgentBackground, fetchBackgroundStatus, type BackgroundTimelineEntry } from "../lib/agent.js";
+import { runAgentTurn } from "../lib/agent-turn.js";
 import { listRepoConnections, type RepoConnection } from "../lib/repos.js";
 import { fetchProjects } from "../lib/projects.js";
 import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
@@ -175,6 +176,7 @@ export default function Workspace() {
   const [showDesignStudio, setShowDesignStudio] = useState(false);
   const [showWebResearch, setShowWebResearch] = useState(false);
   const [showGitRemote, setShowGitRemote] = useState(false);
+  const [gitRemoteSlot, setGitRemoteSlot] = useState<string | undefined>(undefined);
   const [showUsage, setShowUsage] = useState(false);
   const [showRuntimeManager, setShowRuntimeManager] = useState(false);
   const [showQuickStart, setShowQuickStart] = useState(false);
@@ -219,15 +221,23 @@ export default function Workspace() {
   const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
   const [agentMachineId, setAgentMachineId] = useState<string | null>(null);
 
+  // Ask panel session state (Ask is a full independent agent on the local
+  // engine with its own slot/repo, parallel to Agent).
+  const [askSessionId, setAskSessionId] = useState<string | null>(null);
+  const [askMachineId, setAskMachineId] = useState<string | null>(null);
+
   // Active repo connection — when set and no VPS machine is configured, the
   // agent runs on the LOCAL engine inside the cloned repo (no VPS needed).
   const [activeRepo, setActiveRepo] = useState<RepoConnection | null>(null);
+  const [askActiveRepo, setAskActiveRepo] = useState<RepoConnection | null>(null);
 
   const loadActiveRepo = useCallback(async () => {
     try {
       const conns = await listRepoConnections();
-      const active = conns.find((c) => c.isActive) || null;
+      const active = conns.find((c) => c.isActive && c.slot !== "ask") || conns.find((c) => c.isActive) || null;
+      const askActive = conns.find((c) => c.isActive && c.slot === "ask") || null;
       setActiveRepo(active);
+      setAskActiveRepo(askActive);
       return active;
     } catch {
       return null;
@@ -431,6 +441,16 @@ export default function Workspace() {
       setAgentMachineId((prev) => (prev && prev.startsWith("local:") ? null : prev));
     }
   }, [activeRepo]);
+
+  // Ask panel is a full independent agent on its own slot. When an active
+  // repo exists for the ask slot, point it at the local engine (:ask).
+  useEffect(() => {
+    if (askActiveRepo) {
+      setAskMachineId((prev) => (prev && !prev.startsWith("local:") ? prev : "local:opencode:ask"));
+    } else {
+      setAskMachineId((prev) => (prev && prev.startsWith("local:") ? null : prev));
+    }
+  }, [askActiveRepo]);
 
   // Resume system state
   const [dbSessionId, setDbSessionId] = useState<string | null>(null);
@@ -850,6 +870,62 @@ export default function Workspace() {
     setAskLoading(true);
     setAskPrefill("");
 
+    // Ask is a full independent agent on its own local engine/slot. When a
+    // machine is configured (e.g. active repo for the ask slot → local engine),
+    // run the full agent turn (SSE, tools, permissions) instead of plain chat.
+    if (askMachineId) {
+      const roleConfig = getRoleById(askRole);
+      const activePrompts = savedPrompts.filter((p) => activePromptIds.has(p.id));
+      await runAgentTurn(msg, attachments, {
+        role: askRole,
+        provider: askProvider,
+        model: askModel,
+        thinking: askThinking,
+        background: askBackground,
+        machineId: askMachineId,
+        sessionId: askSessionId,
+        setSessionId: setAskSessionId,
+        messages: askMessages,
+        setMessages: setAskMessages,
+        assistantMsgId: assistantMsg.id,
+        setStreamingId: setAskStreamingId,
+        setLoading: setAskLoading,
+        setPrefill: setAskPrefill,
+        permissions,
+        activePromptIds,
+        savedPrompts,
+        projectId,
+        dbSessionId,
+        createDbSession: async () => {
+          try {
+            const PROJECT_ID = projectId || "straxor-landing";
+            const sess = await createSession(
+              PROJECT_ID,
+              askMachineId,
+              msg.slice(0, 100),
+              { provider: askProvider, model: askModel, thinking: askThinking, role: askRole },
+              { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole }
+            );
+            setDbSessionId(sess.id);
+            fetchSessions(PROJECT_ID).then(setDbSessions);
+            return sess.id;
+          } catch {
+            return null;
+          }
+        },
+        saveMessage,
+        updateSession,
+        onToolAllow: proceedToolAllow,
+        setPendingTool,
+        setSecurityPackageName,
+        setPendingInstallAllow,
+        setSecurityVerdict,
+        checkBeforeInstall,
+        onRefreshTodos: () => {},
+      });
+      return;
+    }
+
     // Model orkestracija — route to best model for this task's difficulty.
     // Skipped when images are attached (router is text-only and may pick a
     // non-vision model); image messages use the user's selected model.
@@ -990,7 +1066,7 @@ export default function Workspace() {
         setAskLoading(false);
       },
     }, attachments);
-  }, [askProvider, askModel, askThinking, askRole, askMessages, askModelOrch, askOrchestratedModels, availableModels]);
+  }, [askProvider, askModel, askThinking, askRole, askMessages, askModelOrch, askOrchestratedModels, availableModels, askMachineId, askSessionId, askBackground, agentProvider, agentModel, agentThinking, agentRole, permissions, activePromptIds, savedPrompts, projectId, dbSessionId, proceedToolAllow]);
 
   // Helper: proceed with tool allow after permission/security check
   const proceedToolAllow = useCallback(
@@ -2138,7 +2214,7 @@ export default function Workspace() {
             streamingMessageId={askStreamingId}
             onApiKeyChange={() => hasApiKey(askProvider).then(setAskHasKey)}
             onConnectVps={() => setShowSshModal(true)}
-            onOpenGitRemote={() => setShowGitRemote(true)}
+            onOpenGitRemote={() => { setGitRemoteSlot("ask"); setShowGitRemote(true); }}
             zoom={askZoom}
             onZoomChange={handleAskZoomChange}
             verticalZoom={askVerticalZoom}
@@ -2168,6 +2244,17 @@ export default function Workspace() {
             availableModels={availableModels}
             background={askBackground}
             onBackgroundChange={setAskBackground}
+            runtimeControl={
+              <EnginePicker
+                machineId={askMachineId}
+                hasRepo={!!askActiveRepo}
+                repoName={askActiveRepo?.fullName}
+                onSelectLocal={() => setAskMachineId("local:opencode:ask")}
+                onConnectVps={() => setShowSshModal(true)}
+                onOpenGitRemote={() => { setGitRemoteSlot("ask"); setShowGitRemote(true); }}
+                onOpenRuntimeManager={() => setShowRuntimeManager(true)}
+              />
+            }
           />
         </div>
 
@@ -2237,7 +2324,7 @@ export default function Workspace() {
             streamingMessageId={agentStreamingId}
             onApiKeyChange={() => hasApiKey(askProvider).then(setAskHasKey)}
             onConnectVps={() => setShowSshModal(true)}
-            onOpenGitRemote={() => setShowGitRemote(true)}
+            onOpenGitRemote={() => { setGitRemoteSlot("agent"); setShowGitRemote(true); }}
             zoom={agentZoom}
             onZoomChange={handleAgentZoomChange}
             verticalZoom={agentVerticalZoom}
@@ -2261,7 +2348,7 @@ export default function Workspace() {
                 repoName={activeRepo?.fullName}
                 onSelectLocal={() => setAgentMachineId("local:opencode")}
                 onConnectVps={() => setShowSshModal(true)}
-                onOpenGitRemote={() => setShowGitRemote(true)}
+                onOpenGitRemote={() => { setGitRemoteSlot("agent"); setShowGitRemote(true); }}
                 onOpenRuntimeManager={() => setShowRuntimeManager(true)}
               />
             }
@@ -2564,7 +2651,11 @@ modelOrch={agentModelOrch}
       )}
 
       {showGitRemote && (
-        <GitRemotePanel onClose={() => setShowGitRemote(false)} onRepoChanged={() => loadActiveRepo()} />
+        <GitRemotePanel
+          slot={gitRemoteSlot}
+          onClose={() => setShowGitRemote(false)}
+          onRepoChanged={() => loadActiveRepo()}
+        />
       )}
 
       {showWebResearch && (

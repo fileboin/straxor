@@ -19,11 +19,12 @@ import type { RepoConnection, UrlRepoMeta } from "../../lib/repos";
 interface Props {
   onClose: () => void;
   onRepoChanged?: () => void;
+  slot?: string;
 }
 
 type Tab = "repos" | "prs" | "issues";
 
-export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
+export default function GitRemotePanel({ onClose, onRepoChanged, slot }: Props) {
   const [platform, setPlatform] = useState<GitPlatformId>("github");
   const [configured, setConfigured] = useState(false);
   const [token, setToken] = useState("");
@@ -117,7 +118,7 @@ export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
   async function handleConnect(fullName: string) {
     setConnecting(fullName);
     try {
-      await connectRepo(platform, fullName);
+      await connectRepo(platform, fullName, slot);
       setActionMsg("Povezan za agenta: " + fullName);
       await loadConnections();
       onRepoChanged?.();
@@ -129,7 +130,7 @@ export default function GitRemotePanel({ onClose, onRepoChanged }: Props) {
 
   async function handleMakeActive(fullName: string) {
     try {
-      await setActiveRepo(platform, fullName);
+      await setActiveRepo(platform, fullName, slot);
       setActionMsg("Aktivni repo: " + fullName);
       await loadConnections();
       onRepoChanged?.();

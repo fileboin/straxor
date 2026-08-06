@@ -16,6 +16,7 @@ import { eq, and } from "drizzle-orm";
 import { getGitRemoteToken } from "../../adapters/git/remote/registry.js";
 import { ensureWorkspace, type WorkspaceInfo } from "./workspace.js";
 import { buildOpenCodeModelConfig } from "./opencode-model.js";
+import { normalizeSlot, type RepoSlot } from "./shared-workspace.js";
 import type { GitPlatformId } from "../../adapters/git/remote/adapter.js";
 
 export type LocalEngineId = "opencode" | "crush";
@@ -24,6 +25,7 @@ export interface LocalEngineHandle {
   key: string;
   userId: string;
   engine: string;
+  slot: RepoSlot;
   port: number;
   cwd: string;
   process: ChildProcess;
@@ -43,8 +45,15 @@ export function isLocalMachineId(machineId: string): boolean {
 }
 
 export function engineFromMachineId(machineId: string): string {
-  const engine = machineId.slice(LOCAL_PREFIX.length);
+  const parts = machineId.slice(LOCAL_PREFIX.length).split(":");
+  const engine = parts[0];
   return engine || "opencode";
+}
+
+export function slotFromMachineId(machineId: string): RepoSlot {
+  const parts = machineId.slice(LOCAL_PREFIX.length).split(":");
+  const slot = parts[1];
+  return normalizeSlot(slot);
 }
 
 function log(key: string, line: string): void {
@@ -85,24 +94,26 @@ function findFreePort(start: number): Promise<number> {
   });
 }
 
-async function getActiveRepo(userId: string) {
+async function getActiveRepo(userId: string, slot: RepoSlot) {
   const rows = await db
     .select()
     .from(repoConnections)
-    .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+    .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true), eq(repoConnections.slot, slot)))
     .limit(1);
   return rows[0];
 }
 
-export async function getLocalEngineKey(userId: string, engine: string): Promise<string> {
-  const repo = await getActiveRepo(userId);
+export async function getLocalEngineKey(userId: string, engine: string, slot?: string | null): Promise<string> {
+  const normalized = normalizeSlot(slot);
+  const repo = await getActiveRepo(userId, normalized);
   const fullName = repo ? repo.fullName : "no-repo";
-  return `${userId}:${engine}:${fullName}`;
+  return `${userId}:${engine}:${normalized}:${fullName}`;
 }
 
-export async function ensureLocalEngine(userId: string, engine: string): Promise<LocalEngineHandle> {
+export async function ensureLocalEngine(userId: string, engine: string, slot?: string | null): Promise<LocalEngineHandle> {
   const normalized = (engine || "opencode").toLowerCase() as LocalEngineId;
-  const key = await getLocalEngineKey(userId, normalized);
+  const panelSlot = normalizeSlot(slot);
+  const key = await getLocalEngineKey(userId, normalized, panelSlot);
   const existing = handles.get(key);
   if (existing && existing.process.exitCode === null) {
     const alive = await isPortOpen(existing.port);
@@ -110,8 +121,8 @@ export async function ensureLocalEngine(userId: string, engine: string): Promise
     stopHandle(existing);
   }
 
-  const repo = await getActiveRepo(userId);
-  if (!repo) throw new Error("No active repo — connect a GitHub repo first");
+  const repo = await getActiveRepo(userId, panelSlot);
+  if (!repo) throw new Error("No active repo — connect a GitHub repo for this panel");
 
   // TEST ONLY: allow overriding the stored (encrypted) token with a temporary
   // PAT via env, so the agent↔repo pipeline can be verified without touching
@@ -173,6 +184,7 @@ export async function ensureLocalEngine(userId: string, engine: string): Promise
     key,
     userId,
     engine: normalized,
+    slot: panelSlot,
     port,
     cwd: ws.dir,
     process: child,
@@ -198,10 +210,11 @@ export async function ensureLocalEngine(userId: string, engine: string): Promise
   return handle;
 }
 
-export async function stopLocalEngine(userId: string, engine?: string): Promise<void> {
+export async function stopLocalEngine(userId: string, engine?: string, slot?: string | null): Promise<void> {
   const targetEngine = engine || "opencode";
+  const targetSlot = normalizeSlot(slot);
   for (const handle of Array.from(handles.values())) {
-    if (handle.userId === userId && handle.engine === targetEngine) {
+    if (handle.userId === userId && handle.engine === targetEngine && handle.slot === targetSlot) {
       stopHandle(handle);
     }
   }

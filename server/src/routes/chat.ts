@@ -6,7 +6,7 @@ import { db } from "../db/index.js";
 import { userApiKeys, repoConnections } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import { classifyComplexity, pickModel } from "../lib/model-router.js";
-import { getSharedWorkspaceStatus } from "../runtime/local/shared-workspace.js";
+import { getSharedWorkspaceStatus, normalizeSlot } from "../runtime/local/shared-workspace.js";
 import {
   resolveAttachments,
   countImageBlocks,
@@ -155,13 +155,14 @@ router.post("/route", requireAuth, async (req: Request, res: Response) => {
 
 // POST /api/chat — streaming SSE proxy via AIProviderAdapter
 router.post("/", requireAuth, async (req: Request, res: Response) => {
-  const { providerId, modelId, messages, apiKey, thinking, attachments } = req.body as {
+  const { providerId, modelId, messages, apiKey, thinking, attachments, slot } = req.body as {
     providerId: string;
     modelId: string;
     messages: { role: "user" | "assistant" | "system"; content: string }[];
     apiKey: string;
     thinking?: string;
     attachments?: AttachmentRef[];
+    slot?: string | null;
   };
 
   // Providers that work without an API key (e.g. local Ollama).
@@ -192,7 +193,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
     // Inject the active GitHub repository context (Ask panel). The Agent panel
     // already gets this via /api/agent/send; this makes Ask aware of the repo too.
-    const context = await buildRepoContext(req);
+    const context = await buildRepoContext(req.user!.userId, slot);
     if (context) {
       finalMessages = prependContextToLastUser(finalMessages, context);
     }
@@ -221,16 +222,16 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
 // Build the [STRAXOR GITHUB CONTEXT] block for the Ask panel when the user has
 // an active repository. Returns undefined when nothing is connected.
-async function buildRepoContext(req: Request): Promise<string | undefined> {
-  if (!req.user?.userId) return undefined;
+async function buildRepoContext(userId: string, slot?: string | null): Promise<string | undefined> {
   try {
+    const normalizedSlot = normalizeSlot(slot);
     const [repo] = await db
       .select()
       .from(repoConnections)
-      .where(and(eq(repoConnections.userId, req.user.userId), eq(repoConnections.isActive, true)))
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true), eq(repoConnections.slot, normalizedSlot)))
       .limit(1);
     if (!repo) return undefined;
-    const status = await getSharedWorkspaceStatus(req.user.userId);
+    const status = await getSharedWorkspaceStatus(userId, normalizedSlot);
     const dir = status.connected ? status.workspace : "";
     return [
       "[STRAXOR GITHUB CONTEXT]",

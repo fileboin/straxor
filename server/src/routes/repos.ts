@@ -11,6 +11,7 @@ import {
 import type { GitPlatformId } from "../adapters/git/remote/adapter.js";
 import { ensureWorkspace, getRepoWorkspaceDir, hasGitBinary, pushWorkspace, commitWorkspace } from "../runtime/local/workspace.js";
 import { stopLocalEnginesForUser } from "../runtime/local/engine.js";
+import { normalizeSlot, type RepoSlot } from "../runtime/local/shared-workspace.js";
 
 const router = Router();
 
@@ -41,9 +42,10 @@ router.get("/", async (req, res) => {
 router.post("/connect", async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { platform, fullName } = req.body as {
+    const { platform, fullName, slot } = req.body as {
       platform: GitPlatformId;
       fullName: string;
+      slot?: string | null;
     };
 
     if (!platform || !fullName || !fullName.includes("/")) {
@@ -51,6 +53,7 @@ router.post("/connect", async (req, res) => {
       return;
     }
 
+    const normalizedSlot = normalizeSlot(slot);
     const [owner, name] = fullName.split("/");
 
     const adapter = getGitRemoteAdapter(userId, platform);
@@ -76,6 +79,7 @@ router.post("/connect", async (req, res) => {
           cloneUrl: repo.cloneUrl,
           defaultBranch: repo.defaultBranch || "main",
           connectionType: "token",
+          slot: normalizedSlot,
           updatedAt: new Date(),
         })
         .where(and(eq(repoConnections.userId, userId), eq(repoConnections.platform, platform), eq(repoConnections.fullName, fullName)));
@@ -92,17 +96,18 @@ router.post("/connect", async (req, res) => {
           cloneUrl: repo.cloneUrl,
           defaultBranch: repo.defaultBranch || "main",
           isActive: true,
+          slot: normalizedSlot,
           connectionType: "token",
         })
         .returning();
       connectionId = inserted[0].id;
     }
 
-    // Set as active (single active repo per user)
+    // Set as active (single active repo per user per panel slot)
     await db
       .update(repoConnections)
       .set({ isActive: false })
-      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)));
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true), eq(repoConnections.slot, normalizedSlot)));
     await db
       .update(repoConnections)
       .set({ isActive: true })
@@ -119,15 +124,18 @@ router.post("/connect", async (req, res) => {
 router.post("/active", async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { platform, fullName } = req.body as {
+    const { platform, fullName, slot } = req.body as {
       platform: GitPlatformId;
       fullName: string;
+      slot?: string | null;
     };
 
     if (!platform || !fullName) {
       res.status(400).json({ error: "Missing required fields: platform, fullName" });
       return;
     }
+
+    const normalizedSlot = normalizeSlot(slot);
 
     const found = await db
       .select()
@@ -143,10 +151,10 @@ router.post("/active", async (req, res) => {
     await db
       .update(repoConnections)
       .set({ isActive: false })
-      .where(eq(repoConnections.userId, userId));
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.slot, normalizedSlot)));
     await db
       .update(repoConnections)
-      .set({ isActive: true })
+      .set({ isActive: true, slot: normalizedSlot })
       .where(eq(repoConnections.id, found[0].id));
 
     await stopLocalEnginesForUser(userId);

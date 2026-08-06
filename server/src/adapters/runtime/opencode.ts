@@ -20,12 +20,14 @@ import {
 import {
   ensureLocalEngine,
   engineFromMachineId,
+  slotFromMachineId,
   isLocalMachineId,
   getLocalEngineLog,
   resolveBin,
   stopLocalEngine,
 } from "../../runtime/local/engine.js";
 import { getRepoWorkspaceDir } from "../../runtime/local/workspace.js";
+import { normalizeSlot } from "../../runtime/local/shared-workspace.js";
 import type { RuntimeAdapter, TodoItem, FileDiff, RuntimeHealth, RuntimeChannel, EngineAttachment } from "./adapter.js";
 
 const execFileP = promisify(execFile);
@@ -171,7 +173,7 @@ async function withTransport<T>(
   fn: (port: number, ssh: SSHClient | null) => Promise<T>
 ): Promise<T> {
   if (isLocalMachineId(machineId)) {
-    const handle = await ensureLocalEngine(userId, engineFromMachineId(machineId));
+    const handle = await ensureLocalEngine(userId, engineFromMachineId(machineId), slotFromMachineId(machineId));
     return fn(handle.port, null);
   }
   return withSSH(machineId, userId, async (ssh, port) => fn(port, ssh));
@@ -278,8 +280,8 @@ export function createOpenCodeAdapter(): RuntimeAdapter {
 }
 
 export function createBoundAdapter(userId: string) {
-  async function localHealth(engine: string) {
-    const handle = await ensureLocalEngine(userId, engine);
+  async function localHealth(engine: string, slot?: string | null) {
+    const handle = await ensureLocalEngine(userId, engine, slot);
     const version = await execFileP(resolveBin("opencode"), ["--version"], { shell: true, timeout: 10000, windowsHide: true })
       .then((r) => r.stdout.trim().replace(/^v/, ""))
       .catch(() => "");
@@ -297,11 +299,12 @@ export function createBoundAdapter(userId: string) {
     };
   }
 
-  async function localExecCommand(command: string): Promise<string> {
+  async function localExecCommand(command: string, slot?: string | null): Promise<string> {
+    const normalizedSlot = normalizeSlot(slot);
     const repo = await db
       .select()
       .from(repoConnections)
-      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true), eq(repoConnections.slot, normalizedSlot)))
       .limit(1);
     if (repo.length === 0) throw new Error("No active repo");
     const cwd = getRepoWorkspaceDir(userId, repo[0].owner, repo[0].name);
@@ -380,7 +383,7 @@ export function createBoundAdapter(userId: string) {
 
     async openEventStream(machineId: string) {
       if (isLocalMachineId(machineId)) {
-        const handle = await ensureLocalEngine(userId, engineFromMachineId(machineId));
+        const handle = await ensureLocalEngine(userId, engineFromMachineId(machineId), slotFromMachineId(machineId));
         return localEventStream(handle.port);
       }
 
@@ -424,7 +427,7 @@ export function createBoundAdapter(userId: string) {
 
     async healthCheck(machineId: string) {
       if (isLocalMachineId(machineId)) {
-        return localHealth(engineFromMachineId(machineId)) as unknown as RuntimeHealth;
+        return localHealth(engineFromMachineId(machineId), slotFromMachineId(machineId)) as unknown as RuntimeHealth;
       }
       return withSSHRaw(machineId, userId, async (ssh) => {
         const running = await checkOpenCodeRunning(ssh);
@@ -446,8 +449,8 @@ export function createBoundAdapter(userId: string) {
 
     async restart(machineId: string) {
       if (isLocalMachineId(machineId)) {
-        await stopLocalEngine(userId, engineFromMachineId(machineId));
-        return localHealth(engineFromMachineId(machineId)) as unknown as RuntimeHealth;
+        await stopLocalEngine(userId, engineFromMachineId(machineId), slotFromMachineId(machineId));
+        return localHealth(engineFromMachineId(machineId), slotFromMachineId(machineId)) as unknown as RuntimeHealth;
       }
       return withSSHRaw(machineId, userId, async (ssh) => {
         // Stop existing
@@ -483,7 +486,7 @@ export function createBoundAdapter(userId: string) {
 
     async reconnect(machineId: string) {
       if (isLocalMachineId(machineId)) {
-        return localHealth(engineFromMachineId(machineId)) as unknown as RuntimeHealth;
+        return localHealth(engineFromMachineId(machineId), slotFromMachineId(machineId)) as unknown as RuntimeHealth;
       }
       return withSSHRaw(machineId, userId, async (ssh) => {
         const running = await checkOpenCodeRunning(ssh);
@@ -522,7 +525,7 @@ export function createBoundAdapter(userId: string) {
     async updateRuntime(machineId: string, channel: RuntimeChannel, version?: string) {
       if (isLocalMachineId(machineId)) {
         // Local engine: no remote install — report current health only.
-        return localHealth(engineFromMachineId(machineId)) as unknown as RuntimeHealth;
+        return localHealth(engineFromMachineId(machineId), slotFromMachineId(machineId)) as unknown as RuntimeHealth;
       }
       return withSSHRaw(machineId, userId, async (ssh) => {
         // Update the package
@@ -572,7 +575,7 @@ export function createBoundAdapter(userId: string) {
 
     async executeCommand(machineId: string, command: string) {
       if (isLocalMachineId(machineId)) {
-        return localExecCommand(command);
+        return localExecCommand(command, slotFromMachineId(machineId));
       }
       return withSSHRaw(machineId, userId, async (ssh) => {
         const { stdout } = await ssh.exec(command);

@@ -10,6 +10,7 @@ export interface RepoConnection {
   cloneUrl: string;
   defaultBranch: string;
   isActive: boolean;
+  slot?: string;
   connectionType?: string;
   createdAt: string;
   updatedAt: string;
@@ -49,17 +50,17 @@ export async function listRepoConnections() {
   return api<RepoConnection[]>(`/`);
 }
 
-export async function connectRepo(platform: GitPlatformId, fullName: string) {
+export async function connectRepo(platform: GitPlatformId, fullName: string, slot?: string) {
   return api<{ success: boolean; id: string; repo: GitRemoteRepo }>(`/connect`, {
     method: "POST",
-    body: JSON.stringify({ platform, fullName }),
+    body: JSON.stringify({ platform, fullName, slot }),
   });
 }
 
-export async function setActiveRepo(platform: GitPlatformId, fullName: string) {
+export async function setActiveRepo(platform: GitPlatformId, fullName: string, slot?: string) {
   return api<{ success: boolean }>(`/active`, {
     method: "POST",
-    body: JSON.stringify({ platform, fullName }),
+    body: JSON.stringify({ platform, fullName, slot }),
   });
 }
 

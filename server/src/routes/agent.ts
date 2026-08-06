@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import { getAdapters } from "../adapters/registry.js";
 import { requireAuth } from "../middleware/auth.js";
 import { resolveAttachments, type AttachmentRef } from "../lib/attachments.js";
-import { isLocalMachineId } from "../runtime/local/engine.js";
+import { isLocalMachineId, slotFromMachineId } from "../runtime/local/engine.js";
 import { withSharedWorkspace } from "../runtime/local/shared-workspace.js";
 
 const CONNECTION_TIMEOUT_MS = 30 * 60 * 1000; // 30 min hard timeout
@@ -47,7 +47,7 @@ router.post("/send", async (req: Request, res: Response) => {
   // preparation with any other active agent.
   if (isLocalMachineId(machineId)) {
     try {
-      const workspace = await withSharedWorkspace(userId, async (context) => context);
+      const workspace = await withSharedWorkspace(userId, async (context) => context, slotFromMachineId(machineId));
       fullText = [
         "[STRAXOR GITHUB CONTEXT]",
         `Active repository: ${workspace.repo}`,
