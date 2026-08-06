@@ -358,9 +358,7 @@ export const sessions = pgTable("sessions", {
   projectId: uuid("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
-  machineId: uuid("machine_id")
-    .notNull()
-    .references(() => machines.id, { onDelete: "cascade" }),
+  machineId: varchar("machine_id", { length: 255 }).notNull(),
   opencodeSessionId: varchar("opencode_session_id", { length: 255 }),
   title: varchar("title", { length: 255 }),
   status: varchar("status", { length: 20 }).notNull().default("active"),
@@ -378,7 +376,6 @@ export const sessions = pgTable("sessions", {
 export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, { fields: [sessions.userId], references: [users.id] }),
   project: one(projects, { fields: [sessions.projectId], references: [projects.id] }),
-  machine: one(machines, { fields: [sessions.machineId], references: [machines.id] }),
 }));
 
 export const sessionMessages = pgTable("session_messages", {
