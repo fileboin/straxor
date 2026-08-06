@@ -14,7 +14,7 @@ import { db } from "../../db/index.js";
 import { repoConnections } from "../../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import { getGitRemoteToken } from "../../adapters/git/remote/registry.js";
-import { ensureWorkspace, type WorkspaceInfo } from "./workspace.js";
+import { ensureWorkspace } from "./workspace.js";
 import { buildOpenCodeModelConfig } from "./opencode-model.js";
 import { normalizeSlot, type RepoSlot } from "./shared-workspace.js";
 import type { GitPlatformId } from "../../adapters/git/remote/adapter.js";
@@ -103,6 +103,22 @@ async function getActiveRepo(userId: string, slot: RepoSlot) {
   return rows[0];
 }
 
+// Create (if needed) a bare per-user/per-slot sandbox dir so the engine can run
+// even when there is no connected repo or the repo token can't be decrypted
+// locally. The agent still works as a general-purpose chat from this folder.
+function ensureBareWorkspace(userId: string, slot: RepoSlot): string {
+  const safeUser = userId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const dir = path.join(getWorkspaceRoot(), safeUser, `__${slot}`);
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {}
+  return dir;
+}
+
+function getWorkspaceRoot(): string {
+  return process.env.STRAXOR_WORKSPACE_DIR || path.join(process.cwd(), ".straxor-workspaces");
+}
+
 export async function getLocalEngineKey(userId: string, engine: string, slot?: string | null): Promise<string> {
   const normalized = normalizeSlot(slot);
   const repo = await getActiveRepo(userId, normalized);
@@ -121,31 +137,44 @@ export async function ensureLocalEngine(userId: string, engine: string, slot?: s
     stopHandle(existing);
   }
 
-  const repo = await getActiveRepo(userId, panelSlot);
-  if (!repo) throw new Error("No active repo — connect a GitHub repo for this panel");
+  const repo = await getActiveRepo(userId, panelSlot).catch(() => null);
 
-  // TEST ONLY: allow overriding the stored (encrypted) token with a temporary
-  // PAT via env, so the agent↔repo pipeline can be verified without touching
-  // the DB or existing tokens. Remove once real token flow is confirmed.
-  const testToken = process.env.STRAXOR_TEST_GITHUB_TOKEN;
-  const token = testToken || (await getGitRemoteToken(userId, repo.platform as GitPlatformId));
-  if (!token) throw new Error("Platform token missing — save a token first");
-
-  const ws: WorkspaceInfo = await ensureWorkspace({
-    userId,
-    platform: repo.platform,
-    owner: repo.owner,
-    name: repo.name,
-    fullName: repo.fullName,
-    cloneUrl: repo.cloneUrl,
-    defaultBranch: repo.defaultBranch,
-    token,
-  });
+  // Resolve the workspace directory. Prefer the connected repo; if there is no
+  // active repo (or its token cannot be decrypted locally), fall back to a bare
+  // per-user sandbox dir so the agent still works as a general-purpose chat.
+  let wsDir: string;
+  if (repo) {
+    const readOnly = repo.connectionType === "url";
+    let token: string | undefined;
+    try {
+      if (!readOnly) token = await getGitRemoteToken(userId, repo.platform as GitPlatformId);
+    } catch {}
+    try {
+      if (!readOnly && !token) throw new Error("token unavailable");
+      const info = await ensureWorkspace({
+        userId,
+        platform: repo.platform,
+        owner: repo.owner,
+        name: repo.name,
+        fullName: repo.fullName,
+        cloneUrl: repo.cloneUrl,
+        defaultBranch: repo.defaultBranch,
+        token,
+      });
+      wsDir = info.dir;
+    } catch {
+      // Repo clone failed (e.g. token can't be decrypted locally) — run the
+      // engine in a bare sandbox so the panel still works as a chat.
+      wsDir = ensureBareWorkspace(userId, panelSlot);
+    }
+  } else {
+    wsDir = ensureBareWorkspace(userId, panelSlot);
+  }
 
   const port = await findFreePort(BASE_PORT + Math.abs(hashCode(key) % 1000));
   const bin = resolveBin(normalized);
   const args = normalized === "crush" ? ["serve", "--port", String(port)] : ["serve", "--port", String(port)];
-  const logFile = path.join(ws.dir, ".straxor-engine.log");
+  const logFile = path.join(wsDir, ".straxor-engine.log");
 
   // Feed the OpenCode engine an active AI model from the user's stored keys.
   // Without this the engine is spawned with NO provider -> "empty gap".
@@ -173,7 +202,7 @@ export async function ensureLocalEngine(userId: string, engine: string, slot?: s
   }
 
   const child = spawn(bin, args, {
-    cwd: ws.dir,
+    cwd: wsDir,
     shell: true,
     env: modelEnv,
     stdio: ["ignore", "pipe", "pipe"],
@@ -186,7 +215,7 @@ export async function ensureLocalEngine(userId: string, engine: string, slot?: s
     engine: normalized,
     slot: panelSlot,
     port,
-    cwd: ws.dir,
+    cwd: wsDir,
     process: child,
     startedAt: Date.now(),
   };

@@ -236,10 +236,13 @@ export default function Workspace() {
       const conns = await listRepoConnections();
       const active = conns.find((c) => c.isActive && c.slot !== "ask") || conns.find((c) => c.isActive) || null;
       const askActive = conns.find((c) => c.isActive && c.slot === "ask") || null;
+      console.log("[repo-debug] conns=", conns.map((c) => `${c.fullName}:active=${c.isActive}:slot=${c.slot}`).join(" | "));
+      console.log("[repo-debug] active=", active?.fullName, "askActive=", askActive?.fullName);
       setActiveRepo(active);
       setAskActiveRepo(askActive);
       return active;
-    } catch {
+    } catch (e) {
+      console.error("[repo-debug] loadActiveRepo error", e);
       return null;
     }
   }, []);
@@ -437,8 +440,10 @@ export default function Workspace() {
   useEffect(() => {
     if (activeRepo) {
       setAgentMachineId((prev) => (prev && !prev.startsWith("local:") ? prev : "local:opencode"));
+      console.log("[machine-debug] agent activeRepo=", activeRepo.fullName, "-> local:opencode");
     } else {
       setAgentMachineId((prev) => (prev && prev.startsWith("local:") ? null : prev));
+      console.log("[machine-debug] agent no activeRepo -> clearing local");
     }
   }, [activeRepo]);
 
@@ -447,8 +452,10 @@ export default function Workspace() {
   useEffect(() => {
     if (askActiveRepo) {
       setAskMachineId((prev) => (prev && !prev.startsWith("local:") ? prev : "local:opencode:ask"));
+      console.log("[machine-debug] ask activeRepo=", askActiveRepo.fullName, "-> local:opencode:ask");
     } else {
       setAskMachineId((prev) => (prev && prev.startsWith("local:") ? null : prev));
+      console.log("[machine-debug] ask no activeRepo -> clearing local");
     }
   }, [askActiveRepo]);
 
@@ -621,13 +628,20 @@ export default function Workspace() {
       // Restore DB session ID
       setDbSessionId(full.id);
 
-      // Restore OpenCode session ID
-      if (full.opencodeSessionId) {
-        setAgentSessionId(full.opencodeSessionId);
+      // Restore OpenCode session ID — only meaningful for a VPS machine.
+      // A restored session ID belongs to a specific machine; reusing it on the
+      // local engine would cause the SSE filter to discard every event.
+      if (full.machineId && !full.machineId.startsWith("local:")) {
+        if (full.opencodeSessionId) {
+          setAgentSessionId(full.opencodeSessionId);
+        }
       }
 
-      // Restore machine ID
-      if (full.machineId) {
+      // Restore machine ID — but only for a real VPS machine. Local engines
+      // ("local:*") are assigned automatically from the active repo for each
+      // panel slot, so restoring one here would override the agent panel with
+      // the ask-slot engine (or vice-versa) and leave it unresponsive.
+      if (full.machineId && !full.machineId.startsWith("local:")) {
         setAgentMachineId(full.machineId);
         setVpsStatus("ready");
       }

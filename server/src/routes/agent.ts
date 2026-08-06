@@ -58,10 +58,11 @@ router.post("/send", async (req: Request, res: Response) => {
         fullText,
       ].join("\n");
       console.log(`[agent:workspace] user=${userId} repo=${workspace.repo} branch=${workspace.branch}`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Active GitHub workspace unavailable";
-      res.status(409).json({ error: message });
-      return;
+    } catch {
+      // No usable workspace (no active repo, or the repo token can't be
+      // decrypted locally). The agent is a general-purpose chat too, so carry
+      // on without the GitHub context instead of failing the whole turn.
+      console.log(`[agent:workspace] user=${userId} — no workspace, running as general chat`);
     }
   }
 
@@ -73,6 +74,7 @@ router.post("/send", async (req: Request, res: Response) => {
       const result = await adapter.createSession(machineId, "Straxor Session");
       activeSessionId = result.id;
     } catch (err) {
+      console.log(`[agent:session] user=${userId} machineId=${machineId} error=${err instanceof Error ? err.message : err}`);
       res.status(500).json({ error: "Failed to create session" });
       return;
     }

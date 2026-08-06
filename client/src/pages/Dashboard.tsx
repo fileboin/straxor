@@ -114,12 +114,20 @@ export default function Dashboard() {
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold">Projekti</h2>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 rounded-xl bg-accent hover:opacity-90 text-sm font-semibold text-white transition-opacity"
-          >
-            + Novi projekat
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate("/project/agents")}
+              className="px-4 py-2 rounded-xl bg-accent hover:opacity-90 text-sm font-semibold text-white transition-opacity"
+            >
+              🤖 Agenti
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="px-4 py-2 rounded-xl border border-border bg-surface-2 hover:bg-surface-3 text-sm font-semibold text-text transition-colors"
+            >
+              + Novi projekat
+            </button>
+          </div>
         </div>
 
         {showCreate && (
