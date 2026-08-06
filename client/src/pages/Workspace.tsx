@@ -851,6 +851,28 @@ export default function Workspace() {
     }
   }, [agentMachineId, agentSessionId]);
 
+  // Helper: proceed with tool allow after permission/security check
+  const proceedToolAllow = useCallback(
+    (toolCallId: string, toolName: string, toolArgs: Record<string, unknown> | string, assistantMsgId: string) => {
+      setAgentMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantMsgId) return m;
+          const existing = m.toolCalls || [];
+          const idx = existing.findIndex((tc) => tc.id === toolCallId);
+          const tc: ToolCall = { id: toolCallId, name: toolName, args: toolArgs, status: "running" };
+          const updated = [...existing];
+          if (idx >= 0) {
+            updated[idx] = { ...updated[idx], status: "running", args: toolArgs };
+          } else {
+            updated.push(tc);
+          }
+          return { ...m, toolCalls: updated };
+        })
+      );
+    },
+    []
+  );
+
   const handleAskSend = useCallback(async (msg: string, attachments?: Attachment[]) => {
     const userMsg: ChatMessage = {
       id: `a-${Date.now()}`,
@@ -1067,28 +1089,6 @@ export default function Workspace() {
       },
     }, attachments);
   }, [askProvider, askModel, askThinking, askRole, askMessages, askModelOrch, askOrchestratedModels, availableModels, askMachineId, askSessionId, askBackground, agentProvider, agentModel, agentThinking, agentRole, permissions, activePromptIds, savedPrompts, projectId, dbSessionId, proceedToolAllow]);
-
-  // Helper: proceed with tool allow after permission/security check
-  const proceedToolAllow = useCallback(
-    (toolCallId: string, toolName: string, toolArgs: Record<string, unknown> | string, assistantMsgId: string) => {
-      setAgentMessages((prev) =>
-        prev.map((m) => {
-          if (m.id !== assistantMsgId) return m;
-          const existing = m.toolCalls || [];
-          const idx = existing.findIndex((tc) => tc.id === toolCallId);
-          const tc: ToolCall = { id: toolCallId, name: toolName, args: toolArgs, status: "running" };
-          const updated = [...existing];
-          if (idx >= 0) {
-            updated[idx] = { ...updated[idx], status: "running", args: toolArgs };
-          } else {
-            updated.push(tc);
-          }
-          return { ...m, toolCalls: updated };
-        })
-      );
-    },
-    []
-  );
 
   const handleAgentSend = useCallback(async (msg: string, attachments?: Attachment[]) => {
     const roleConfig = getRoleById(agentRole);
