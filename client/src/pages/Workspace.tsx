@@ -1128,7 +1128,13 @@ export default function Workspace() {
     setAgentPrefill("");
 
     // No VPS connected — fall back to plain model chat (works exactly like the Ask panel).
-    if (!agentMachineId) {
+    // Local engines (local:opencode) only exist on the local machine; on a remote
+    // host (Render / phone) they can't run, so use plain AI chat there too.
+    const isLocalHost =
+      typeof window !== "undefined" &&
+      ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+    const localEngineOnRemote = !!agentMachineId?.startsWith("local:") && !isLocalHost;
+    if (!agentMachineId || localEngineOnRemote) {
       // FAZA 5: parallel multi-model execution when 2+ models selected.
       if (agentOrchestratedModels.length >= 2 && (!attachments || attachments.length === 0)) {
         const systemParts: string[] = [];
