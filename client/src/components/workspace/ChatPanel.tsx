@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, type FormEvent, type ChangeEvent } from "react";
 import { createPortal } from "react-dom";
-import { BorderBeam } from "border-beam";
 import { ThinkingOrb, type OrbState } from "thinking-orbs";
 import ProviderModelDropdown from "./ProviderModelDropdown.js";
 import ModelPickerModal from "./ModelPickerModal.js";
@@ -121,8 +120,6 @@ interface Props {
   orchestratedModels?: { providerId: string; modelId: string }[];
   onOrchestratedModelsChange?: (models: { providerId: string; modelId: string }[]) => void;
   availableModels?: { providerId: string; name: string; models: { id: string; name: string }[] }[];
-  /** BorderBeam glow is active while the panel is doing real work. */
-  beamActive?: boolean;
   /** ThinkingOrb state shown in the inline status bar (null hides the orb). */
   orbState?: OrbState | null;
   /** Text label rendered next to the orb. */
@@ -299,7 +296,6 @@ export default function ChatPanel({
   orchestratedModels = [],
   onOrchestratedModelsChange,
   availableModels = [],
-  beamActive = false,
   orbState = null,
   orbLabel,
   onFocusChange,
@@ -316,7 +312,6 @@ export default function ChatPanel({
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [showKeyErrorForm, setShowKeyErrorForm] = useState(false);
-  const [panelFocused, setPanelFocused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { providers: catalogProviders, loading: catalogLoading } = useModelCatalog();
   const providerName =
@@ -389,7 +384,6 @@ export default function ChatPanel({
   // Debounced briefly so a quick focus transfer doesn't flicker the glow.
   const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleFocusChange = (focused: boolean) => {
-    setPanelFocused(focused);
     if (focusTimer.current) clearTimeout(focusTimer.current);
     focusTimer.current = setTimeout(() => onFocusChange?.(focused), focused ? 0 : 220);
   };
@@ -766,15 +760,6 @@ export default function ChatPanel({
     : undefined;
 
   return (
-    <BorderBeam
-      colorVariant="sunset"
-      theme="dark"
-      size="md"
-      active={beamActive || panelFocused}
-      borderRadius={16}
-      style={{ overflow: "visible", "--beam-hue-base": "10deg" } as React.CSSProperties}
-      className="h-full rounded-2xl"
-    >
     <div
       tabIndex={-1}
       onFocus={() => handleFocusChange(true)}
@@ -1165,6 +1150,5 @@ export default function ChatPanel({
           document.body
         )}
     </div>
-    </BorderBeam>
   );
 }

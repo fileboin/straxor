@@ -2326,7 +2326,6 @@ export default function Workspace() {
                 onOpenRuntimeManager={() => setShowRuntimeManager(true)}
               />
             }
-            beamActive={askFocused || !!askStreamingId}
             onFocusChange={setAskFocused}
             orbState={askLoading ? "composing" : null}
             orbLabel={askLoading ? "Generišem odgovor…" : undefined}
@@ -2460,7 +2459,6 @@ modelOrch={agentModelOrch}
                   )}
                 </>
               }
-              beamActive={agentLoading}
               orbState={agentStatusOrb?.state ?? null}
               orbLabel={agentStatusOrb?.label}
             />
