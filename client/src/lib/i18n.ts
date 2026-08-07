@@ -1,403 +1,223 @@
 import { useEffect, useState } from "react";
 
-export type Lang = "en" | "bs";
+export type Lang =
+  | "en"
+  | "sr"
+  | "de"
+  | "fr"
+  | "es"
+  | "it"
+  | "pt"
+  | "nl"
+  | "pl"
+  | "ru"
+  | "uk"
+  | "zh"
+  | "ja"
+  | "ko"
+  | "ar"
+  | "hi"
+  | "tr"
+  | "el"
+  | "sv"
+  | "cs"
+  | "da"
+  | "fi"
+  | "no"
+  | "ro"
+  | "hu"
+  | "sk"
+  | "bg";
 
 export const LANGS: { code: Lang; label: string; short: string }[] = [
   { code: "en", label: "English", short: "EN" },
-  { code: "bs", label: "Srpski", short: "SR" },
+  { code: "sr", label: "Srpski", short: "SR" },
+  { code: "de", label: "Deutsch", short: "DE" },
+  { code: "fr", label: "Français", short: "FR" },
+  { code: "es", label: "Español", short: "ES" },
+  { code: "it", label: "Italiano", short: "IT" },
+  { code: "pt", label: "Português", short: "PT" },
+  { code: "nl", label: "Nederlands", short: "NL" },
+  { code: "pl", label: "Polski", short: "PL" },
+  { code: "ru", label: "Русский", short: "RU" },
+  { code: "uk", label: "Українська", short: "UK" },
+  { code: "zh", label: "中文", short: "ZH" },
+  { code: "ja", label: "日本語", short: "JA" },
+  { code: "ko", label: "한국어", short: "KO" },
+  { code: "ar", label: "العربية", short: "AR" },
+  { code: "hi", label: "हिन्दी", short: "HI" },
+  { code: "tr", label: "Türkçe", short: "TR" },
+  { code: "el", label: "Ελληνικά", short: "EL" },
+  { code: "sv", label: "Svenska", short: "SV" },
+  { code: "cs", label: "Čeština", short: "CS" },
+  { code: "da", label: "Dansk", short: "DA" },
+  { code: "fi", label: "Suomi", short: "FI" },
+  { code: "no", label: "Norsk", short: "NO" },
+  { code: "ro", label: "Română", short: "RO" },
+  { code: "hu", label: "Magyar", short: "HU" },
+  { code: "sk", label: "Slovenčina", short: "SK" },
+  { code: "bg", label: "Български", short: "BG" },
 ];
 
 const STORAGE_KEY = "straxor.lang";
 
-const DICT: Record<string, { en: string; bs: string }> = {
+// English is the base language and the universal fallback. Missing
+// translations in any other language automatically fall back to English,
+// so English is always the priority.
+const DICT: Record<string, Partial<Record<Lang, string>>> = {
   // ── Common ──
-  "common.loading": { en: "Loading...", bs: "Učitavanje..." },
-  "common.error": { en: "Error", bs: "Greška" },
-  "common.save": { en: "Save", bs: "Sačuvaj" },
-  "common.cancel": { en: "Cancel", bs: "Odustani" },
-  "common.delete": { en: "Delete", bs: "Obriši" },
-  "common.close": { en: "Close", bs: "Zatvori" },
-  "common.confirm": { en: "Confirm", bs: "Potvrdi" },
+  "common.loading": { en: "Loading...", sr: "Učitavanje...", de: "Laden...", fr: "Chargement...", es: "Cargando...", it: "Caricamento...", pt: "Carregando...", nl: "Laden...", pl: "Ładowanie...", ru: "Загрузка...", uk: "Завантаження...", zh: "加载中...", ja: "読み込み中...", ko: "로딩 중...", ar: "جارٍ التحميل...", hi: "लोड हो रहा है...", tr: "Yükleniyor...", el: "Φόρτωση...", sv: "Laddar...", cs: "Načítání...", da: "Indlæser...", fi: "Ladataan...", no: "Laster...", ro: "Se încarcă...", hu: "Betöltés...", sk: "Načítava sa...", bg: "Зареждане..."},
+  "common.error": { en: "Error", sr: "Greška", de: "Fehler", fr: "Erreur", es: "Error", it: "Errore", pt: "Erro", nl: "Fout", pl: "Błąd", ru: "Ошибка", uk: "Помилка", zh: "错误", ja: "エラー", ko: "오류", ar: "خطأ", hi: "त्रुटि", tr: "Hata", el: "Σφάλμα", sv: "Fel", cs: "Chyba", da: "Fejl", fi: "Virhe", no: "Feil", ro: "Eroare", hu: "Hiba", sk: "Chyba", bg: "Грешка"},
+  "common.save": { en: "Save", sr: "Sačuvaj", de: "Speichern", fr: "Enregistrer", es: "Guardar", it: "Salva", pt: "Salvar", nl: "Opslaan", pl: "Zapisz", ru: "Сохранить", uk: "Зберегти", zh: "保存", ja: "保存", ko: "저장", ar: "حفظ", hi: "सहेजें", tr: "Kaydet", el: "Αποθήκευση", sv: "Spara", cs: "Uložit", da: "Gem", fi: "Tallenna", no: "Lagre", ro: "Salvează", hu: "Mentés", sk: "Uložiť", bg: "Запази"},
+  "common.cancel": { en: "Cancel", sr: "Odustani", de: "Abbrechen", fr: "Annuler", es: "Cancelar", it: "Annulla", pt: "Cancelar", nl: "Annuleren", pl: "Anuluj", ru: "Отмена", uk: "Скасувати", zh: "取消", ja: "キャンセル", ko: "취소", ar: "إلغاء", hi: "रद्द करें", tr: "İptal", el: "Ακύρωση", sv: "Avbryt", cs: "Zrušit", da: "Annuller", fi: "Peruuta", no: "Avbryt", ro: "Anulează", hu: "Mégse", sk: "Zrušiť", bg: "Отказ"},
+  "common.delete": { en: "Delete", sr: "Obriši", de: "Löschen", fr: "Supprimer", es: "Eliminar", it: "Elimina", pt: "Excluir", nl: "Verwijderen", pl: "Usuń", ru: "Удалить", uk: "Видалити", zh: "删除", ja: "削除", ko: "삭제", ar: "حذف", hi: "हटाएं", tr: "Sil", el: "Διαγραφή", sv: "Radera", cs: "Smazat", da: "Slet", fi: "Poista", no: "Slett", ro: "Șterge", hu: "Törlés", sk: "Odstrániť", bg: "Изтрий"},
+  "common.close": { en: "Close", sr: "Zatvori", de: "Schließen", fr: "Fermer", es: "Cerrar", it: "Chiudi", pt: "Fechar", nl: "Sluiten", pl: "Zamknij", ru: "Закрыть", uk: "Закрити", zh: "关闭", ja: "閉じる", ko: "닫기", ar: "إغلاق", hi: "बंद करें", tr: "Kapat", el: "Κλείσιμο", sv: "Stäng", cs: "Zavřít", da: "Luk", fi: "Sulje", no: "Lukk", ro: "Închide", hu: "Bezárás", sk: "Zavrieť", bg: "Затвори"},
+  "common.confirm": { en: "Confirm", sr: "Potvrdi", de: "Bestätigen", fr: "Confirmer", es: "Confirmar", it: "Conferma", pt: "Confirmar", nl: "Bevestigen", pl: "Potwierdź", ru: "Подтвердить", uk: "Підтвердити", zh: "确认", ja: "確認", ko: "확인", ar: "تأكيد", hi: "पुष्टि करें", tr: "Onayla", el: "Επιβεβαίωση", sv: "Bekräfta", cs: "Potvrdit", da: "Bekræft", fi: "Vahvista", no: "Bekreft", ro: "Confirmă", hu: "Megerősítés", sk: "Potvrdiť", bg: "Потвърди"},
 
-  // ── Install PWA button ──
-  "pwa.install": { en: "Install App", bs: "Instaliraj aplikaciju" },
-  "pwa.install.title": {
-    en: "Install Straxor as an app",
-    bs: "Instaliraj Straxor kao aplikaciju",
-  },
+  // ── Install PWA ──
+  "pwa.install": { en: "Install App", sr: "Instaliraj aplikaciju", de: "App installieren", fr: "Installer l'app", es: "Instalar app", it: "Installa app", pt: "Instalar app", nl: "App installeren", pl: "Zainstaluj aplikację", ru: "Установить приложение", uk: "Встановити застосунок", zh: "安装应用", ja: "アプリをインストール", ko: "앱 설치", ar: "تثبيت التطبيق", hi: "ऐप इंस्टॉल करें", tr: "Uygulamayı kur", el: "Εγκατάσταση εφαρμογής", sv: "Installera app", cs: "Nainstalovat aplikaci", da: "Installer app", fi: "Asenna sovellus", no: "Installer app", ro: "Instalează aplicația", hu: "Alkalmazás telepítése", sk: "Nainštalovať aplikáciu", bg: "Инсталиране на приложение"},
+  "pwa.install.title": { en: "Install Straxor as an app", sr: "Instaliraj Straxor kao aplikaciju", de: "Straxor als App installieren", fr: "Installer Straxor en tant qu'app", es: "Instalar Straxor como app", it: "Installa Straxor come app", pt: "Instalar Straxor como app", nl: "Straxor als app installeren", pl: "Zainstaluj Straxor jako aplikację", ru: "Установите Straxor как приложение", uk: "Встановіть Straxor як застосунок", zh: "将 Straxor 安装为应用", ja: "Straxor をアプリとしてインストール", ko: "Straxor를 앱으로 설치", ar: "تثبيت Straxor كتطبيق", hi: "Straxor को ऐप के रूप में इंस्टॉल करें", tr: "Straxor'ı uygulama olarak kur", el: "Εγκατάσταση του Straxor ως εφαρμογή", sv: "Installera Straxor som app", cs: "Nainstalovat Straxor jako aplikaci", da: "Installer Straxor som app", fi: "Asenna Straxor sovelluksena", no: "Installer Straxor som app", ro: "Instalează Straxor ca aplicație", hu: "Straxor telepítése alkalmazásként", sk: "Nainštalovať Straxor ako aplikáciu", bg: "Инсталиране на Straxor като приложение"},
 
-  // ── Chat input / toolbar ──
-  "toolbar.attach": { en: "Add attachment", bs: "Dodaj prilog" },
-  "toolbar.connectVps": { en: "Connect VPS", bs: "Poveži VPS" },
-  "toolbar.connectVpsInfo": {
-    en: "Optional — connect a VPS server to unlock the full agent (files, deploy, todos). Not required to chat.",
-    bs: "Opcionalno — poveži VPS server za puni agent (fajlovi, deploy, zadaci). Nije potrebno za čet.",
-  },
-  "toolbar.githubRepo": { en: "GitHub repo", bs: "GitHub repo" },
-  "toolbar.githubRepoInfo": {
-    en: "Connect GitHub with a token, browse your repositories, create/fork repos and manage PRs and issues.",
-    bs: "Poveži GitHub tokenom, pregledaj svoje repozitorijume, kreiraj/forkuj repo-ove i upravljaj PR-ovima i issue-ima.",
-  },
-  "toolbar.mic": { en: "Microphone", bs: "Mikrofon" },
-  "toolbar.mic.stop": { en: "Stop recording", bs: "Zaustavi snimanje" },
-  "toolbar.mic.recording": { en: "Recording…", bs: "Snimanje…" },
-  "toolbar.mic.processing": { en: "Processing audio…", bs: "Obrada zvuka…" },
-  "toolbar.mic.unsupported": { en: "Speech recognition not supported in this browser", bs: "Prepoznavanje govora nije podržano u ovom pregledniku" },
-  "toolbar.camera": { en: "Camera", bs: "Kamera" },
-  "toolbar.camera.alt": { en: "Camera capture", bs: "Snimanje kamerom" },
-  "toolbar.camera.take": { en: "Capture photo", bs: "Snimi fotografiju" },
-  "toolbar.camera.close": { en: "Close camera", bs: "Zatvori kameru" },
-  "toolbar.file": { en: "File", bs: "Fajl" },
-  "toolbar.image": { en: "Image", bs: "Slika" },
-  "upload.uploading": { en: "Uploading…", bs: "Prijenos…" },
-  "upload.failed": { en: "Upload failed", bs: "Prijenos nije uspio" },
-  "upload.remove": { en: "Remove", bs: "Ukloni" },
-  "upload.reject": { en: "File type not allowed", bs: "Tip datoteke nije dozvoljen" },
-  "upload.camera.error": { en: "Camera unavailable. Check browser permission.", bs: "Kamera nije dostupna. Provjeri dozvolu preglednika." },
-  "upload.mic.error": { en: "Microphone unavailable. Check browser permission.", bs: "Mikrofon nije dostupan. Provjeri dozvolu preglednika." },
-  "upload.attach.hint": { en: "attached", bs: "priloženo" },
-  "toolbar.menu": { en: "Options", bs: "Opcije" },
-  "toolbar.model": { en: "Model", bs: "Model" },
-  "toolbar.modelInfo": { en: "Choose the AI model and sub-model for this panel.", bs: "Izaberi AI model i podmodel za ovaj panel." },
-  "toolbar.prompts": { en: "Prompts & templates", bs: "Promptovi i šabloni" },
-  "toolbar.promptsInfo": { en: "Use predefined prompts and templates, or leave empty for free text.", bs: "Koristi predefinisane promptove i šablone, ili ostavi prazno za slobodan tekst." },
-  "toolbar.cameraInfo": { en: "Capture a photo with your camera and attach it to the message.", bs: "Snimi fotografiju kamerom i priloži je uz poruku." },
-  "toolbar.fileInfo": { en: "Attach a file from your device to the message.", bs: "Priloži fajl sa uređaja uz poruku." },
-  "toolbar.imageInfo": { en: "Attach an image from your device.", bs: "Priloži sliku sa uređaja." },
-  "toolbar.micInfo": { en: "Speak instead of typing. Requires browser permission.", bs: "Diktiraj umjesto kucanja. Zahtijeva dozvolu preglednika." },
-  "toolbar.budget": { en: "Project budget estimate", bs: "Proračun projekta" },
-  "toolbar.budgetInfo": { en: "Optional — rough cost estimate for the project. Never runs automatically.", bs: "Opcionalno — okvirna procjena troškova projekta. Nikad se ne pokreće automatski." },
-  "budget.title": { en: "Project budget estimate", bs: "Proračun projekta" },
-  "budget.desc": { en: "Rough estimate based on the current message or last task.", bs: "Okvirna procjena na osnovu trenutne poruke ili posljednjeg zadatka." },
-  "budget.empty": { en: "Type a message first so we can estimate it.", bs: "Prvo ukucaj poruku da bismo mogli procijeniti." },
-  "budget.cost": { en: "Est. cost", bs: "Proc. trošak" },
-  "budget.tokens": { en: "Tokens", bs: "Tokeni" },
-  "budget.steps": { en: "Steps", bs: "Koraci" },
-  "budget.duration": { en: "Duration", bs: "Trajanje" },
-  "budget.send": { en: "Send detailed budget request", bs: "Pošalji detaljan zahtjev za proračun" },
-  "budget.close": { en: "Close", bs: "Zatvori" },
-  "agent.panel1": { en: "Ask", bs: "Ask" },
-  "agent.panel2": { en: "Agent", bs: "Agent" },
-  "chat.copy.other": { en: "Copy to other panel", bs: "Kopiraj u drugi panel" },
-  "chat.placeholder": {
-    en: "Ask Straxor anything...",
-    bs: "Pitajte Straxor bilo šta...",
-  },
-  "chat.placeholder.plan": {
-    en: "Describe your feature request...",
-    bs: "Opišite zahtjev za funkcionalnost...",
-  },
-  "chat.steer.placeholder": {
-    en: "Instruction for the active agent...",
-    bs: "Instrukcija za aktivnog agenta...",
-  },
-  "chat.steer.active": {
-    en: "Agent is active — send an instruction to steer",
-    bs: "Agent je aktivan — pošalji instrukciju za preusmjeravanje",
-  },
-  "chat.background.on": {
-    en: "Background execution on",
-    bs: "Rad u pozadini uključen",
-  },
-  "chat.background.off": {
-    en: "Background execution off",
-    bs: "Rad u pozadini isključen",
-  },
-  "chat.background.hint": {
-    en: "Run the agent server-side and poll progress — works when the tab/app is in the background",
-    bs: "Agent radi server-side, progres se prati pollingom — radi i kad je tab/aplikacija u pozadini",
-  },
-  "chat.plan.title": {
-    en: "Plan Preview",
-    bs: "Pregled plana",
-  },
-  "chat.copy.agent": {
-    en: "Copy to Agent",
-    bs: "Kopiraj u Agent",
-  },
-  "chat.copy.ask": {
-    en: "Copy to Ask",
-    bs: "Kopiraj u Ask",
-  },
-  "chat.ask.any": { en: "Ask anything...", bs: "Pitaj bilo šta..." },
-  "chat.ask.noKey": {
-    en: "Enter an API key first...",
-    bs: "Prvo unesi API key...",
-  },
-  "chat.agent.command": {
-    en: "Tell the agent what to do...",
-    bs: "Naredi agentu šta da napravi...",
-  },
-  "chat.agent.connect": {
-    en: "Connect a VPS to use the Agent...",
-    bs: "Poveži VPS za agenta...",
-  },
-  "chat.steer.steps": {
-    en: "Agent is executing {n} steps — send an instruction",
-    bs: "Agent izvršava {n} koraka — pošalji instrukciju",
-  },
-  "chat.steer.sent": {
-    en: "Instruction sent to the agent.",
-    bs: "Instrukcija poslana agentu. Agent nastavlja sa smjernicama.",
-  },
-  "chat.steer.error": {
-    en: "Failed to send instruction to the agent.",
-    bs: "Slanje instrukcije agentu nije uspjelo.",
-  },
+  // ── Toolbar / chat ──
+  "toolbar.attach": { en: "Add attachment", sr: "Dodaj prilog", de: "Anhang hinzufügen", fr: "Ajouter une pièce jointe", es: "Añadir adjunto", it: "Aggiungi allegato", pt: "Adicionar anexo", nl: "Bijlage toevoegen", pl: "Dodaj załącznik", ru: "Добавить вложение", uk: "Додати вкладення", zh: "添加附件", ja: "添付ファイルを追加", ko: "첨부 추가", ar: "إضافة مرفق", hi: "अटैचमेंट जोड़ें", tr: "Ek ekle", el: "Προσθήκη συνημμένου", sv: "Lägg till bilaga", cs: "Přidat přílohu", da: "Tilføj vedhæftning", fi: "Lisää liite", no: "Legg til vedlegg", ro: "Adaugă atașament", hu: "Melléklet hozzáadása", sk: "Pridať prílohu", bg: "Добави прикачен файл"},
+  "toolbar.connectVps": { en: "Connect VPS", sr: "Poveži VPS", de: "VPS verbinden", fr: "Connecter VPS", es: "Conectar VPS", it: "Connetti VPS", pt: "Conectar VPS", nl: "VPS verbinden", pl: "Połącz VPS", ru: "Подключить VPS", uk: "Підключити VPS", zh: "连接 VPS", ja: "VPS に接続", ko: "VPS 연결", ar: "الاتصال بـ VPS", hi: "VPS कनेक्ट करें", tr: "VPS bağla", el: "Σύνδεση VPS", sv: "Anslut VPS", cs: "Připojit VPS", da: "Tilslut VPS", fi: "Yhdistä VPS", no: "Koble til VPS", ro: "Conectează VPS", hu: "VPS csatlakoztatása", sk: "Pripojiť VPS", bg: "Свържи VPS"},
+  "toolbar.connectVpsInfo": { en: "Optional — connect a VPS server to unlock the full agent (files, deploy, todos). Not required to chat.", sr: "Opcionalno — poveži VPS server za puni agent (fajlovi, deploy, zadaci). Nije potrebno za čet.", de: "Optional — verbinden Sie einen VPS-Server, um den vollen Agenten (Dateien, Deploy, Aufgaben) freizuschalten. Zum Chatten nicht nötig.", fr: "Optionnel — connectez un serveur VPS pour débloquer l'agent complet (fichiers, déploiement, tâches). Non requis pour discuter.", es: "Opcional — conecta un servidor VPS para desbloquear el agente completo (archivos, deploy, tareas). No es necesario para chatear.", it: "Opzionale — collega un server VPS per sbloccare l'agente completo (file, deploy, attività). Non necessario per chattare.", pt: "Opcional — conecte um servidor VPS para desbloquear o agente completo (arquivos, deploy, tarefas). Não é necessário para conversar.", nl: "Optioneel — verbind een VPS-server om de volledige agent (bestanden, deploy, taken) te ontgrendelen. Niet nodig om te chatten.", pl: "Opcjonalnie — podłącz serwer VPS, aby odblokować pełnego agenta (pliki, wdrożenie, zadania). Niewymagane do czatu.", ru: "Необязательно — подключите VPS-сервер, чтобы разблокировать полного агента (файлы, деплой, задачи). Для чата не требуется.", uk: "Необов'язково — підключіть VPS-сервер, щоб розблокувати повного агента (файли, деплой, завдання). Для чату не потрібно.", zh: "可选 — 连接 VPS 服务器以解锁完整代理（文件、部署、任务）。聊天不需要。", ja: "任意 — VPSサーバーを接続して完全なエージェント（ファイル、デプロイ、タスク）を有効化。チャットには不要。", ko: "선택 — 전체 에이전트(파일, 배포, 작업)를 잠금 해제하려면 VPS 서버를 연결하세요. 채팅에는 필요 없습니다.", ar: "اختياري — قم بتوصيل خادم VPS لفتح الوكيل الكامل (ملفات، نشر، مهام). غير مطلوب للدردشة.", hi: "वैकल्पिक — पूर्ण एजेंट (फाइलें, डिप्लॉय, कार्य) अनलॉक करने के लिए VPS सर्वर कनेक्ट करें। चैट के लिए आवश्यक नहीं।", tr: "İsteğe bağlı — tam aracıyı (dosyalar, deploy, görevler) açmak için bir VPS sunucusu bağlayın. Sohbet için gerekli değil.", el: "Προαιρετικό — συνδέστε έναν διακομιστή VPS για να ξεκλειδώσετε τον πλήρη πράκτορα (αρχεία, ανάπτυξη, εργασίες). Δεν απαιτείται για συνομιλία.", sv: "Valfritt — anslut en VPS-server för att låsa upp den fulla agenten (filer, deploy, uppgifter). Krävs inte för chatt." },
+  "toolbar.githubRepo": { en: "GitHub repo", sr: "GitHub repo", de: "GitHub-Repo", fr: "Dépôt GitHub", es: "Repositorio GitHub", it: "Repo GitHub", pt: "Repositório GitHub", nl: "GitHub-repo", pl: "Repo GitHub", ru: "Репозиторий GitHub", uk: "Репозиторій GitHub", zh: "GitHub 仓库", ja: "GitHub リポジトリ", ko: "GitHub 저장소", ar: "مستودع GitHub", hi: "GitHub रेपो", tr: "GitHub deposu", el: "Αποθετήριο GitHub", sv: "GitHub-repo" },
+  "toolbar.githubRepoInfo": { en: "Connect GitHub with a token, browse your repositories, create/fork repos and manage PRs and issues.", sr: "Poveži GitHub tokenom, pregledaj svoje repozitorijume, kreiraj/forkuj repo-ove i upravljaj PR-ovima i issue-ima.", de: "Verbinden Sie GitHub mit einem Token, durchsuchen Sie Ihre Repos, erstellen/forken Sie Repos und verwalten Sie PRs und Issues.", fr: "Connectez GitHub avec un token, parcourez vos dépôts, créez/forkez des dépôts et gérez les PR et issues.", es: "Conecta GitHub con un token, explora tus repositorios, crea/haz fork de repos y gestiona PR e issues.", it: "Collega GitHub con un token, sfoglia i tuoi repository, crea/forka repo e gestisci PR e issue.", pt: "Conecte o GitHub com um token, navegue pelos repositórios, crie/faça fork e gerencie PRs e issues.", nl: "Verbind GitHub met een token, blader door je repositories, maak/fork repos en beheer PR's en issues.", pl: "Połącz GitHub tokenem, przeglądaj repozytoria, twórz/forkuj repo i zarządzaj PR-ami i issue'ami.", ru: "Подключите GitHub с токеном, просматривайте репозитории, создавайте/форкайте и управляйте PR и issues.", uk: "Підключіть GitHub з токеном, переглядайте репозиторії, створюйте/форкайте та керуйте PR та issues.", zh: "使用令牌连接 GitHub，浏览你的仓库，创建/分叉仓库并管理 PR 和 Issue。", ja: "トークンで GitHub に接続し、リポジトリを閲覧、作成/フォーク、PR と issue を管理。", ko: "토큰으로 GitHub에 연결하고 저장소를 탐색하며 만들고/포크하고 PR과 이슈를 관리하세요.", ar: "اربط GitHub برمز، وتصفح مستودعاتك، وأنشئ/انشئ فرعًا للمستودعات، وأدر الطلبات والمشكلات.", hi: "टोकन के साथ GitHub कनेक्ट करें, अपने रेपो ब्राउज़ करें, बनाएं/फोर्क करें और PR व इश्यू प्रबंधित करें।", tr: "GitHub'ı bir token ile bağlayın, depolarınıza göz atın, oluşturun/fork'layın ve PR ile issue'ları yönetin.", el: "Συνδέστε το GitHub με ένα token, περιηγηθείτε στα αποθετήριά σας, δημιουργήστε/κάντε fork και διαχειριστείτε PR και issues.", sv: "Anslut GitHub med en token, bläddra bland dina repos, skapa/forka repos och hantera PR:er och issues." },
+  "toolbar.mic": { en: "Microphone", sr: "Mikrofon", de: "Mikrofon", fr: "Microphone", es: "Micrófono", it: "Microfono", pt: "Microfone", nl: "Microfoon", pl: "Mikrofon", ru: "Микрофон", uk: "Мікрофон", zh: "麦克风", ja: "マイク", ko: "마이크", ar: "ميكروفون", hi: "माइक्रोफ़ोन", tr: "Mikrofon", el: "Μικρόφωνο", sv: "Mikrofon" },
+  "toolbar.mic.stop": { en: "Stop recording", sr: "Zaustavi snimanje", de: "Aufnahme stoppen", fr: "Arrêter l'enregistrement", es: "Detener grabación", it: "Interrompi registrazione", pt: "Parar gravação", nl: "Opname stoppen", pl: "Zatrzymaj nagrywanie", ru: "Остановить запись", uk: "Зупинити запис", zh: "停止录音", ja: "録音停止", ko: "녹음 중지", ar: "إيقاف التسجيل", hi: "रिकॉर्डिंग रोकें", tr: "Kaydı durdur", el: "Διακοπή εγγραφής", sv: "Stoppa inspelning" },
+  "toolbar.mic.recording": { en: "Recording…", sr: "Snimanje…", de: "Aufnahme…", fr: "Enregistrement…", es: "Grabando…", it: "Registrando…", pt: "Gravando…", nl: "Opname…", pl: "Nagrywanie…", ru: "Запись…", uk: "Запис…", zh: "录音中…", ja: "録音中…", ko: "녹음 중…", ar: "جارٍ التسجيل…", hi: "रिकॉर्ड हो रहा है…", tr: "Kaydediliyor…", el: "Εγγραφή…", sv: "Inspelning…" },
+  "toolbar.camera": { en: "Camera", sr: "Kamera", de: "Kamera", fr: "Caméra", es: "Cámara", it: "Fotocamera", pt: "Câmera", nl: "Camera", pl: "Aparat", ru: "Камера", uk: "Камера", zh: "相机", ja: "カメラ", ko: "카메라", ar: "كاميرا", hi: "कैमरा", tr: "Kamera", el: "Κάμερα", sv: "Kamera" },
+  "toolbar.camera.alt": { en: "Camera capture", sr: "Snimanje kamerom", de: "Kameraaufnahme", fr: "Capture caméra", es: "Captura de cámara", it: "Scatto fotocamera", pt: "Captura de câmera", nl: "Cameracaptuur", pl: "Ujęcie kamerą", ru: "Съёмка камерой", uk: "Зйомка камерою", zh: "相机拍摄", ja: "カメラ撮影", ko: "카메라 촬영", ar: "التقاط بالكاميرا", hi: "कैमरा कैप्चर", tr: "Kamera çekimi", el: "Λήψη κάμερας", sv: "Kamerafångst" },
+  "toolbar.camera.take": { en: "Capture photo", sr: "Snimi fotografiju", de: "Foto aufnehmen", fr: "Prendre une photo", es: "Tomar foto", it: "Scatta foto", pt: "Tirar foto", nl: "Foto maken", pl: "Zrób zdjęcie", ru: "Сфотографировать", uk: "Сфотографувати", zh: "拍照", ja: "写真を撮る", ko: "사진 촬영", ar: "التقاط صورة", hi: "फोटो लें", tr: "Fotoğraf çek", el: "Λήψη φωτογραφίας", sv: "Ta foto" },
+  "toolbar.camera.close": { en: "Close camera", sr: "Zatvori kameru", de: "Kamera schließen", fr: "Fermer la caméra", es: "Cerrar cámara", it: "Chiudi fotocamera", pt: "Fechar câmera", nl: "Camera sluiten", pl: "Zamknij aparat", ru: "Закрыть камеру", uk: "Закрити камеру", zh: "关闭相机", ja: "カメラを閉じる", ko: "카메라 닫기", ar: "إغلاق الكاميرا", hi: "कैमरा बंद करें", tr: "Kamerayı kapat", el: "Κλείσιμο κάμερας", sv: "Stäng kamera" },
+  "toolbar.file": { en: "File", sr: "Fajl", de: "Datei", fr: "Fichier", es: "Archivo", it: "File", pt: "Arquivo", nl: "Bestand", pl: "Plik", ru: "Файл", uk: "Файл", zh: "文件", ja: "ファイル", ko: "파일", ar: "ملف", hi: "फ़ाइल", tr: "Dosya", el: "Αρχείο", sv: "Fil" },
+  "toolbar.image": { en: "Image", sr: "Slika", de: "Bild", fr: "Image", es: "Imagen", it: "Immagine", pt: "Imagem", nl: "Afbeelding", pl: "Obraz", ru: "Изображение", uk: "Зображення", zh: "图片", ja: "画像", ko: "이미지", ar: "صورة", hi: "छवि", tr: "Görsel", el: "Εικόνα", sv: "Bild" },
+  "toolbar.menu": { en: "Options", sr: "Opcije", de: "Optionen", fr: "Options", es: "Opciones", it: "Opzioni", pt: "Opções", nl: "Opties", pl: "Opcje", ru: "Параметры", uk: "Параметри", zh: "选项", ja: "オプション", ko: "옵션", ar: "خيارات", hi: "विकल्प", tr: "Seçenekler", el: "Επιλογές", sv: "Alternativ" },
+  "toolbar.model": { en: "Model", sr: "Model", de: "Modell", fr: "Modèle", es: "Modelo", it: "Modello", pt: "Modelo", nl: "Model", pl: "Model", ru: "Модель", uk: "Модель", zh: "模型", ja: "モデル", ko: "모델", ar: "نموذج", hi: "मॉडल", tr: "Model", el: "Μοντέλο", sv: "Modell" },
+  "toolbar.prompts": { en: "Prompts & templates", sr: "Promptovi i šabloni", de: "Prompts & Vorlagen", fr: "Prompts & modèles", es: "Prompts y plantillas", it: "Prompt e modelli", pt: "Prompts e modelos", nl: "Prompts & sjablonen", pl: "Prompty i szablony", ru: "Промпты и шаблоны", uk: "Промпти та шаблони", zh: "提示词和模板", ja: "プロンプトとテンプレート", ko: "프롬프트 및 템플릿", ar: "الموجهات والقوالب", hi: "प्रॉम्प्ट और टेम्पलेट", tr: "Promptlar ve şablonlar", el: "Προτροπές και πρότυπα", sv: "Prompts och mallar" },
+  "toolbar.budget": { en: "Project budget estimate", sr: "Proračun projekta", de: "Projektbudget-Schätzung", fr: "Estimation du budget projet", es: "Estimación de presupuesto", it: "Stima budget progetto", pt: "Estimativa de orçamento", nl: "Projectbudget schatting", pl: "Szacunek budżetu projektu", ru: "Оценка бюджета проекта", uk: "Оцінка бюджету проекту", zh: "项目预算估算", ja: "プロジェクト予算の見積もり", ko: "프로젝트 예산 추정", ar: "تقدير ميزانية المشروع", hi: "प्रोजेक्ट बजट अनुमान", tr: "Proje bütçe tahmini", el: "Εκτίμηση προϋπολογισμού έργου", sv: "Projektbudget uppskattning" },
+  "toolbar.micInfo": { en: "Speak instead of typing. Requires browser permission.", sr: "Diktiraj umjesto kucanja. Zahtijeva dozvolu preglednika.", de: "Sprechen statt Tippen. Erfordert Browserberechtigung.", fr: "Parlez au lieu de taper. Nécessite la permission du navigateur.", es: "Habla en lugar de escribir. Requiere permiso del navegador.", it: "Parla invece di digitare. Richiede il permesso del browser.", pt: "Fale em vez de digitar. Requer permissão do navegador.", nl: "Spreek in plaats van typen. Vereist browserrechten.", pl: "Mów zamiast pisać. Wymaga uprawnień przeglądarki.", ru: "Говорите вместо ввода. Требуется разрешение браузера.", uk: "Говоріть замість вводу. Потрібен дозвіл браузера.", zh: "用语音代替输入。需要浏览器权限。", ja: "入力の代わりに話す。ブラウザの許可が必要。", ko: "입력 대신 말하세요. 브라우저 권한이 필요합니다.", ar: "تحدث بدلاً من الكتابة. يتطلب إذن المتصفح.", hi: "टाइप करने के बजाय बोलें। ब्राउज़र अनुमति आवश्यक है।", tr: "Yazmak yerine konuşun. Tarayıcı izni gerektirir.", el: "Μιλήστε αντί να πληκτρολογείτε. Απαιτεί άδεια του προγράμματος περιήγησης.", sv: "Tala istället för att skriva. Kräver webbläsarbehörighet." },
+  "upload.uploading": { en: "Uploading…", sr: "Prijenos…", de: "Hochladen…", fr: "Téléversement…", es: "Subiendo…", it: "Caricamento…", pt: "Enviando…", nl: "Uploaden…", pl: "Przesyłanie…", ru: "Загрузка…", uk: "Завантаження…", zh: "上传中…", ja: "アップロード中…", ko: "업로드 중…", ar: "جارٍ الرفع…", hi: "अपलोड हो रहा है…", tr: "Yükleniyor…", el: "Μεταφόρτωση…", sv: "Laddar upp…" },
+  "upload.failed": { en: "Upload failed", sr: "Prijenos nije uspio", de: "Upload fehlgeschlagen", fr: "Échec du téléversement", es: "Error al subir", it: "Caricamento fallito", pt: "Falha no envio", nl: "Upload mislukt", pl: "Przesyłanie nie powiodło się", ru: "Не удалось загрузить", uk: "Не вдалося завантажити", zh: "上传失败", ja: "アップロード失敗", ko: "업로드 실패", ar: "فشل الرفع", hi: "अपलोड विफल", tr: "Yükleme başarısız", el: "Η μεταφόρτωση απέτυχε", sv: "Uppladdning misslyckades" },
+  "upload.remove": { en: "Remove", sr: "Ukloni", de: "Entfernen", fr: "Retirer", es: "Quitar", it: "Rimuovi", pt: "Remover", nl: "Verwijderen", pl: "Usuń", ru: "Удалить", uk: "Прибрати", zh: "移除", ja: "削除", ko: "제거", ar: "إزالة", hi: "हटाएं", tr: "Kaldır", el: "Αφαίρεση", sv: "Ta bort" },
+  "upload.reject": { en: "File type not allowed", sr: "Tip datoteke nije dozvoljen", de: "Dateityp nicht erlaubt", fr: "Type de fichier non autorisé", es: "Tipo de archivo no permitido", it: "Tipo di file non consentito", pt: "Tipo de arquivo não permitido", nl: "Bestandstype niet toegestaan", pl: "Typ pliku niedozwolony", ru: "Тип файла не разрешён", uk: "Тип файлу не дозволено", zh: "不允许的文件类型", ja: "許可されないファイルタイプ", ko: "허용되지 않는 파일 형식", ar: "نوع الملف غير مسموح", hi: "फ़ाइल प्रकार अनुमति नहीं", tr: "Dosya türüne izin verilmiyor", el: "Ο τύπος αρχείου δεν επιτρέπεται", sv: "Filtyp ej tillåten" },
+  "toolbar.cameraInfo": { en: "Capture a photo with your camera and attach it to the message.", sr: "Snimi fotografiju kamerom i priloži je uz poruku.", de: "Fotografieren Sie mit Ihrer Kamera und fügen Sie es der Nachricht hinzu.", fr: "Prenez une photo avec votre caméra et joignez-la au message.", es: "Toma una foto con tu cámara y adjúntala al mensaje.", it: "Scatta una foto con la fotocamera e allegala al messaggio.", pt: "Tire uma foto com sua câmera e anexe à mensagem.", nl: "Maak een foto met je camera en voeg die toe aan het bericht.", pl: "Zrób zdjęcie aparatem i dodaj je do wiadomości.", ru: "Сфотографируйте камерой и прикрепите к сообщению.", uk: "Сфотографуйте камерою та додайте до повідомлення.", zh: "用相机拍照并附加到消息中。", ja: "カメラで写真を撮り、メッセージに添付します。", ko: "카메라로 사진을 찍어 메시지에 첨부하세요.", ar: "التقط صورة بكاميرتك وأرفقها بالرسالة.", hi: "अपने कैमरे से फोटो लें और संदेश में संलग्न करें।", tr: "Kameranızla fotoğraf çekin ve mesaja ekleyin.", el: "Τραβήξτε φωτογραφία με την κάμερά σας και επισυνάψτε την στο μήνυμα.", sv: "Ta ett foto med kameran och bifoga det till meddelandet." },
+  "toolbar.fileInfo": { en: "Attach a file from your device to the message.", sr: "Priloži fajl sa uređaja uz poruku.", de: "Fügen Sie eine Datei von Ihrem Gerät zur Nachricht hinzu.", fr: "Joignez un fichier de votre appareil au message.", es: "Adjunta un archivo de tu dispositivo al mensaje.", it: "Allega un file dal tuo dispositivo al messaggio.", pt: "Anexe um arquivo do seu dispositivo à mensagem.", nl: "Voeg een bestand van je apparaat toe aan het bericht.", pl: "Dodaj plik ze swojego urządzenia do wiadomości.", ru: "Прикрепите файл с устройства к сообщению.", uk: "Додайте файл із пристрою до повідомлення.", zh: "将设备中的文件附加到消息。", ja: "デバイスからファイルをメッセージに添付します。", ko: "기기에서 파일을 메시지에 첨부하세요.", ar: "أرفق ملفًا من جهازك بالرسالة.", hi: "अपने डिवाइस से फ़ाइल को संदेश में संलग्न करें।", tr: "Cihazınızdan mesaja bir dosya ekleyin.", el: "Επισυνάψτε ένα αρχείο από τη συσκευή σας στο μήνυμα.", sv: "Bifoga en fil från din enhet till meddelandet." },
+  "toolbar.imageInfo": { en: "Attach an image from your device.", sr: "Priloži sliku sa uređaja.", de: "Fügen Sie ein Bild von Ihrem Gerät hinzu.", fr: "Joignez une image de votre appareil.", es: "Adjunta una imagen de tu dispositivo.", it: "Allega un'immagine dal tuo dispositivo.", pt: "Anexe uma imagem do seu dispositivo.", nl: "Voeg een afbeelding van je apparaat toe.", pl: "Dodaj obraz ze swojego urządzenia.", ru: "Прикрепите изображение с устройства.", uk: "Додайте зображення з пристрою.", zh: "附加设备中的图片。", ja: "デバイスから画像を添付します。", ko: "기기에서 이미지를 첨부하세요.", ar: "أرفق صورة من جهازك.", hi: "अपने डिवाइस से एक छवि संलग्न करें।", tr: "Cihazınızdan bir görsel ekleyin.", el: "Επισυνάψτε μια εικόνα από τη συσκευή σας.", sv: "Bifoga en bild från din enhet." },
 
-  // ── Welcome / prompt hero ──
-  "welcome.title": {
-    en: "What will you build today?",
-    bs: "Šta ćete danas napraviti?",
-  },
-  "welcome.subtitle": {
-    en: "Describe what you want to create and Straxor will build it for you.",
-    bs: "Opišite šta želite da napravite, a Straxor će to izgraditi za vas.",
-  },
-  "welcome.placeholder": {
-    en: "e.g. Build a responsive landing page with a booking form...",
-    bs: "npr. Napravi responzivnu landing stranicu sa formom za rezervacije...",
-  },
-  "welcome.startFrom": {
-    en: "or start from",
-    bs: "ili počni od",
-  },
-  "welcome.pillFigma": { en: "Figma", bs: "Figma" },
-  "welcome.pillTemplate": {
-    en: "Team template",
-    bs: "Timski šablon",
-  },
-  "welcome.model": {
-    en: "Choose model",
-    bs: "Izaberi model",
-  },
-  "welcome.ideas": {
-    en: "Ideas & templates",
-    bs: "Ideje i šabloni",
-  },
-  "welcome.send": { en: "Send", bs: "Pošalji" },
+  // ── Welcome ──
+  "welcome.title": { en: "What will you build today?", sr: "Šta ćete danas napraviti?", de: "Was werden Sie heute bauen?", fr: "Que voulez-vous construire aujourd'hui ?", es: "¿Qué vas a construir hoy?", it: "Cosa costruirai oggi?", pt: "O que você vai construir hoje?", nl: "Wat ga je vandaag bouwen?", pl: "Co dziś zbudujesz?", ru: "Что вы построите сегодня?", uk: "Що ви сьогодні збудуєте?", zh: "今天要构建什么？", ja: "今日は何を作りますか？", ko: "오늘 무엇을 만드시겠어요?", ar: "ماذا ستبني اليوم؟", hi: "आज आप क्या बनाएंगे?", tr: "Bugün ne inşa edeceksiniz?", el: "Τι θα φτιάξετε σήμερα;", sv: "Vad ska du bygga idag?" },
+  "welcome.subtitle": { en: "Describe what you want to create and Straxor will build it for you.", sr: "Opišite šta želite da napravite, a Straxor će to izgraditi za vas.", de: "Beschreiben Sie, was Sie erstellen möchten, und Straxor baut es für Sie.", fr: "Décrivez ce que vous voulez créer et Straxor le construira pour vous.", es: "Describe lo que quieres crear y Straxor lo construirá por ti.", it: "Descrivi cosa vuoi creare e Straxor lo costruirà per te.", pt: "Descreva o que você quer criar e o Straxor construirá para você.", nl: "Beschrijf wat je wilt maken en Straxor bouwt het voor je.", pl: "Opisz, co chcesz stworzyć, a Straxor to zbuduje.", ru: "Опишите, что вы хотите создать, и Straxor создаст это для вас.", uk: "Опишіть, що ви хочете створити, і Straxor збудує це для вас.", zh: "描述你想创建的内容，Straxor 会为你构建。", ja: "作成したい内容を説明すると、Straxor が構築します。", ko: "만들고 싶은 것을 설명하면 Straxor가 만들어 드립니다.", ar: "صف ما تريد إنشاءه وسيبني لك Straxor.", hi: "आप जो बनाना चाहते हैं उसका वर्णन करें और Straxor इसे बनाएगा।", tr: "Ne oluşturmak istediğinizi açıklayın, Straxor sizin için inşa etsin.", el: "Περιγράψτε τι θέλετε να δημιουργήσετε και το Straxor θα το φτιάξει για εσάς.", sv: "Beskriv vad du vill skapa så bygger Straxor det åt dig." },
+  "welcome.placeholder": { en: "e.g. Build a responsive landing page with a booking form...", sr: "npr. Napravi responzivnu landing stranicu sa formom za rezervacije...", de: "z. B. Erstellen Sie eine responsive Landingpage mit Buchungsformular...", fr: "ex. Créez une page d'atterrissage responsive avec un formulaire de réservation...", es: "p. ej. Crea una landing page responsive con formulario de reserva...", it: "es. Crea una landing page responsive con modulo di prenotazione...", pt: "ex. Crie uma landing page responsiva com formulário de reserva...", nl: "bijv. Maak een responsieve landingspagina met een boekingsformulier...", pl: "np. Zbuduj responsywną stronę docelową z formularzem rezerwacji...", ru: "напр. Создайте адаптивный лендинг с формой бронирования...", uk: "напр. Створіть адаптивну лендінг-сторінку з формою бронювання...", zh: "例如：构建一个带预订表单的响应式落地页...", ja: "例：予約フォーム付きのレスポンシブランディングページを構築...", ko: "예: 예약 양식이 있는 반응형 랜딩 페이지 만들기...", ar: "مثال: أنشئ صفحة هبوط متجاوبة مع نموذج حجز...", hi: "जैसे: बुकिंग फॉर्म के साथ रिस्पॉन्सिव लैंडिंग पेज बनाएं...", tr: "örn. Rezervasyon formlu duyarlı bir açılış sayfası oluşturun...", el: "π.χ. Δημιουργήστε μια προσαρμοστική σελίδα προορισμού με φόρμα κράτησης...", sv: "t.ex. Bygg en responsiv landningssida med bokningsformulär..." },
+  "welcome.startFrom": { en: "or start from", sr: "ili počni od", de: "oder starten Sie von", fr: "ou commencez à partir de", es: "o empieza desde", it: "o inizia da", pt: "ou comece a partir de", nl: "of begin vanaf", pl: "lub zacznij od", ru: "или начните с", uk: "або почніть з", zh: "或从以下开始", ja: "または以下から開始", ko: "또는 다음에서 시작", ar: "أو ابدأ من", hi: "या यहाँ से शुरू करें", tr: "veya şuradan başlayın", el: "ή ξεκινήστε από", sv: "eller börja från" },
+  "welcome.pillFigma": { en: "Figma", sr: "Figma", de: "Figma", fr: "Figma", es: "Figma", it: "Figma", pt: "Figma", nl: "Figma", pl: "Figma", ru: "Figma", uk: "Figma", zh: "Figma", ja: "Figma", ko: "Figma", ar: "Figma", hi: "Figma", tr: "Figma", el: "Figma", sv: "Figma" },
+  "welcome.pillTemplate": { en: "Team template", sr: "Timski šablon", de: "Teamvorlage", fr: "Modèle d'équipe", es: "Plantilla de equipo", it: "Modello team", pt: "Modelo de equipe", nl: "Teamsjabloon", pl: "Szablon zespołu", ru: "Шаблон команды", uk: "Шаблон команди", zh: "团队模板", ja: "チームテンプレート", ko: "팀 템플릿", ar: "قالب الفريق", hi: "टीम टेम्पलेट", tr: "Ekip şablonu", el: "Πρότυπο ομάδας", sv: "Teammall" },
+  "welcome.model": { en: "Choose model", sr: "Izaberi model", de: "Modell wählen", fr: "Choisir le modèle", es: "Elegir modelo", it: "Scegli modello", pt: "Escolher modelo", nl: "Kies model", pl: "Wybierz model", ru: "Выбрать модель", uk: "Вибрати модель", zh: "选择模型", ja: "モデルを選択", ko: "모델 선택", ar: "اختيار النموذج", hi: "मॉडल चुनें", tr: "Model seç", el: "Επιλογή μοντέλου", sv: "Välj modell" },
+  "welcome.ideas": { en: "Ideas & templates", sr: "Ideje i šabloni", de: "Ideen & Vorlagen", fr: "Idées & modèles", es: "Ideas y plantillas", it: "Idee e modelli", pt: "Ideias e modelos", nl: "Ideeën & sjablonen", pl: "Pomysły i szablony", ru: "Идеи и шаблоны", uk: "Ідеї та шаблони", zh: "想法和模板", ja: "アイデアとテンプレート", ko: "아이디어 및 템플릿", ar: "أفكار وقوالب", hi: "विचार और टेम्पलेट", tr: "Fikirler ve şablonlar", el: "Ιδέες και πρότυπα", sv: "Idéer och mallar" },
+  "welcome.send": { en: "Send", sr: "Pošalji", de: "Senden", fr: "Envoyer", es: "Enviar", it: "Invia", pt: "Enviar", nl: "Verzenden", pl: "Wyślij", ru: "Отправить", uk: "Надіслати", zh: "发送", ja: "送信", ko: "보내기", ar: "إرسال", hi: "भेजें", tr: "Gönder", el: "Αποστολή", sv: "Skicka" },
 
-  // ── Model picker ──
-  "models.title": { en: "Select Model", bs: "Odaberi model" },
-  "models.search": { en: "Search models...", bs: "Pretraži modele..." },
-  "models.provider": { en: "Provider", bs: "Provajder" },
-  "models.thinking": { en: "Thinking budget", bs: "Budget razmišljanja" },
-  "models.setup": {
-    en: "Set up API key",
-    bs: "Postavi API ključ",
-  },
-  "models.addKey": { en: "Add key", bs: "Dodaj key" },
-  "models.addApiKey": { en: "Add API key", bs: "Dodaj API ključ" },
-  "models.keyReady": { en: "Key configured", bs: "Ključ konfigurisan" },
-  "models.keyNeeded": { en: "API key required", bs: "API ključ je potreban" },
-  "models.keyOpenRouterPrefix": {
-    en: "OpenRouter keys start with sk-or-v1-",
-    bs: "OpenRouter ključevi počinju sa sk-or-v1-",
-  },
-  "models.keyTooShort": {
-    en: "Key is too short",
-    bs: "Ključ je prekratak",
-  },
-  "models.keyPlaceholder": {
-    en: "Paste {provider} API key...",
-    bs: "Zalijepi {provider} API ključ...",
-  },
-  "models.enabled": { en: "Enabled", bs: "Omogućeno" },
-  "models.notConfigured": { en: "Not configured", bs: "Nije konfigurisano" },
-  "models.count": { en: "{n} models", bs: "{n} modela" },
-  "models.noResults": { en: "No results", bs: "Nema rezultata" },
-  "models.pickerTitle": {
-    en: "Model picker (full catalog)",
-    bs: "Model picker (kompletan katalog)",
-  },
-  "models.modalTitle": {
-    en: "{title} — model picker",
-    bs: "{title} — odabir modela",
-  },
-  "panel.expand.exit": {
-    en: "Exit fullscreen (Esc)",
-    bs: "Izađi iz punog ekrana (Esc)",
-  },
-  "panel.expand.enter": {
-    en: "Expand to fullscreen",
-    bs: "Proširi na puni ekran",
-  },
-  "zoom.title": { en: "Panel zoom", bs: "Zoom panela" },
-  "zoom.decrease": { en: "Zoom out", bs: "Smanji zoom" },
-  "zoom.increase": { en: "Zoom in", bs: "Povećaj zoom" },
-  "zoom.presets": { en: "Preset size", bs: "Predložena veličina" },
-  "zoom.reset": { en: "Reset to 100%", bs: "Vrati na 100%" },
-  "zoom.tiny": { en: "Very small", bs: "Skroz mali" },
-  "zoom.small": { en: "Small", bs: "Mali" },
-  "zoom.medium": { en: "Medium", bs: "Srednji" },
-  "zoom.large": { en: "Large", bs: "Veliki" },
-  "zoom.xlarge": { en: "Extra large", bs: "Ekstra veliki" },
-  "vzoom.title": { en: "Vertical zoom", bs: "Vertikalni zoom" },
-  "vzoom.squeeze": { en: "Squeeze", bs: "Stisnuto" },
-  "vzoom.compact": { en: "Compact", bs: "Kompaktno" },
-  "vzoom.normal": { en: "Normal", bs: "Normalno" },
-  "vzoom.tall": { en: "Tall", bs: "Visoko" },
-  "vzoom.full": { en: "Full", bs: "Puno" },
-  "panelMenu.title": { en: "Panel settings", bs: "Podešavanja panela" },
-  "panelMenu.theme": { en: "Theme", bs: "Tema" },
-  "panelMenu.panelAccent": { en: "Panel accent", bs: "Boja panela" },
-  "panelMenu.orchestrator": { en: "Orchestrator", bs: "Orkestar" },
-  "panelMenu.orchestratorEmpty": { en: "Select 2+ models for parallel execution", bs: "Odaberi 2+ modela za paralelno izvršavanje" },
-  "panelMenu.role": { en: "Agent role", bs: "Uloga agenta" },
-  "panelMenu.model": { en: "Choose model", bs: "Izaberi model" },
-  "panelMenu.prompts": { en: "Ideas & templates", bs: "Ideje i šabloni" },
-  "panelMenu.gitOpen": { en: "Git platforms", bs: "Git platforme" },
-  "panelMenu.gitActivate": { en: "Activate this token", bs: "Aktiviraj ovaj token" },
-  "panelMenu.gitRename": { en: "Rename", bs: "Preimenuj" },
-  "panelMenu.gitDelete": { en: "Delete", bs: "Obriši" },
-  "panelMenu.gitAdd": { en: "Add token", bs: "Dodaj token" },
-  "panelMenu.gitName": { en: "Label (e.g. Work / Personal)", bs: "Naziv (npr. Posao / Osobno)" },
-  "panelMenu.noTokens": { en: "No tokens yet", bs: "Još nema tokena" },
-  "layout.side": {
-    en: "Side-by-side (Ask | Agent)",
-    bs: "Jedan pored drugog (Ask | Agent)",
-  },
-  "layout.stack": {
-    en: "Stacked (Ask / Agent)",
-    bs: "Jedan ispod drugog (Ask / Agent)",
-  },
-  "layout.sideLabel": {
-    en: "side-by-side",
-    bs: "jedan pored drugog",
-  },
-  "layout.stackLabel": {
-    en: "stacked",
-    bs: "jedan ispod drugog",
-  },
-  "layout.resize": {
-    en: "Drag to resize panels",
-    bs: "Povuci za promjenu širine panela",
-  },
-  "layout.resizeHeight": {
-    en: "Drag to resize panel height",
-    bs: "Povuci za promjenu visine panela",
-  },
+  // ── Agent / chat text ──
+  "agent.panel1": { en: "Ask", sr: "Ask", de: "Fragen", fr: "Demander", es: "Preguntar", it: "Chiedi", pt: "Perguntar", nl: "Vragen", pl: "Zapytaj", ru: "Спросить", uk: "Запитати", zh: "提问", ja: "質問", ko: "질문", ar: "اسأل", hi: "पूछें", tr: "Sor", el: "Ρώτα", sv: "Fråga" },
+  "agent.panel2": { en: "Agent", sr: "Agent", de: "Agent", fr: "Agent", es: "Agente", it: "Agente", pt: "Agente", nl: "Agent", pl: "Agent", ru: "Агент", uk: "Агент", zh: "代理", ja: "エージェント", ko: "에이전트", ar: "وكيل", hi: "एजेंट", tr: "Ajan", el: "Πράκτορας", sv: "Agent" },
+  "chat.copy.other": { en: "Copy to other panel", sr: "Kopiraj u drugi panel", de: "In anderes Panel kopieren", fr: "Copier dans l'autre panneau", es: "Copiar a otro panel", it: "Copia in altro pannello", pt: "Copiar para outro painel", nl: "Kopieer naar ander paneel", pl: "Kopiuj do innego panelu", ru: "Копировать в другую панель", uk: "Копіювати в іншу панель", zh: "复制到另一个面板", ja: "他のパネルにコピー", ko: "다른 패널로 복사", ar: "نسخ إلى لوحة أخرى", hi: "दूसरे पैनल में कॉपी करें", tr: "Diğer panele kopyala", el: "Αντιγραφή σε άλλο πάνελ", sv: "Kopiera till annan panel" },
+  "chat.placeholder": { en: "Ask Straxor anything...", sr: "Pitajte Straxor bilo šta...", de: "Fragen Sie Straxor alles...", fr: "Demandez n'importe quoi à Straxor...", es: "Pregunta a Straxor cualquier cosa...", it: "Chiedi qualsiasi cosa a Straxor...", pt: "Pergunte qualquer coisa ao Straxor...", nl: "Vraag Straxor van alles...", pl: "Zapytaj Straxora o cokolwiek...", ru: "Спросите Straxor о чём угодно...", uk: "Запитайте Straxor що завгодно...", zh: "向 Straxor 提问...", ja: "Straxor に何でも聞いてください...", ko: "Straxor에게 무엇이든 물어보세요...", ar: "اسأل Straxor أي شيء...", hi: "Straxor से कुछ भी पूछें...", tr: "Straxor'a her şeyi sorun...", el: "Ρωτήστε τον Straxor οτιδήποτε...", sv: "Fråga Straxor vad som helst..." },
+  "chat.placeholder.plan": { en: "Describe your feature request...", sr: "Opišite zahtjev za funkcionalnost...", de: "Beschreiben Sie Ihren Feature-Wunsch...", fr: "Décrivez votre demande de fonctionnalité...", es: "Describe tu solicitud de función...", it: "Descrivi la tua richiesta di funzionalità...", pt: "Descreva sua solicitação de recurso...", nl: "Beschrijf je functieverzoek...", pl: "Opisz swoje żądanie funkcji...", ru: "Опишите запрос функции...", uk: "Опишіть запит функціональності...", zh: "描述你的功能请求...", ja: "機能リクエストを説明してください...", ko: "기능 요청을 설명하세요...", ar: "صف طلب الميزة الخاص بك...", hi: "अपनी फीचर अनुरोध का वर्णन करें...", tr: "Özellik isteğinizi açıklayın...", el: "Περιγράψτε το αίτημά σας για λειτουργία...", sv: "Beskriv din funktionsförfrågan..." },
+  "chat.steer.active": { en: "Agent is active — send an instruction to steer", sr: "Agent je aktivan — pošalji instrukciju za preusmjeravanje", de: "Agent aktiv — senden Sie eine Anweisung zur Steuerung", fr: "Agent actif — envoyez une instruction pour diriger", es: "Agente activo — envía una instrucción para dirigir", it: "Agente attivo — invia un'istruzione per guidare", pt: "Agente ativo — envie uma instrução para direcionar", nl: "Agent actief — stuur een instructie om te sturen", pl: "Agent aktywny — wyślij instrukcję, aby sterować", ru: "Агент активен — отправьте инструкцию для управления", uk: "Агент активний — надішліть інструкцію для керування", zh: "代理已激活 — 发送指令以引导", ja: "エージェント実行中 — 指示を送信して操縦", ko: "에이전트 활성 — 지시를 보내 조종하세요", ar: "الوكيل نشط — أرسل تعليمات للتوجيه", hi: "एजेंट सक्रिय है — निर्देश भेजें", tr: "Ajan aktif — yönlendirmek için talimat gönderin", el: "Ο πράκτορας είναι ενεργός — στείλτε οδηγία", sv: "Agent aktiv — skicka en instruktion för att styra" },
+  "chat.background.on": { en: "Background execution on", sr: "Rad u pozadini uključen", de: "Hintergrundausführung an", fr: "Exécution en arrière-plan activée", es: "Ejecución en segundo plano activada", it: "Esecuzione in background attiva", pt: "Execução em segundo plano ativada", nl: "Achtergronduitvoering aan", pl: "Wykonywanie w tle włączone", ru: "Фоновое выполнение включено", uk: "Фонове виконання увімкнено", zh: "后台执行已开启", ja: "バックグラウンド実行オン", ko: "백그라운드 실행 켜짐", ar: "التنفيذ في الخلفية مفعّل", hi: "बैकग्राउंड निष्पादन चालू", tr: "Arka plan yürütme açık", el: "Εκτέλεση στο παρασκήνιο ενεργή", sv: "Bakgrundskörning på" },
+  "chat.background.off": { en: "Background execution off", sr: "Rad u pozadini isključen", de: "Hintergrundausführung aus", fr: "Exécution en arrière-plan désactivée", es: "Ejecución en segundo plano desactivada", it: "Esecuzione in background disattivata", pt: "Execução em segundo plano desativada", nl: "Achtergronduitvoering uit", pl: "Wykonywanie w tle wyłączone", ru: "Фоновое выполнение выключено", uk: "Фонове виконання вимкнено", zh: "后台执行已关闭", ja: "バックグラウンド実行オフ", ko: "백그라운드 실행 꺼짐", ar: "التنفيذ في الخلفية معطّل", hi: "बैकग्राउंड निष्पादन बंद", tr: "Arka plan yürütme kapalı", el: "Εκτέλεση στο παρασκήνιο ανενεργή", sv: "Bakgrundskörning av" },
+  "chat.background.hint": { en: "Run the agent server-side and poll progress — works when the tab/app is in the background", sr: "Agent radi server-side, progres se prati pollingom — radi i kad je tab/aplikacija u pozadini", de: "Agent serverseitig ausführen und Fortschritt abfragen — funktioniert, wenn Tab/App im Hintergrund sind", fr: "Exécutez l'agent côté serveur et interrogez la progression — fonctionne quand l'onglet/app est en arrière-plan", es: "Ejecuta el agente en el servidor y consulta el progreso — funciona cuando la pestaña/app está en segundo plano", it: "Esegui l'agente lato server e interroga i progressi — funziona quando la scheda/app è in background", pt: "Execute o agente no servidor e consulte o progresso — funciona quando a aba/app está em segundo plano", nl: "Voer de agent server-side uit en peil de voortgang — werkt wanneer de tab/app op de achtergrond staat", pl: "Uruchom agenta po stronie serwera i odpytywaj postęp — działa, gdy karta/aplikacja jest w tle", ru: "Запускайте агента на сервере и опрашивайте прогресс — работает, когда вкладка/приложение в фоне", uk: "Запускайте агента на сервері та опитуйте прогрес — працює, коли вкладка/застосунок у фоні", zh: "在服务器端运行代理并轮询进度 — 在标签页/应用在后台时工作", ja: "エージェントをサーバー側で実行し進捗をポーリング — タブ/アプリがバックグラウンドでも動作", ko: "서버에서 에이전트를 실행하고 진행 상황을 폴링 — 탭/앱이 백그라운드에 있어도 작동", ar: "شغّل الوكيل على الخادم واستعلم عن التقدم — يعمل عندما تكون علامة التبويب/التطبيق في الخلفية", hi: "एजेंट को सर्वर-साइड चलाएं और प्रगति पोल करें — टैब/ऐप बैकग्राउंड में होने पर भी काम करता है", tr: "Aracıyı sunucu tarafında çalıştırın ve ilerlemeyi yoklayın — sekme/uygulama arka plandayken çalışır", el: "Εκτελέστε τον πράκτορα στην πλευρά του διακομιστή και ελέγξτε την πρόοδο — λειτουργεί όταν η καρτέλα/εφαρμογή είναι στο παρασκήνιο", sv: "Kör agenten server-side och polla förloppet — fungerar när fliken/appen är i bakgrunden" },
 
-  // ── Auth pages ──
-  "auth.login": { en: "Log in", bs: "Prijava" },
-  "auth.register": { en: "Register", bs: "Registracija" },
-  "auth.logout": { en: "Log out", bs: "Odjava" },
-  "auth.email": { en: "Email", bs: "Email" },
-  "auth.password": { en: "Password", bs: "Lozinka" },
-  "auth.forgot": { en: "Forgot password?", bs: "Zaboravili ste lozinku?" },
-  "auth.noAccount": {
-    en: "Don't have an account?",
-    bs: "Nemate račun?",
-  },
-  "auth.haveAccount": {
-    en: "Already have an account?",
-    bs: "Već imate račun?",
-  },
-  "auth.verifyTitle": {
-    en: "Verify your email",
-    bs: "Potvrdite email adresu",
-  },
-  "auth.verifySubtitle": {
-    en: "We sent a confirmation link to your inbox.",
-    bs: "Poslali smo vam link za potvrdu na email.",
-  },
-  "auth.resetTitle": {
-    en: "Set a new password",
-    bs: "Postavite novu lozinku",
-  },
-  "auth.forgotTitle": {
-    en: "Reset password",
-    bs: "Reset lozinke",
-  },
-  "auth.forgotSubtitle": {
-    en: "Enter your email and we'll send you a reset link.",
-    bs: "Unesite email i poslat ćemo vam link za reset.",
-  },
-  "auth.loginTab": { en: "Log in", bs: "Prijavi se" },
-  "auth.registerTab": { en: "Register", bs: "Registruj se" },
-  "auth.loginLoading": { en: "Logging in...", bs: "Prijavljivanje..." },
-  "auth.registerLoading": { en: "Registering...", bs: "Registracija..." },
-  "auth.firstAdmin": {
-    en: "No administrator yet — the first registered account is created as Admin",
-    bs: "Još nema administratora — prvi registrovani račun se kreira kao Administrator",
-  },
-  "auth.passwordMin": {
-    en: "Min. 6 characters",
-    bs: "Min. 6 karaktera",
-  },
-  "auth.verificationNotice": {
-    en: "We sent you a verification email. Confirm your address from your inbox to activate the account.",
-    bs: "Poslali smo vam verifikacioni email. Potvrdite email adresu iz inboxa da aktivirate račun.",
-  },
-  "auth.backToLogin": { en: "Back to login", bs: "Nazad na prijavu" },
-  "auth.checkEmail": { en: "Check your email", bs: "Provjerite svoj email" },
-  "auth.resetSent": {
-    en: "If an account with that address exists, we sent a password reset link. The link is valid for 1 hour.",
-    bs: "Ako račun sa tom adresom postoji, poslali smo link za reset lozinke. Link važi 1 sat.",
-  },
-  "auth.sendLink": { en: "Send reset link", bs: "Pošalji link" },
-  "auth.sending": { en: "Sending...", bs: "Slanje..." },
-  "auth.newPassword": { en: "New password", bs: "Nova lozinka" },
-  "auth.confirmPassword": {
-    en: "Confirm password",
-    bs: "Potvrdi lozinku",
-  },
-  "auth.resetButton": { en: "Reset password", bs: "Resetuj lozinku" },
-  "auth.resetting": { en: "Resetting...", bs: "Resetovanje..." },
-  "auth.verificationSuccess": {
-    en: "Your email has been verified.",
-    bs: "Vaša email adresa je potvrđena.",
-  },
-  "auth.verificationFailed": {
-    en: "The verification link is invalid or has expired.",
-    bs: "Link za verifikaciju nije ispravan ili je istekao.",
-  },
-  "auth.passwordMismatch": {
-    en: "Passwords do not match.",
-    bs: "Lozinke se ne podudaraju.",
-  },
-  "auth.resetInvalid": {
-    en: "Invalid password reset link.",
-    bs: "Neispravan link za reset lozinke.",
-  },
-  "auth.requestNewLink": {
-    en: "Request a new link",
-    bs: "Zatražite novi link",
-  },
-  "auth.resetDoneTitle": {
-    en: "Password changed",
-    bs: "Lozinka promijenjena",
-  },
-  "auth.resetDoneSubtitle": {
-    en: "You can now log in with your new password.",
-    bs: "Sada se možete prijaviti s novom lozinkom.",
-  },
-  "auth.resetSubtitle": {
-    en: "Set a new password for your account.",
-    bs: "Postavite novu lozinku za svoj račun.",
-  },
-  "auth.saving": { en: "Saving...", bs: "Spremanje..." },
-  "auth.changePassword": { en: "Change password", bs: "Promijeni lozinku" },
-  "auth.verifying": { en: "Verifying...", bs: "Verifikacija u toku..." },
-  "auth.verifyDone": { en: "Email verified", bs: "Email potvrđen" },
-  "auth.verifyDoneSubtitle": {
-    en: "Your email address has been verified successfully.",
-    bs: "Vaša email adresa je uspješno potvrđena.",
-  },
-  "auth.verifyFailedTitle": {
-    en: "Verification failed",
-    bs: "Verifikacija nije uspjela",
-  },
+  // ── Auth ──
+  "auth.login": { en: "Log in", sr: "Prijava", de: "Anmelden", fr: "Connexion", es: "Iniciar sesión", it: "Accedi", pt: "Entrar", nl: "Inloggen", pl: "Zaloguj się", ru: "Войти", uk: "Увійти", zh: "登录", ja: "ログイン", ko: "로그인", ar: "تسجيل الدخول", hi: "लॉग इन", tr: "Giriş yap", el: "Σύνδεση", sv: "Logga in" },
+  "auth.register": { en: "Register", sr: "Registracija", de: "Registrieren", fr: "S'inscrire", es: "Registrarse", it: "Registrati", pt: "Registrar", nl: "Registreren", pl: "Zarejestruj się", ru: "Регистрация", uk: "Реєстрація", zh: "注册", ja: "登録", ko: "가입", ar: "تسجيل", hi: "पंजीकरण", tr: "Kayıt ol", el: "Εγγραφή", sv: "Registrera" },
+  "auth.logout": { en: "Log out", sr: "Odjava", de: "Abmelden", fr: "Se déconnecter", es: "Cerrar sesión", it: "Esci", pt: "Sair", nl: "Uitloggen", pl: "Wyloguj się", ru: "Выйти", uk: "Вийти", zh: "退出登录", ja: "ログアウト", ko: "로그아웃", ar: "تسجيل الخروج", hi: "लॉग आउट", tr: "Çıkış yap", el: "Αποσύνδεση", sv: "Logga ut" },
+  "auth.email": { en: "Email", sr: "Email", de: "E-Mail", fr: "E-mail", es: "Correo", it: "Email", pt: "E-mail", nl: "E-mail", pl: "E-mail", ru: "Эл. почта", uk: "Електронна пошта", zh: "邮箱", ja: "メール", ko: "이메일", ar: "البريد الإلكتروني", hi: "ईमेल", tr: "E-posta", el: "Email", sv: "E-post" },
+  "auth.password": { en: "Password", sr: "Lozinka", de: "Passwort", fr: "Mot de passe", es: "Contraseña", it: "Password", pt: "Senha", nl: "Wachtwoord", pl: "Hasło", ru: "Пароль", uk: "Пароль", zh: "密码", ja: "パスワード", ko: "비밀번호", ar: "كلمة المرور", hi: "पासवर्ड", tr: "Şifre", el: "Κωδικός", sv: "Lösenord" },
+  "auth.forgot": { en: "Forgot password?", sr: "Zaboravili ste lozinku?", de: "Passwort vergessen?", fr: "Mot de passe oublié ?", es: "¿Olvidaste tu contraseña?", it: "Password dimenticata?", pt: "Esqueceu a senha?", nl: "Wachtwoord vergeten?", pl: "Zapomniałeś hasła?", ru: "Забыли пароль?", uk: "Забули пароль?", zh: "忘记密码？", ja: "パスワードをお忘れですか？", ko: "비밀번호를 잊으셨나요?", ar: "هل نسيت كلمة المرور؟", hi: "पासवर्ड भूल गए?", tr: "Şifrenizi mi unuttunuz?", el: "Ξεχάσατε τον κωδικό;", sv: "Glömt lösenordet?" },
+  "auth.noAccount": { en: "Don't have an account?", sr: "Nemate račun?", de: "Noch kein Konto?", fr: "Pas de compte ?", es: "¿No tienes cuenta?", it: "Non hai un account?", pt: "Não tem conta?", nl: "Geen account?", pl: "Nie masz konta?", ru: "Нет аккаунта?", uk: "Немає акаунта?", zh: "没有账户？", ja: "アカウントがありませんか？", ko: "계정이 없으신가요?", ar: "ليس لديك حساب؟", hi: "खाता नहीं है?", tr: "Hesabınız yok mu?", el: "Δεν έχετε λογαριασμό;", sv: "Har du inget konto?" },
+  "auth.haveAccount": { en: "Already have an account?", sr: "Već imate račun?", de: "Schon ein Konto?", fr: "Déjà un compte ?", es: "¿Ya tienes cuenta?", it: "Hai già un account?", pt: "Já tem conta?", nl: "Al een account?", pl: "Masz już konto?", ru: "Уже есть аккаунт?", uk: "Вже є акаунт?", zh: "已有账户？", ja: "すでにアカウントをお持ちですか？", ko: "이미 계정이 있으신가요?", ar: "هل لديك حساب بالفعل؟", hi: "पहले से खाता है?", tr: "Zaten hesabınız var mı?", el: "Έχετε ήδη λογαριασμό;", sv: "Har du redan ett konto?" },
+  "auth.verifyTitle": { en: "Verify your email", sr: "Potvrdite email adresu", de: "E-Mail verifizieren", fr: "Vérifiez votre e-mail", es: "Verifica tu correo", it: "Verifica la tua email", pt: "Verifique seu e-mail", nl: "Verifieer je e-mail", pl: "Zweryfikuj swój e-mail", ru: "Подтвердите почту", uk: "Підтвердіть електронну пошту", zh: "验证您的邮箱", ja: "メールを確認してください", ko: "이메일을 인증하세요", ar: "تحقق من بريدك الإلكتروني", hi: "अपना ईमेल सत्यापित करें", tr: "E-postanızı doğrulayın", el: "Επαληθεύστε το email σας", sv: "Verifiera din e-post" },
+  "auth.resetTitle": { en: "Set a new password", sr: "Postavite novu lozinku", de: "Neues Passwort festlegen", fr: "Définir un nouveau mot de passe", es: "Establecer nueva contraseña", it: "Imposta una nuova password", pt: "Definir nova senha", nl: "Nieuw wachtwoord instellen", pl: "Ustaw nowe hasło", ru: "Установите новый пароль", uk: "Встановіть новий пароль", zh: "设置新密码", ja: "新しいパスワードを設定", ko: "새 비밀번호 설정", ar: "تعيين كلمة مرور جديدة", hi: "नया पासवर्ड सेट करें", tr: "Yeni şifre belirleyin", el: "Ορίστε νέο κωδικό", sv: "Ange nytt lösenord" },
+  "auth.backToLogin": { en: "Back to login", sr: "Nazad na prijavu", de: "Zurück zur Anmeldung", fr: "Retour à la connexion", es: "Volver al inicio de sesión", it: "Torna al login", pt: "Voltar ao login", nl: "Terug naar inloggen", pl: "Wróć do logowania", ru: "Назад к входу", uk: "Назад до входу", zh: "返回登录", ja: "ログインに戻る", ko: "로그인으로 돌아가기", ar: "العودة إلى تسجيل الدخول", hi: "लॉगिन पर वापस जाएं", tr: "Girişe geri dön", el: "Επιστροφή στη σύνδεση", sv: "Tillbaka till inloggning" },
+  "auth.checkEmail": { en: "Check your email", sr: "Provjerite svoj email", de: "Prüfen Sie Ihre E-Mail", fr: "Vérifiez votre e-mail", es: "Revisa tu correo", it: "Controlla la tua email", pt: "Verifique seu e-mail", nl: "Controleer je e-mail", pl: "Sprawdź swoją pocztę", ru: "Проверьте почту", uk: "Перевірте пошту", zh: "检查您的邮箱", ja: "メールを確認してください", ko: "이메일을 확인하세요", ar: "تحقق من بريدك", hi: "अपना ईमेल जांचें", tr: "E-postanızı kontrol edin", el: "Ελέγξτε το email σας", sv: "Kolla din e-post" },
+  "auth.sendLink": { en: "Send reset link", sr: "Pošalji link", de: "Reset-Link senden", fr: "Envoyer le lien de réinitialisation", es: "Enviar enlace de reinicio", it: "Invia link di reset", pt: "Enviar link de redefinição", nl: "Resetlink verzenden", pl: "Wyślij link do resetu", ru: "Отправить ссылку сброса", uk: "Надіслати посилання скидання", zh: "发送重置链接", ja: "リセットリンクを送信", ko: "재설정 링크 보내기", ar: "إرسال رابط إعادة التعيين", hi: "रीसेट लिंक भेजें", tr: "Sıfırlama bağlantısı gönder", el: "Αποστολή συνδέσμου επαναφοράς", sv: "Skicka återställningslänk" },
+  "auth.sending": { en: "Sending...", sr: "Slanje...", de: "Senden...", fr: "Envoi...", es: "Enviando...", it: "Invio...", pt: "Enviando...", nl: "Verzenden...", pl: "Wysyłanie...", ru: "Отправка...", uk: "Надсилання...", zh: "发送中...", ja: "送信中...", ko: "보내는 중...", ar: "جارٍ الإرسال...", hi: "भेजा जा रहा है...", tr: "Gönderiliyor...", el: "Αποστολή...", sv: "Skickar..." },
+  "auth.newPassword": { en: "New password", sr: "Nova lozinka", de: "Neues Passwort", fr: "Nouveau mot de passe", es: "Nueva contraseña", it: "Nuova password", pt: "Nova senha", nl: "Nieuw wachtwoord", pl: "Nowe hasło", ru: "Новый пароль", uk: "Новий пароль", zh: "新密码", ja: "新しいパスワード", ko: "새 비밀번호", ar: "كلمة مرور جديدة", hi: "नया पासवर्ड", tr: "Yeni şifre", el: "Νέος κωδικός", sv: "Nytt lösenord" },
+  "auth.confirmPassword": { en: "Confirm password", sr: "Potvrdi lozinku", de: "Passwort bestätigen", fr: "Confirmer le mot de passe", es: "Confirmar contraseña", it: "Conferma password", pt: "Confirmar senha", nl: "Bevestig wachtwoord", pl: "Potwierdź hasło", ru: "Подтвердите пароль", uk: "Підтвердіть пароль", zh: "确认密码", ja: "パスワードを確認", ko: "비밀번호 확인", ar: "تأكيد كلمة المرور", hi: "पासवर्ड की पुष्टि करें", tr: "Şifreyi onayla", el: "Επιβεβαίωση κωδικού", sv: "Bekräfta lösenord" },
+  "auth.resetButton": { en: "Reset password", sr: "Resetuj lozinku", de: "Passwort zurücksetzen", fr: "Réinitialiser le mot de passe", es: "Restablecer contraseña", it: "Reimposta password", pt: "Redefinir senha", nl: "Wachtwoord resetten", pl: "Zresetuj hasło", ru: "Сбросить пароль", uk: "Скинути пароль", zh: "重置密码", ja: "パスワードをリセット", ko: "비밀번호 재설정", ar: "إعادة تعيين كلمة المرور", hi: "पासवर्ड रीसेट करें", tr: "Şifreyi sıfırla", el: "Επαναφορά κωδικού", sv: "Återställ lösenord" },
+  "auth.resetting": { en: "Resetting...", sr: "Resetovanje...", de: "Zurücksetzen...", fr: "Réinitialisation...", es: "Restableciendo...", it: "Reimpostazione...", pt: "Redefinindo...", nl: "Resetten...", pl: "Resetowanie...", ru: "Сброс...", uk: "Скидання...", zh: "重置中...", ja: "リセット中...", ko: "재설정 중...", ar: "جارٍ إعادة التعيين...", hi: "रीसेट हो रहा है...", tr: "Sıfırlanıyor...", el: "Επαναφορά...", sv: "Återställer..." },
+  "auth.passwordMismatch": { en: "Passwords do not match.", sr: "Lozinke se ne podudaraju.", de: "Passwörter stimmen nicht überein.", fr: "Les mots de passe ne correspondent pas.", es: "Las contraseñas no coinciden.", it: "Le password non corrispondono.", pt: "As senhas não coincidem.", nl: "Wachtwoorden komen niet overeen.", pl: "Hasła nie są zgodne.", ru: "Пароли не совпадают.", uk: "Паролі не збігаються.", zh: "密码不匹配。", ja: "パスワードが一致しません。", ko: "비밀번호가 일치하지 않습니다.", ar: "كلمتا المرور غير متطابقتين.", hi: "पासवर्ड मेल नहीं खाते।", tr: "Şifreler eşleşmiyor.", el: "Οι κωδικοί δεν ταιριάζουν.", sv: "Lösenorden matchar inte." },
+  "auth.passwordMin": { en: "Min. 6 characters", sr: "Min. 6 karaktera", de: "Mind. 6 Zeichen", fr: "Min. 6 caractères", es: "Mín. 6 caracteres", it: "Min. 6 caratteri", pt: "Mín. 6 caracteres", nl: "Min. 6 tekens", pl: "Min. 6 znaków", ru: "Мин. 6 символов", uk: "Мін. 6 символів", zh: "至少 6 个字符", ja: "6 文字以上", ko: "최소 6자", ar: "6 أحرف على الأقل", hi: "न्यूनतम 6 अक्षर", tr: "Min. 6 karakter", el: "Ελάχ. 6 χαρακτήρες", sv: "Min. 6 tecken" },
+  "auth.loginLoading": { en: "Logging in...", sr: "Prijavljivanje...", de: "Anmelden...", fr: "Connexion...", es: "Iniciando sesión...", it: "Accesso...", pt: "Entrando...", nl: "Inloggen...", pl: "Logowanie...", ru: "Вход...", uk: "Вхід...", zh: "登录中...", ja: "ログイン中...", ko: "로그인 중...", ar: "جارٍ تسجيل الدخول...", hi: "लॉग इन हो रहा है...", tr: "Giriş yapılıyor...", el: "Σύνδεση...", sv: "Loggar in..." },
+  "auth.registerLoading": { en: "Registering...", sr: "Registracija...", de: "Registrieren...", fr: "Inscription...", es: "Registrando...", it: "Registrazione...", pt: "Registrando...", nl: "Registreren...", pl: "Rejestracja...", ru: "Регистрация...", uk: "Реєстрація...", zh: "注册中...", ja: "登録中...", ko: "가입 중...", ar: "جارٍ التسجيل...", hi: "पंजीकरण हो रहा है...", tr: "Kayıt yapılıyor...", el: "Εγγραφή...", sv: "Registrerar..." },
+  "auth.saving": { en: "Saving...", sr: "Spremanje...", de: "Speichern...", fr: "Enregistrement...", es: "Guardando...", it: "Salvataggio...", pt: "Salvando...", nl: "Opslaan...", pl: "Zapisywanie...", ru: "Сохранение...", uk: "Збереження...", zh: "保存中...", ja: "保存中...", ko: "저장 중...", ar: "جارٍ الحفظ...", hi: "सहेजा जा रहा है...", tr: "Kaydediliyor...", el: "Αποθήκευση...", sv: "Sparar..." },
+  "auth.changePassword": { en: "Change password", sr: "Promijeni lozinku", de: "Passwort ändern", fr: "Changer le mot de passe", es: "Cambiar contraseña", it: "Cambia password", pt: "Alterar senha", nl: "Wachtwoord wijzigen", pl: "Zmień hasło", ru: "Изменить пароль", uk: "Змінити пароль", zh: "修改密码", ja: "パスワードを変更", ko: "비밀번호 변경", ar: "تغيير كلمة المرور", hi: "पासवर्ड बदलें", tr: "Şifreyi değiştir", el: "Αλλαγή κωδικού", sv: "Ändra lösenord" },
+  "auth.verifying": { en: "Verifying...", sr: "Verifikacija u toku...", de: "Verifizieren...", fr: "Vérification...", es: "Verificando...", it: "Verifica...", pt: "Verificando...", nl: "Verifiëren...", pl: "Weryfikacja...", ru: "Проверка...", uk: "Перевірка...", zh: "验证中...", ja: "確認中...", ko: "인증 중...", ar: "جارٍ التحقق...", hi: "सत्यापन हो रहा है...", tr: "Doğrulanıyor...", el: "Επαλήθευση...", sv: "Verifierar..." },
+  "auth.verifyDone": { en: "Email verified", sr: "Email potvrđen", de: "E-Mail verifiziert", fr: "E-mail vérifié", es: "Correo verificado", it: "Email verificata", pt: "E-mail verificado", nl: "E-mail geverifieerd", pl: "E-mail zweryfikowany", ru: "Почта подтверждена", uk: "Пошту підтверджено", zh: "邮箱已验证", ja: "メール確認済み", ko: "이메일 인증됨", ar: "تم التحقق من البريد", hi: "ईमेल सत्यापित", tr: "E-posta doğrulandı", el: "Το email επαληθεύτηκε", sv: "E-post verifierad" },
+  "auth.firstAdmin": { en: "No administrator yet — the first registered account is created as Admin", sr: "Još nema administratora — prvi registrovani račun se kreira kao Administrator", de: "Noch kein Administrator — das erste registrierte Konto wird als Admin erstellt", fr: "Pas encore d'administrateur — le premier compte enregistré est créé en tant qu'admin", es: "Aún no hay administrador — la primera cuenta registrada se crea como Admin", it: "Nessun amministratore — il primo account registrato viene creato come Admin", pt: "Nenhum administrador ainda — a primeira conta registrada é criada como Admin", nl: "Nog geen beheerder — het eerste geregistreerde account wordt als beheerder aangemaakt", pl: "Brak administratora — pierwsze zarejestrowane konto zostaje utworzone jako Admin", ru: "Администратора пока нет — первый зарегистрированный аккаунт создаётся как админ", uk: "Адміністратора ще немає — перший зареєстрований акаунт створюється як адмін", zh: "还没有管理员 — 第一个注册的账户将创建为管理员", ja: "管理者がまだいません — 最初に登録されたアカウントが管理者として作成されます", ko: "아직 관리자가 없습니다 — 첫 번째 등록 계정이 관리자로 생성됩니다", ar: "لا يوجد مسؤول بعد — يتم إنشاء أول حساب مسجل كمسؤول", hi: "अभी कोई व्यवस्थापक नहीं — पहला पंजीकृत खाता व्यवस्थापक के रूप में बनाया जाता है", tr: "Henüz yönetici yok — ilk kayıtlı hesap Yönetici olarak oluşturulur", el: "Δεν υπάρχει ακόμη διαχειριστής — ο πρώτος εγγεγραμμένος λογαριασμός δημιουργείται ως Διαχειριστής", sv: "Ingen administratör ännu — det första registrerade kontot skapas som Admin" },
+
+  // ── Models ──
+  "models.title": { en: "Select Model", sr: "Odaberi model", de: "Modell wählen", fr: "Sélectionner le modèle", es: "Seleccionar modelo", it: "Seleziona modello", pt: "Selecionar modelo", nl: "Model selecteren", pl: "Wybierz model", ru: "Выберите модель", uk: "Виберіть модель", zh: "选择模型", ja: "モデルを選択", ko: "모델 선택", ar: "اختيار النموذج", hi: "मॉडल चुनें", tr: "Model seçin", el: "Επιλογή μοντέλου", sv: "Välj modell" },
+  "models.search": { en: "Search models...", sr: "Pretraži modele...", de: "Modelle suchen...", fr: "Rechercher des modèles...", es: "Buscar modelos...", it: "Cerca modelli...", pt: "Pesquisar modelos...", nl: "Modellen zoeken...", pl: "Szukaj modeli...", ru: "Поиск моделей...", uk: "Пошук моделей...", zh: "搜索模型...", ja: "モデルを検索...", ko: "모델 검색...", ar: "ابحث عن النماذج...", hi: "मॉडल खोजें...", tr: "Modelleri ara...", el: "Αναζήτηση μοντέλων...", sv: "Sök modeller..." },
+  "models.provider": { en: "Provider", sr: "Provajder", de: "Anbieter", fr: "Fournisseur", es: "Proveedor", it: "Fornitore", pt: "Provedor", nl: "Provider", pl: "Dostawca", ru: "Провайдер", uk: "Провайдер", zh: "提供商", ja: "プロバイダー", ko: "제공자", ar: "المزود", hi: "प्रदाता", tr: "Sağlayıcı", el: "Πάροχος", sv: "Leverantör" },
+  "models.thinking": { en: "Thinking budget", sr: "Budget razmišljanja", de: "Denk-Budget", fr: "Budget de réflexion", es: "Presupuesto de razonamiento", it: "Budget di ragionamento", pt: "Orçamento de raciocínio", nl: "Denkbudget", pl: "Budżet myślenia", ru: "Бюджет размышлений", uk: "Бюджет роздумів", zh: "思考预算", ja: "思考バジェット", ko: "사고 예산", ar: "ميزانية التفكير", hi: "सोच बजट", tr: "Düşünme bütçesi", el: "Προϋπολογισμός σκέψης", sv: "Tänk-budget" },
+  "models.setup": { en: "Set up API key", sr: "Postavi API ključ", de: "API-Schlüssel einrichten", fr: "Configurer la clé API", es: "Configurar clave API", it: "Configura chiave API", pt: "Configurar chave API", nl: "API-sleutel instellen", pl: "Skonfiguruj klucz API", ru: "Настроить API-ключ", uk: "Налаштувати API-ключ", zh: "设置 API 密钥", ja: "APIキーを設定", ko: "API 키 설정", ar: "إعداد مفتاح API", hi: "API कुंजी सेट करें", tr: "API anahtarı ayarla", el: "Ρύθμιση κλειδιού API", sv: "Ställ in API-nyckel" },
+  "models.addKey": { en: "Add key", sr: "Dodaj key", de: "Schlüssel hinzufügen", fr: "Ajouter la clé", es: "Añadir clave", it: "Aggiungi chiave", pt: "Adicionar chave", nl: "Sleutel toevoegen", pl: "Dodaj klucz", ru: "Добавить ключ", uk: "Додати ключ", zh: "添加密钥", ja: "キーを追加", ko: "키 추가", ar: "إضافة مفتاح", hi: "कुंजी जोड़ें", tr: "Anahtar ekle", el: "Προσθήκη κλειδιού", sv: "Lägg till nyckel" },
+  "models.addApiKey": { en: "Add API key", sr: "Dodaj API ključ", de: "API-Schlüssel hinzufügen", fr: "Ajouter une clé API", es: "Añadir clave API", it: "Aggiungi chiave API", pt: "Adicionar chave API", nl: "API-sleutel toevoegen", pl: "Dodaj klucz API", ru: "Добавить API-ключ", uk: "Додати API-ключ", zh: "添加 API 密钥", ja: "APIキーを追加", ko: "API 키 추가", ar: "إضافة مفتاح API", hi: "API कुंजी जोड़ें", tr: "API anahtarı ekle", el: "Προσθήκη κλειδιού API", sv: "Lägg till API-nyckel" },
+  "models.keyReady": { en: "Key configured", sr: "Ključ konfigurisan", de: "Schlüssel konfiguriert", fr: "Clé configurée", es: "Clave configurada", it: "Chiave configurata", pt: "Chave configurada", nl: "Sleutel geconfigureerd", pl: "Klucz skonfigurowany", ru: "Ключ настроен", uk: "Ключ налаштовано", zh: "密钥已配置", ja: "キー設定済み", ko: "키 구성됨", ar: "تم تكوين المفتاح", hi: "कुंजी कॉन्फ़िगर", tr: "Anahtar yapılandırıldı", el: "Το κλειδί ρυθμίστηκε", sv: "Nyckel konfigurerad" },
+  "models.keyNeeded": { en: "API key required", sr: "API ključ je potreban", de: "API-Schlüssel erforderlich", fr: "Clé API requise", es: "Se requiere clave API", it: "Chiave API richiesta", pt: "Chave API necessária", nl: "API-sleutel vereist", pl: "Klucz API wymagany", ru: "Требуется API-ключ", uk: "Потрібен API-ключ", zh: "需要 API 密钥", ja: "APIキーが必要", ko: "API 키 필요", ar: "مطلوب مفتاح API", hi: "API कुंजी आवश्यक", tr: "API anahtarı gerekli", el: "Απαιτείται κλειδί API", sv: "API-nyckel krävs" },
+  "models.enabled": { en: "Enabled", sr: "Omogućeno", de: "Aktiviert", fr: "Activé", es: "Habilitado", it: "Abilitato", pt: "Ativado", nl: "Ingeschakeld", pl: "Włączone", ru: "Включено", uk: "Увімкнено", zh: "已启用", ja: "有効", ko: "활성화", ar: "ممكّن", hi: "सक्षम", tr: "Etkin", el: "Ενεργό", sv: "Aktiverad" },
+  "models.notConfigured": { en: "Not configured", sr: "Nije konfigurisano", de: "Nicht konfiguriert", fr: "Non configuré", es: "No configurado", it: "Non configurato", pt: "Não configurado", nl: "Niet geconfigureerd", pl: "Nie skonfigurowano", ru: "Не настроено", uk: "Не налаштовано", zh: "未配置", ja: "未設定", ko: "구성되지 않음", ar: "غير مكوّن", hi: "कॉन्फ़िगर नहीं", tr: "Yapılandırılmamış", el: "Μη ρυθμισμένο", sv: "Inte konfigurerad" },
+  "models.count": { en: "{n} models", sr: "{n} modela", de: "{n} Modelle", fr: "{n} modèles", es: "{n} modelos", it: "{n} modelli", pt: "{n} modelos", nl: "{n} modellen", pl: "{n} modeli", ru: "{n} моделей", uk: "{n} моделей", zh: "{n} 个模型", ja: "{n} モデル", ko: "{n}개 모델", ar: "{n} نماذج", hi: "{n} मॉडल", tr: "{n} model", el: "{n} μοντέλα", sv: "{n} modeller" },
+  "models.noResults": { en: "No results", sr: "Nema rezultata", de: "Keine Ergebnisse", fr: "Aucun résultat", es: "Sin resultados", it: "Nessun risultato", pt: "Sem resultados", nl: "Geen resultaten", pl: "Brak wyników", ru: "Нет результатов", uk: "Немає результатів", zh: "无结果", ja: "結果なし", ko: "결과 없음", ar: "لا نتائج", hi: "कोई परिणाम नहीं", tr: "Sonuç yok", el: "Δεν υπάρχουν αποτελέσματα", sv: "Inga resultat" },
+  "models.pickerTitle": { en: "Model picker (full catalog)", sr: "Model picker (kompletan katalog)", de: "Modellauswahl (voller Katalog)", fr: "Sélecteur de modèles (catalogue complet)", es: "Selector de modelos (catálogo completo)", it: "Selettore modelli (catalogo completo)", pt: "Seletor de modelos (catálogo completo)", nl: "Modelkiezer (volledige catalogus)", pl: "Wybór modelu (pełny katalog)", ru: "Выбор модели (полный каталог)", uk: "Вибір моделі (повний каталог)", zh: "模型选择器（完整目录）", ja: "モデル選択（完全カタログ）", ko: "모델 선택기(전체 카탈로그)", ar: "محدد النماذج (كتالوج كامل)", hi: "मॉडल चयनक (पूर्ण कैटलॉग)", tr: "Model seçici (tam katalog)", el: "Επιλογή μοντέλου (πλήρης κατάλογος)", sv: "Modellväljare (full katalog)" },
+  "models.modalTitle": { en: "{title} — model picker", sr: "{title} — odabir modela", de: "{title} — Modellauswahl", fr: "{title} — sélecteur de modèles", es: "{title} — selector de modelos", it: "{title} — selettore modelli", pt: "{title} — seletor de modelos", nl: "{title} — modelkiezer", pl: "{title} — wybór modelu", ru: "{title} — выбор модели", uk: "{title} — вибір моделі", zh: "{title} — 模型选择器", ja: "{title} — モデル選択", ko: "{title} — 모델 선택", ar: "{title} — محدد النماذج", hi: "{title} — मॉडल चयनक", tr: "{title} — model seçici", el: "{title} — επιλογή μοντέλου", sv: "{title} — modellväljare" },
+
+  // ── Panel ──
+  "panel.expand.exit": { en: "Exit fullscreen (Esc)", sr: "Izađi iz punog ekrana (Esc)", de: "Vollbild beenden (Esc)", fr: "Quitter le plein écran (Échap)", es: "Salir de pantalla completa (Esc)", it: "Esci da schermo intero (Esc)", pt: "Sair da tela cheia (Esc)", nl: "Volledig scherm verlaten (Esc)", pl: "Wyjdź z pełnego ekranu (Esc)", ru: "Выйти из полноэкранного режима (Esc)", uk: "Вийти з повноекранного режиму (Esc)", zh: "退出全屏 (Esc)", ja: "全画面を終了 (Esc)", ko: "전체 화면 종료 (Esc)", ar: "الخروج من ملء الشاشة (Esc)", hi: "पूर्ण स्क्रीन से बाहर निकलें (Esc)", tr: "Tam ekrandan çık (Esc)", el: "Έξοδος από πλήρη οθόνη (Esc)", sv: "Avsluta helskärm (Esc)" },
+  "panel.expand.enter": { en: "Expand to fullscreen", sr: "Proširi na puni ekran", de: "Auf Vollbild erweitern", fr: "Passer en plein écran", es: "Expandir a pantalla completa", it: "Espandi a schermo intero", pt: "Expandir para tela cheia", nl: "Uitvouwen naar volledig scherm", pl: "Rozwiń do pełnego ekranu", ru: "Развернуть на весь экран", uk: "Розгорнути на весь екран", zh: "展开为全屏", ja: "全画面に展開", ko: "전체 화면으로 확장", ar: "توسيع إلى ملء الشاشة", hi: "पूर्ण स्क्रीन में विस्तार करें", tr: "Tam ekrana genişlet", el: "Επέκταση σε πλήρη οθόνη", sv: "Expandera till helskärm" },
+  "panelMenu.title": { en: "Panel settings", sr: "Podešavanja panela", de: "Panel-Einstellungen", fr: "Paramètres du panneau", es: "Configuración del panel", it: "Impostazioni pannello", pt: "Configurações do painel", nl: "Paneelinstellingen", pl: "Ustawienia panelu", ru: "Настройки панели", uk: "Налаштування панелі", zh: "面板设置", ja: "パネル設定", ko: "패널 설정", ar: "إعدادات اللوحة", hi: "पैनल सेटिंग्स", tr: "Panel ayarları", el: "Ρυθμίσεις πάνελ", sv: "Panelinställningar" },
+  "panelMenu.role": { en: "Agent role", sr: "Uloga agenta", de: "Agentenrolle", fr: "Rôle de l'agent", es: "Rol del agente", it: "Ruolo agente", pt: "Função do agente", nl: "Agentrol", pl: "Rola agenta", ru: "Роль агента", uk: "Роль агента", zh: "代理角色", ja: "エージェントの役割", ko: "에이전트 역할", ar: "دور الوكيل", hi: "एजेंट भूमिका", tr: "Ajan rolü", el: "Ρόλος πράκτορα", sv: "Agentroll" },
+  "panelMenu.model": { en: "Choose model", sr: "Izaberi model", de: "Modell wählen", fr: "Choisir le modèle", es: "Elegir modelo", it: "Scegli modello", pt: "Escolher modelo", nl: "Kies model", pl: "Wybierz model", ru: "Выбрать модель", uk: "Вибрати модель", zh: "选择模型", ja: "モデルを選択", ko: "모델 선택", ar: "اختيار النموذج", hi: "मॉडल चुनें", tr: "Model seç", el: "Επιλογή μοντέλου", sv: "Välj modell" },
+  "panelMenu.prompts": { en: "Ideas & templates", sr: "Ideje i šabloni", de: "Ideen & Vorlagen", fr: "Idées & modèles", es: "Ideas y plantillas", it: "Idee e modelli", pt: "Ideias e modelos", nl: "Ideeën & sjablonen", pl: "Pomysły i szablony", ru: "Идеи и шаблоны", uk: "Ідеї та шаблони", zh: "想法和模板", ja: "アイデアとテンプレート", ko: "아이디어 및 템플릿", ar: "أفكار وقوالب", hi: "विचार और टेम्पलेट", tr: "Fikirler ve şablonlar", el: "Ιδέες και πρότυπα", sv: "Idéer och mallar" },
+  "panelMenu.gitAdd": { en: "Add token", sr: "Dodaj token", de: "Token hinzufügen", fr: "Ajouter un jeton", es: "Añadir token", it: "Aggiungi token", pt: "Adicionar token", nl: "Token toevoegen", pl: "Dodaj token", ru: "Добавить токен", uk: "Додати токен", zh: "添加令牌", ja: "トークンを追加", ko: "토큰 추가", ar: "إضافة رمز", hi: "टोकन जोड़ें", tr: "Token ekle", el: "Προσθήκη token", sv: "Lägg till token" },
+  "panelMenu.gitDelete": { en: "Delete", sr: "Obriši", de: "Löschen", fr: "Supprimer", es: "Eliminar", it: "Elimina", pt: "Excluir", nl: "Verwijderen", pl: "Usuń", ru: "Удалить", uk: "Видалити", zh: "删除", ja: "削除", ko: "삭제", ar: "حذف", hi: "हटाएं", tr: "Sil", el: "Διαγραφή", sv: "Radera" },
+  "panelMenu.gitRename": { en: "Rename", sr: "Preimenuj", de: "Umbenennen", fr: "Renommer", es: "Renombrar", it: "Rinomina", pt: "Renomear", nl: "Hernoemen", pl: "Zmień nazwę", ru: "Переименовать", uk: "Перейменувати", zh: "重命名", ja: "名前を変更", ko: "이름 변경", ar: "إعادة تسمية", hi: "नाम बदलें", tr: "Yeniden adlandır", el: "Μετονομασία", sv: "Byt namn" },
+  "panelMenu.gitActivate": { en: "Activate this token", sr: "Aktiviraj ovaj token", de: "Diesen Token aktivieren", fr: "Activer ce jeton", es: "Activar este token", it: "Attiva questo token", pt: "Ativar este token", nl: "Deze token activeren", pl: "Aktywuj ten token", ru: "Активировать этот токен", uk: "Активувати цей токен", zh: "激活此令牌", ja: "このトークンを有効化", ko: "이 토큰 활성화", ar: "تفعيل هذا الرمز", hi: "इस टोकन को सक्रिय करें", tr: "Bu token'ı etkinleştir", el: "Ενεργοποίηση αυτού του token", sv: "Aktivera denna token" },
+  "panelMenu.gitOpen": { en: "Git platforms", sr: "Git platforme", de: "Git-Plattformen", fr: "Plateformes Git", es: "Plataformas Git", it: "Piattaforme Git", pt: "Plataformas Git", nl: "Git-platforms", pl: "Platformy Git", ru: "Git-платформы", uk: "Git-платформи", zh: "Git 平台", ja: "Git プラットフォーム", ko: "Git 플랫폼", ar: "منصات Git", hi: "Git प्लेटफ़ॉर्म", tr: "Git platformları", el: "Πλατφόρμες Git", sv: "Git-plattformar" },
+  "panelMenu.gitName": { en: "Label (e.g. Work / Personal)", sr: "Naziv (npr. Posao / Osobno)", de: "Name (z. B. Arbeit / Privat)", fr: "Nom (ex. Travail / Perso)", es: "Nombre (ej. Trabajo / Personal)", it: "Nome (es. Lavoro / Personale)", pt: "Nome (ex. Trabalho / Pessoal)", nl: "Naam (bijv. Werk / Persoonlijk)", pl: "Nazwa (np. Praca / Osobiste)", ru: "Название (напр. Работа / Личное)", uk: "Назва (напр. Робота / Особисте)", zh: "标签（如 工作 / 个人）", ja: "名前（例：仕事 / 個人）", ko: "이름(예: 업무 / 개인)", ar: "التسمية (مثل العمل / الشخصي)", hi: "लेबल (जैसे कार्य / व्यक्तिगत)", tr: "Etiket (örn. İş / Kişisel)", el: "Ετικέτα (π.χ. Εργασία / Προσωπικό)", sv: "Etikett (t.ex. Arbete / Personligt)" },
+  "panelMenu.noTokens": { en: "No tokens yet", sr: "Još nema tokena", de: "Noch keine Tokens", fr: "Aucun jeton", es: "Sin tokens aún", it: "Ancora nessun token", pt: "Nenhum token ainda", nl: "Nog geen tokens", pl: "Brak tokenów", ru: "Пока нет токенов", uk: "Ще немає токенів", zh: "还没有令牌", ja: "トークンがありません", ko: "아직 토큰 없음", ar: "لا توجد رموز بعد", hi: "अभी कोई टोकन नहीं", tr: "Henüz token yok", el: "Δεν υπάρχουν token ακόμα", sv: "Inga tokens ännu" },
+  "layout.side": { en: "Side-by-side (Ask | Agent)", sr: "Jedan pored drugog (Ask | Agent)", de: "Nebeneinander (Ask | Agent)", fr: "Côte à côte (Ask | Agent)", es: "Lado a lado (Ask | Agent)", it: "Affiancati (Ask | Agent)", pt: "Lado a lado (Ask | Agent)", nl: "Naast elkaar (Ask | Agent)", pl: "Obok siebie (Ask | Agent)", ru: "Рядом (Ask | Agent)", uk: "Поруч (Ask | Agent)", zh: "并排 (Ask | Agent)", ja: "横並び (Ask | Agent)", ko: "나란히 (Ask | Agent)", ar: "جنبًا إلى جنب (Ask | Agent)", hi: "साथ-साथ (Ask | Agent)", tr: "Yan yana (Ask | Agent)", el: "Δίπλα-δίπλα (Ask | Agent)", sv: "Sida vid sida (Ask | Agent)" },
+  "layout.stack": { en: "Stacked (Ask / Agent)", sr: "Jedan ispod drugog (Ask / Agent)", de: "Übereinander (Ask / Agent)", fr: "Empilé (Ask / Agent)", es: "Apilado (Ask / Agent)", it: "Impilati (Ask / Agent)", pt: "Empilhado (Ask / Agent)", nl: "Gestapeld (Ask / Agent)", pl: "Jeden pod drugim (Ask / Agent)", ru: "Друг над другом (Ask / Agent)", uk: "Один під одним (Ask / Agent)", zh: "堆叠 (Ask / Agent)", ja: "縦並び (Ask / Agent)", ko: "세로 (Ask / Agent)", ar: "مكدّس (Ask / Agent)", hi: "खड़ा (Ask / Agent)", tr: "Üst üste (Ask / Agent)", el: "Στοιβαγμένο (Ask / Agent)", sv: "Staplade (Ask / Agent)" },
+  "layout.sideLabel": { en: "side-by-side", sr: "jedan pored drugog", de: "nebeneinander", fr: "côte à côte", es: "lado a lado", it: "affiancati", pt: "lado a lado", nl: "naast elkaar", pl: "obok siebie", ru: "рядом", uk: "поруч", zh: "并排", ja: "横並び", ko: "나란히", ar: "جنبًا إلى جنب", hi: "साथ-साथ", tr: "yan yana", el: "δίπλα-δίπλα", sv: "sida vid sida" },
+  "layout.stackLabel": { en: "stacked", sr: "jedan ispod drugog", de: "übereinander", fr: "empilé", es: "apilado", it: "impilati", pt: "empilhado", nl: "gestapeld", pl: "jeden pod drugim", ru: "друг над другом", uk: "один під одним", zh: "堆叠", ja: "縦並び", ko: "세로", ar: "مكدّس", hi: "खड़ा", tr: "üst üste", el: "στοιβαγμένο", sv: "staplade" },
+  "layout.resize": { en: "Drag to resize panels", sr: "Povuci za promjenu širine panela", de: "Ziehen, um Panels zu skalieren", fr: "Faites glisser pour redimensionner les panneaux", es: "Arrastra para redimensionar paneles", it: "Trascina per ridimensionare i pannelli", pt: "Arraste para redimensionar os painéis", nl: "Sleep om panelen te vergroten", pl: "Przeciągnij, aby zmienić rozmiar paneli", ru: "Перетащите, чтобы изменить размер панелей", uk: "Перетягніть, щоб змінити розмір панелей", zh: "拖动以调整面板大小", ja: "ドラッグでパネルのサイズを変更", ko: "드래그하여 패널 크기 조정", ar: "اسحب لتغيير حجم اللوحات", hi: "पैनल का आकार बदलने के लिए खींचें", tr: "Panelleri yeniden boyutlandırmak için sürükleyin", el: "Σύρετε για αλλαγή μεγέθους πάνελ", sv: "Dra för att ändra storlek på paneler" },
+
+  // ── Zoom ──
+  "zoom.title": { en: "Panel zoom", sr: "Zoom panela", de: "Panel-Zoom", fr: "Zoom du panneau", es: "Zoom del panel", it: "Zoom pannello", pt: "Zoom do painel", nl: "Paneelzoom", pl: "Zoom panelu", ru: "Масштаб панели", uk: "Масштаб панелі", zh: "面板缩放", ja: "パネルズーム", ko: "패널 줌", ar: "تكبير اللوحة", hi: "पैनल ज़ूम", tr: "Panel yakınlaştırma", el: "Μεγέθυνση πάνελ", sv: "Panelzoom" },
+  "zoom.decrease": { en: "Zoom out", sr: "Smanji zoom", de: "Verkleinern", fr: "Zoom arrière", es: "Reducir zoom", it: "Riduci zoom", pt: "Reduzir zoom", nl: "Zoom uit", pl: "Pomniejsz", ru: "Уменьшить масштаб", uk: "Зменшити масштаб", zh: "缩小", ja: "ズームアウト", ko: "축소", ar: "تصغير", hi: "ज़ूम आउट", tr: "Uzaklaştır", el: "Σμίκρυνση", sv: "Zooma ut" },
+  "zoom.increase": { en: "Zoom in", sr: "Povećaj zoom", de: "Vergrößern", fr: "Zoom avant", es: "Aumentar zoom", it: "Ingrandisci zoom", pt: "Aumentar zoom", nl: "Zoom in", pl: "Powiększ", ru: "Увеличить масштаб", uk: "Збільшити масштаб", zh: "放大", ja: "ズームイン", ko: "확대", ar: "تكبير", hi: "ज़ूम इन", tr: "Yakınlaştır", el: "Μεγέθυνση", sv: "Zooma in" },
+  "zoom.reset": { en: "Reset to 100%", sr: "Vrati na 100%", de: "Auf 100% zurücksetzen", fr: "Réinitialiser à 100 %", es: "Restablecer a 100%", it: "Ripristina al 100%", pt: "Redefinir para 100%", nl: "Reset naar 100%", pl: "Resetuj do 100%", ru: "Сброс на 100%", uk: "Скидання на 100%", zh: "重置为 100%", ja: "100% に戻す", ko: "100%로 재설정", ar: "إعادة تعيين إلى 100%", hi: "100% पर रीसेट करें", tr: "%100'e sıfırla", el: "Επαναφορά στο 100%", sv: "Återställ till 100%" },
+
+  // ── PanelMenu ──
+  "panelMenu.theme": { en: "Theme", sr: "Tema", de: "Design", fr: "Thème", es: "Tema", it: "Tema", pt: "Tema", nl: "Thema", pl: "Motyw", ru: "Тема", uk: "Тема", zh: "主题", ja: "テーマ", ko: "테마", ar: "المظهر", hi: "थीम", tr: "Tema", el: "Θέμα", sv: "Tema" },
+  "panelMenu.panelAccent": { en: "Panel accent", sr: "Boja panela", de: "Panel-Akzent", fr: "Accent du panneau", es: "Acento del panel", it: "Accento pannello", pt: "Acento do painel", nl: "Paneelaccent", pl: "Akcent panelu", ru: "Акцент панели", uk: "Акцент панелі", zh: "面板强调色", ja: "パネルアクセント", ko: "패널 액센트", ar: "لون اللوحة", hi: "पैनल एक्सेंट", tr: "Panel vurgusu", el: "Έμφαση πάνελ", sv: "Panelaccent" },
+  "panelMenu.orchestrator": { en: "Orchestrator", sr: "Orkestar", de: "Orchestrierung", fr: "Orchestrateur", es: "Orquestador", it: "Orchestratore", pt: "Orquestrador", nl: "Orchestrator", pl: "Orchestrator", ru: "Оркестратор", uk: "Оркестратор", zh: "编排器", ja: "オーケストレーター", ko: "오케스트레이터", ar: "المنسّق", hi: "ऑर्केस्ट्रेटर", tr: "Orkestratör", el: "Ορχηστρωτής", sv: "Orchestrator" },
+  "panelMenu.orchestratorEmpty": { en: "Select 2+ models for parallel execution", sr: "Odaberi 2+ modela za paralelno izvršavanje", de: "Wählen Sie 2+ Modelle für die parallele Ausführung", fr: "Sélectionnez 2+ modèles pour une exécution parallèle", es: "Selecciona 2+ modelos para ejecución paralela", it: "Seleziona 2+ modelli per esecuzione parallela", pt: "Selecione 2+ modelos para execução paralela", nl: "Selecteer 2+ modellen voor parallelle uitvoering", pl: "Wybierz 2+ modele do równoległego wykonania", ru: "Выберите 2+ модели для параллельного выполнения", uk: "Виберіть 2+ моделі для паралельного виконання", zh: "选择 2 个以上模型进行并行执行", ja: "並列実行には 2 つ以上のモデルを選択", ko: "병렬 실행에는 모델 2개 이상 선택", ar: "حدد نموذجين أو أكثر للتنفيذ المتوازي", hi: "समानांतर निष्पादन के लिए 2+ मॉडल चुनें", tr: "Paralel yürütme için 2+ model seçin", el: "Επιλέξτε 2+ μοντέλα για παράλληλη εκτέλεση", sv: "Välj 2+ modeller för parallell körning" },
 };
 
 export function detectLang(): Lang {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "en" || stored === "bs") return stored;
-    const nav = (navigator.language || "bs").toLowerCase();
-    return nav.startsWith("en") ? "en" : "bs";
+    if (stored && LANGS.some((l) => l.code === stored)) return stored as Lang;
+    const nav = (navigator.language || "en").toLowerCase().split("-")[0];
+    // English is the priority/default; match the browser only when it is a
+    // supported language, otherwise fall back to English.
+    if (LANGS.some((l) => l.code === nav)) return nav as Lang;
+    return "en";
   } catch {
-    return "bs";
+    return "en";
   }
 }
 
@@ -408,13 +228,13 @@ export function setLang(lang: Lang): void {
     // ignore storage errors
   }
   currentLang = lang;
-  document.documentElement.lang = lang === "en" ? "en" : "bs";
+  document.documentElement.lang = lang;
   listeners.forEach((l) => l(lang));
 }
 
 let currentLang: Lang = detectLang();
 if (typeof document !== "undefined") {
-  document.documentElement.lang = currentLang === "en" ? "en" : "bs";
+  document.documentElement.lang = currentLang;
 }
 const listeners = new Set<(l: Lang) => void>();
 
@@ -424,7 +244,9 @@ export function getLang(): Lang {
 
 export function t(key: string, vars?: Record<string, string | number>): string {
   const entry = DICT[key];
-  let out = entry ? entry[currentLang] : key;
+  // English is the universal fallback: if the active language is missing a
+  // translation, show English. If the key doesn't exist at all, show the key.
+  let out = entry ? (entry[currentLang] ?? entry.en ?? key) : key;
   if (vars) {
     for (const [k, v] of Object.entries(vars)) {
       out = out.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));

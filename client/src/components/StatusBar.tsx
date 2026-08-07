@@ -79,7 +79,7 @@ export default function StatusBar() {
           <span className="text-[9px] opacity-70">▾</span>
         </button>
         {langOpen && (
-          <div className="absolute right-0 top-full mt-1 w-32 rounded-xl border border-border bg-surface shadow-xl shadow-black/30 z-50 overflow-hidden">
+          <div className="absolute right-0 top-full mt-1 w-40 rounded-xl border border-border bg-surface shadow-xl shadow-black/30 z-50 overflow-hidden max-h-80 overflow-y-auto">
             {LANGS.map((l) => (
               <button
                 key={l.code}
