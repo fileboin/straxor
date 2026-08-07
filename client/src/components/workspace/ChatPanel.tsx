@@ -833,6 +833,12 @@ export default function ChatPanel({
           {headerLeft}
         </div>
         <div className="flex items-center gap-1 shrink-0 sm:gap-2">
+          {orbState && orbLabel && (
+            <div className="flex items-center gap-2 mr-1" title={orbLabel}>
+              <ThinkingOrb state={orbState} size={64} theme="auto" aria-label={orbLabel} />
+              <span className="hidden sm:inline text-xs text-text-muted capitalize">{orbState}</span>
+            </div>
+          )}
           {runtimeControl}
           {onBackgroundChange && (
             <div className="flex items-center gap-0.5">
