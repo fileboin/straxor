@@ -8,6 +8,7 @@ import InputToolbar from "./InputToolbar.js";
 import InfoTip from "./InfoTip.js";
 import WelcomeHero from "./WelcomeHero.js";
 import PanelMenu from "./PanelMenu.js";
+import ThinkingOrbStatus from "./ThinkingOrbStatus.js";
 import InlineApiKeyForm from "./InlineApiKeyForm.js";
 import { useModelCatalog, type ThinkingBudget } from "../../lib/models.js";
 import type { AgentRole } from "../../lib/roles.js";
@@ -918,6 +919,9 @@ export default function ChatPanel({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-4 flex flex-col gap-2.5 sm:gap-3 min-h-0">
+        {orbState && messages.length === 0 && (
+          <ThinkingOrbStatus state={orbState} label={orbLabel} />
+        )}
         {messages.map((msg) => (
           <div
             key={msg.id}
