@@ -355,9 +355,9 @@ export const sessions = pgTable("sessions", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  projectId: uuid("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
+  // project_id is a varchar (not a uuid FK) so the Agent panel's virtual
+  // project ("agents") can be stored alongside real UUID project ids.
+  projectId: varchar("project_id", { length: 255 }).notNull(),
   machineId: varchar("machine_id", { length: 255 }).notNull(),
   opencodeSessionId: varchar("opencode_session_id", { length: 255 }),
   title: varchar("title", { length: 255 }),
@@ -375,7 +375,6 @@ export const sessions = pgTable("sessions", {
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, { fields: [sessions.userId], references: [users.id] }),
-  project: one(projects, { fields: [sessions.projectId], references: [projects.id] }),
 }));
 
 export const sessionMessages = pgTable("session_messages", {
