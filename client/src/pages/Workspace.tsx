@@ -60,6 +60,7 @@ import GlobalScalePanel from "../components/workspace/GlobalScalePanel.js";
 import EnterpriseResilience from "../components/workspace/EnterpriseResilience.js";
 import CollaboratorsPanel from "../components/workspace/CollaboratorsPanel.js";
 import OrganizationDashboard from "../components/workspace/OrganizationDashboard.js";
+import type { OrbState } from "thinking-orbs";
 import AdminCenter from "../components/workspace/AdminCenter.js";
 import VerificationPanel from "../components/workspace/VerificationPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
@@ -155,6 +156,7 @@ export default function Workspace() {
 
   const [askLoading, setAskLoading] = useState(false);
   const [agentLoading, setAgentLoading] = useState(false);
+  const [askFocused, setAskFocused] = useState(false);
   // Once the local engine has failed and we switched to plain chat, avoid
   // retrying the (always-failing) local engine for subsequent messages.
   const agentDirectFallbackRef = useRef(false);
@@ -849,6 +851,35 @@ export default function Workspace() {
   }, [agentMachineId, agentSessionId, refreshTodos]);
 
   const isAgentSteerable = !!agentSessionId && !!agentMachineId && agentLoading;
+
+  // Single source of truth for the Agent panel's ThinkingOrb state. Maps the
+  // live run (last assistant message tool-call status + loading flag) to one of
+  // the nine orb states so the indicator reflects real work, not decoration.
+  const agentStatusOrb = useMemo<{ state: OrbState; label: string } | null>(() => {
+    if (!agentLoading && !agentStreamingId) return null;
+    let running: string | null = null;
+    for (let i = agentMessages.length - 1; i >= 0 && !running; i--) {
+      const m = agentMessages[i];
+      if (m.role !== "assistant" || !m.toolCalls?.length) continue;
+      const active = m.toolCalls.find((t) => t.status === "running" || t.status === "pending");
+      if (active) running = active.name;
+    }
+    if (!running) return { state: "composing", label: "Generišem…" };
+    const name = running.toLowerCase();
+    if (/(search|grep|glob|find|read|list|ls|browse|fetch)/.test(name)) {
+      return { state: "searching", label: "Pretražujem kod…" };
+    }
+    if (/(write|edit|create|touch|append|patch|rename)/.test(name)) {
+      return { state: "composing", label: "Pišem kod…" };
+    }
+    if (/(test|build|verify|check|lint|run|execute|compile)/.test(name)) {
+      return { state: "solving", label: "Verifikujem…" };
+    }
+    if (/(plan|think|reason|todo)/.test(name)) {
+      return { state: "working", label: "Razmišljam…" };
+    }
+    return { state: "working", label: "Radim…" };
+  }, [agentLoading, agentStreamingId, agentMessages]);
 
   const handleSteerSend = useCallback(async (msg: string) => {
     if (!agentMachineId || !agentSessionId) return;
@@ -2295,6 +2326,10 @@ export default function Workspace() {
                 onOpenRuntimeManager={() => setShowRuntimeManager(true)}
               />
             }
+            beamActive={askFocused || !!askStreamingId}
+            onFocusChange={setAskFocused}
+            orbState={askLoading ? "composing" : null}
+            orbLabel={askLoading ? "Generišem odgovor…" : undefined}
           />
         </div>
 
@@ -2422,10 +2457,13 @@ modelOrch={agentModelOrch}
                       Pregledaj promjene
                     </button>
                   </div>
-                )}
-              </>
-            }
-          />
+                  )}
+                </>
+              }
+              beamActive={agentLoading}
+              orbState={agentStatusOrb?.state ?? null}
+              orbLabel={agentStatusOrb?.label}
+            />
         </div>
         </div>
       </div>

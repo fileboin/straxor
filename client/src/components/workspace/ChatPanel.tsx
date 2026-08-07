@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, type FormEvent, type ChangeEvent } from "react";
 import { createPortal } from "react-dom";
+import { BorderBeam } from "border-beam";
+import { ThinkingOrb, type OrbState } from "thinking-orbs";
 import ProviderModelDropdown from "./ProviderModelDropdown.js";
 import ModelPickerModal from "./ModelPickerModal.js";
 import InputToolbar from "./InputToolbar.js";
@@ -118,6 +120,14 @@ interface Props {
   orchestratedModels?: { providerId: string; modelId: string }[];
   onOrchestratedModelsChange?: (models: { providerId: string; modelId: string }[]) => void;
   availableModels?: { providerId: string; name: string; models: { id: string; name: string }[] }[];
+  /** BorderBeam glow is active while the panel is doing real work. */
+  beamActive?: boolean;
+  /** ThinkingOrb state shown in the inline status bar (null hides the orb). */
+  orbState?: OrbState | null;
+  /** Text label rendered next to the orb. */
+  orbLabel?: string;
+  /** Reports panel container focus so the Ask beam can light on focus. */
+  onFocusChange?: (focused: boolean) => void;
 }
 
 const ACCEPTED_EXT_RE = /\.(jpe?g|png|webp|gif|avif|mp3|wav|ogg|webm|m4a|pdf|txt|md|csv|json)$/i;
@@ -288,6 +298,10 @@ export default function ChatPanel({
   orchestratedModels = [],
   onOrchestratedModelsChange,
   availableModels = [],
+  beamActive = false,
+  orbState = null,
+  orbLabel,
+  onFocusChange,
 }: Props) {
   const [input, setInput] = useState("");
   useLang();
@@ -301,6 +315,7 @@ export default function ChatPanel({
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [showKeyErrorForm, setShowKeyErrorForm] = useState(false);
+  const [panelFocused, setPanelFocused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { providers: catalogProviders, loading: catalogLoading } = useModelCatalog();
   const providerName =
@@ -368,6 +383,15 @@ export default function ChatPanel({
       cameraCleanupRef.current?.();
     };
   }, []);
+
+  // Report panel-container focus upward (Ask beam lights while focused).
+  // Debounced briefly so a quick focus transfer doesn't flicker the glow.
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleFocusChange = (focused: boolean) => {
+    setPanelFocused(focused);
+    if (focusTimer.current) clearTimeout(focusTimer.current);
+    focusTimer.current = setTimeout(() => onFocusChange?.(focused), focused ? 0 : 220);
+  };
 
   // Close the budget popover on Escape / outside click (non-blocking)
   const budgetRef = useRef<HTMLDivElement>(null);
@@ -741,8 +765,20 @@ export default function ChatPanel({
     : undefined;
 
   return (
+    <BorderBeam
+      colorVariant="sunset"
+      theme="dark"
+      size="md"
+      active={beamActive || panelFocused}
+      borderRadius={16}
+      style={{ overflow: "visible", "--beam-hue-base": "10deg" } as React.CSSProperties}
+      className="h-full rounded-2xl"
+    >
     <div
-      className={`flex flex-col h-full min-h-0 overflow-hidden rounded-2xl panel-glass ${isEmpty ? "border border-white/10" : "border border-border shadow-lg shadow-black/30"}`}
+      tabIndex={-1}
+      onFocus={() => handleFocusChange(true)}
+      onBlur={() => handleFocusChange(false)}
+      className={`flex flex-col h-full min-h-0 overflow-hidden rounded-2xl panel-glass outline-none ${isEmpty ? "border border-white/10" : "border border-border shadow-lg shadow-black/30"}`}
       data-panel-accent={panelAccent ? "true" : undefined}
       style={panelBgStyle}
     >
@@ -979,6 +1015,14 @@ export default function ChatPanel({
         <div ref={messagesEndRef} />
       </div>
 
+      {/* ThinkingOrb status bar — functional indicator while the panel works */}
+      {orbState && orbLabel && (
+        <div className="px-3 py-1.5 border-t border-border bg-surface/60 flex items-center gap-2 shrink-0">
+          <ThinkingOrb state={orbState} size={20} theme="auto" aria-label={orbLabel} />
+          <span className="text-[11px] text-text-muted">{orbLabel}</span>
+        </div>
+      )}
+
       {/* Steer status bar */}
       {isSteerable && (
         <div className="px-3 py-1.5 border-t border-accent/30 bg-accent/5 flex items-center gap-2">
@@ -1111,5 +1155,6 @@ export default function ChatPanel({
           document.body
         )}
     </div>
+    </BorderBeam>
   );
 }
