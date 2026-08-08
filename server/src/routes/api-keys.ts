@@ -18,7 +18,13 @@ router.get("/", requireAuth, async (req, res) => {
 
     // Mask keys for display
     const masked = result.map((row) => {
-      const decrypted = decrypt(row.encryptedKey);
+      let decrypted: string;
+      try {
+        decrypted = decrypt(row.encryptedKey);
+      } catch {
+        // Undecryptable row → skip it rather than failing the whole list.
+        return null;
+      }
       const maskedKey = decrypted.slice(0, 8) + "••••••••" + decrypted.slice(-4);
       return {
         id: row.id,
@@ -26,7 +32,7 @@ router.get("/", requireAuth, async (req, res) => {
         maskedKey,
         createdAt: row.createdAt,
       };
-    });
+    }).filter((r): r is NonNullable<typeof r> => r !== null);
 
     res.json(masked);
   } catch (error) {
@@ -52,7 +58,17 @@ router.get("/:providerId", requireAuth, async (req, res) => {
       return;
     }
 
-    const decrypted = decrypt(result[0].encryptedKey);
+    let decrypted: string;
+    try {
+      decrypted = decrypt(result[0].encryptedKey);
+    } catch {
+      // A stored key that can't be decrypted (e.g. encrypted under a
+      // different ENCRYPTION_KEY) is not usable — treat it as "not
+      // configured" so the client asks the user to re-enter it instead of
+      // surfacing an opaque server error.
+      res.status(404).json({ error: "API key not found" });
+      return;
+    }
     res.json({ key: decrypted });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
