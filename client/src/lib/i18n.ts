@@ -205,6 +205,57 @@ const DICT: Record<string, Partial<Record<Lang, string>>> = {
   "panelMenu.panelAccent": { en: "Panel accent", sr: "Boja panela", de: "Panel-Akzent", fr: "Accent du panneau", es: "Acento del panel", it: "Accento pannello", pt: "Acento do painel", nl: "Paneelaccent", pl: "Akcent panelu", ru: "Акцент панели", uk: "Акцент панелі", zh: "面板强调色", ja: "パネルアクセント", ko: "패널 액센트", ar: "لون اللوحة", hi: "पैनल एक्सेंट", tr: "Panel vurgusu", el: "Έμφαση πάνελ", sv: "Panelaccent" },
   "panelMenu.orchestrator": { en: "Orchestrator", sr: "Orkestar", de: "Orchestrierung", fr: "Orchestrateur", es: "Orquestador", it: "Orchestratore", pt: "Orquestrador", nl: "Orchestrator", pl: "Orchestrator", ru: "Оркестратор", uk: "Оркестратор", zh: "编排器", ja: "オーケストレーター", ko: "오케스트레이터", ar: "المنسّق", hi: "ऑर्केस्ट्रेटर", tr: "Orkestratör", el: "Ορχηστρωτής", sv: "Orchestrator" },
   "panelMenu.orchestratorEmpty": { en: "Select 2+ models for parallel execution", sr: "Odaberi 2+ modela za paralelno izvršavanje", de: "Wählen Sie 2+ Modelle für die parallele Ausführung", fr: "Sélectionnez 2+ modèles pour une exécution parallèle", es: "Selecciona 2+ modelos para ejecución paralela", it: "Seleziona 2+ modelli per esecuzione parallela", pt: "Selecione 2+ modelos para execução paralela", nl: "Selecteer 2+ modellen voor parallelle uitvoering", pl: "Wybierz 2+ modele do równoległego wykonania", ru: "Выберите 2+ модели для параллельного выполнения", uk: "Виберіть 2+ моделі для паралельного виконання", zh: "选择 2 个以上模型进行并行执行", ja: "並列実行には 2 つ以上のモデルを選択", ko: "병렬 실행에는 모델 2개 이상 선택", ar: "حدد نموذجين أو أكثر للتنفيذ المتوازي", hi: "समानांतर निष्पादन के लिए 2+ मॉडल चुनें", tr: "Paralel yürütme için 2+ model seçin", el: "Επιλέξτε 2+ μοντέλα για παράλληλη εκτέλεση", sv: "Välj 2+ modeller för parallell körning" },
+
+  // ── Missing keys restored from pre-rewrite (English fallback) ──
+  "auth.loginTab": { en: "Log in" },
+  "auth.registerTab": { en: "Register" },
+  "auth.resetSent": { en: "If an account with that address exists, we sent a password reset link. The link is valid for 1 hour." },
+  "auth.forgotTitle": { en: "Reset password" },
+  "auth.forgotSubtitle": { en: "Enter your email and we'll send you a reset link." },
+  "auth.verificationNotice": { en: "We sent you a verification email. Confirm your address from your inbox to activate the account." },
+  "auth.resetInvalid": { en: "Invalid password reset link." },
+  "auth.requestNewLink": { en: "Request a new link" },
+  "auth.resetDoneTitle": { en: "Password changed" },
+  "auth.resetDoneSubtitle": { en: "You can now log in with your new password." },
+  "auth.resetSubtitle": { en: "Set a new password for your account." },
+  "auth.verificationFailed": { en: "The verification link is invalid or has expired." },
+  "auth.verifyDoneSubtitle": { en: "Your email address has been verified successfully." },
+  "auth.verifyFailedTitle": { en: "Verification failed" },
+
+  "chat.ask.any": { en: "Ask anything..." },
+  "chat.ask.noKey": { en: "Enter an API key first..." },
+  "chat.steer.placeholder": { en: "Instruction for the active agent..." },
+  "chat.steer.sent": { en: "Instruction sent to the agent." },
+  "chat.steer.error": { en: "Failed to send instruction to the agent." },
+  "chat.steer.steps": { en: "Agent is executing {n} steps — send an instruction" },
+  "chat.agent.command": { en: "Tell the agent what to do..." },
+
+  "toolbar.modelInfo": { en: "Choose the AI model and sub-model for this panel." },
+  "toolbar.budgetInfo": { en: "Optional — rough cost estimate for the project. Never runs automatically." },
+  "toolbar.promptsInfo": { en: "Use predefined prompts and templates, or leave empty for free text." },
+  "toolbar.mic.unsupported": { en: "Speech recognition not supported in this browser" },
+  "toolbar.mic.processing": { en: "Processing audio…" },
+
+  "upload.mic.error": { en: "Microphone unavailable. Check browser permission." },
+  "upload.camera.error": { en: "Camera unavailable. Check browser permission." },
+
+  "vzoom.title": { en: "Vertical zoom" },
+  "layout.resizeHeight": { en: "Drag to resize panel height" },
+  "zoom.presets": { en: "Preset size" },
+
+  "budget.title": { en: "Project budget estimate" },
+  "budget.close": { en: "Close" },
+  "budget.desc": { en: "Rough estimate based on the current message or last task." },
+  "budget.cost": { en: "Est. cost" },
+  "budget.tokens": { en: "Tokens" },
+  "budget.steps": { en: "Steps" },
+  "budget.duration": { en: "Duration" },
+  "budget.send": { en: "Send detailed budget request" },
+  "budget.empty": { en: "Type a message first so we can estimate it." },
+
+  "models.keyPlaceholder": { en: "Paste {provider} API key..." },
+  "models.keyTooShort": { en: "Key is too short" },
+  "models.keyOpenRouterPrefix": { en: "OpenRouter keys start with sk-or-v1-" },
 };
 
 export function detectLang(): Lang {
