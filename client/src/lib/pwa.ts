@@ -3,6 +3,15 @@ import { useEffect, useState } from "react";
 const RESUME_TOKEN_KEY = "straxor.pwa.resumeToken";
 const RESUME_META_KEY = "straxor.pwa.resumeMeta";
 
+export interface PwaResumeMeta {
+  token: string;
+  reason: string;
+  href: string;
+  path: string;
+  standalone: boolean;
+  savedAt: number;
+}
+
 export function isStandalone(): boolean {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
@@ -14,7 +23,7 @@ function makeResumeToken(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function updateResumeMeta(reason: string): void {
+export function updateResumeMeta(reason: string): void {
   try {
     const existing = localStorage.getItem(RESUME_TOKEN_KEY) || makeResumeToken();
     localStorage.setItem(RESUME_TOKEN_KEY, existing);
@@ -27,7 +36,7 @@ function updateResumeMeta(reason: string): void {
         path: `${window.location.pathname}${window.location.search}${window.location.hash}`,
         standalone: isStandalone(),
         savedAt: Date.now(),
-      })
+      } satisfies PwaResumeMeta)
     );
   } catch {
     // Ignore localStorage failures.
@@ -36,9 +45,63 @@ function updateResumeMeta(reason: string): void {
 
 export function getResumeToken(): string | null {
   try {
+    if (!localStorage.getItem(RESUME_TOKEN_KEY)) {
+      localStorage.setItem(RESUME_TOKEN_KEY, makeResumeToken());
+    }
+  } catch {
+    // Ignore localStorage failures.
+  }
+  try {
     return localStorage.getItem(RESUME_TOKEN_KEY);
   } catch {
     return null;
+  }
+}
+
+export function getResumeMeta(): PwaResumeMeta | null {
+  try {
+    const raw = localStorage.getItem(RESUME_META_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PwaResumeMeta>;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (typeof parsed.token !== "string" || typeof parsed.reason !== "string") return null;
+    return {
+      token: parsed.token,
+      reason: parsed.reason,
+      href: typeof parsed.href === "string" ? parsed.href : window.location.href,
+      path: typeof parsed.path === "string" ? parsed.path : `${window.location.pathname}${window.location.search}${window.location.hash}`,
+      standalone: parsed.standalone === true,
+      savedAt: typeof parsed.savedAt === "number" ? parsed.savedAt : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function getServiceWorkerDiagnostics(): Promise<{
+  supported: boolean;
+  registered: boolean;
+  controller: boolean;
+  scope: string | null;
+}> {
+  if (!("serviceWorker" in navigator)) {
+    return { supported: false, registered: false, controller: false, scope: null };
+  }
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    return {
+      supported: true,
+      registered: !!reg,
+      controller: !!navigator.serviceWorker.controller,
+      scope: reg?.scope || null,
+    };
+  } catch {
+    return {
+      supported: true,
+      registered: false,
+      controller: !!navigator.serviceWorker.controller,
+      scope: null,
+    };
   }
 }
 

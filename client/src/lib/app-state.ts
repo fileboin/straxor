@@ -1,5 +1,6 @@
 export interface AppStateShape {
   version?: number;
+  localMirrorSavedAt?: number;
   [key: string]: unknown;
 }
 
@@ -9,6 +10,7 @@ let pendingState: AppStateShape | null = null;
 const SAVE_DELAY = 2500;
 const LOCAL_MIRROR_KEY = "straxor.appState.mirror";
 const LOCAL_MIRROR_TS_KEY = "straxor.appState.mirror.ts";
+const LAST_RESTORE_META_KEY = "straxor.appState.lastRestoreMeta";
 
 function readMirrorTimestamp(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
@@ -43,12 +45,34 @@ function readLocalMirror(): AppStateShape {
   }
 }
 
+function writeLastRestoreMeta(source: "remote" | "mirror", state: AppStateShape): void {
+  safeLocalSet(
+    LAST_RESTORE_META_KEY,
+    JSON.stringify({
+      source,
+      savedAt: readMirrorTimestamp(state.localMirrorSavedAt),
+      restoredAt: Date.now(),
+    })
+  );
+}
+
 function pickNewerState(remoteState: AppStateShape, mirrorState: AppStateShape): AppStateShape {
   const remoteTs = readMirrorTimestamp(remoteState.localMirrorSavedAt);
   const mirrorTs = readMirrorTimestamp(mirrorState.localMirrorSavedAt);
-  if (!remoteState || typeof remoteState !== "object") return mirrorState;
-  if (!mirrorState || typeof mirrorState !== "object") return remoteState;
-  return mirrorTs > remoteTs ? mirrorState : remoteState;
+  if (!remoteState || typeof remoteState !== "object") {
+    writeLastRestoreMeta("mirror", mirrorState);
+    return mirrorState;
+  }
+  if (!mirrorState || typeof mirrorState !== "object") {
+    writeLastRestoreMeta("remote", remoteState);
+    return remoteState;
+  }
+  if (mirrorTs > remoteTs) {
+    writeLastRestoreMeta("mirror", mirrorState);
+    return mirrorState;
+  }
+  writeLastRestoreMeta("remote", remoteState);
+  return remoteState;
 }
 
 async function push(state: AppStateShape): Promise<void> {
@@ -89,6 +113,22 @@ export function saveAppStateNow(state: AppStateShape): void {
   void push(pendingState);
 }
 
+export function getLastRestoreMeta(): { source: "remote" | "mirror"; savedAt: number; restoredAt: number } | null {
+  try {
+    const raw = localStorage.getItem(LAST_RESTORE_META_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { source?: "remote" | "mirror"; savedAt?: number; restoredAt?: number };
+    if (parsed.source !== "remote" && parsed.source !== "mirror") return null;
+    return {
+      source: parsed.source,
+      savedAt: readMirrorTimestamp(parsed.savedAt),
+      restoredAt: readMirrorTimestamp(parsed.restoredAt),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function loadAppState(): Promise<AppStateShape> {
   const mirrorState = readLocalMirror();
   try {
@@ -96,11 +136,15 @@ export async function loadAppState(): Promise<AppStateShape> {
     const res = await fetch("/api/app-state", {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
-    if (!res.ok) return mirrorState;
+    if (!res.ok) {
+      writeLastRestoreMeta("mirror", mirrorState);
+      return mirrorState;
+    }
     const data = (await res.json()) as { state?: AppStateShape };
     const remoteState = data.state && typeof data.state === "object" ? data.state : {};
     return pickNewerState(remoteState, mirrorState);
   } catch {
+    writeLastRestoreMeta("mirror", mirrorState);
     return mirrorState;
   }
 }

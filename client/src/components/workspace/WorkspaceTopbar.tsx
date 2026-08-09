@@ -30,6 +30,7 @@ interface Props {
   onOpenImage?: () => void;
   onOpenImageAgent?: () => void;
   onOpenVerification?: () => void;
+  onOpenPwaDiagnostics?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -76,6 +77,7 @@ export default function WorkspaceTopbar({
   onOpenImage,
   onOpenImageAgent,
   onOpenVerification,
+  onOpenPwaDiagnostics,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -228,6 +230,15 @@ export default function WorkspaceTopbar({
             title="Proof Loop Verification"
           >
             ✓
+          </button>
+        )}
+        {onOpenPwaDiagnostics && (
+          <button
+            onClick={onOpenPwaDiagnostics}
+            className="hidden sm:flex w-8 h-8 items-center justify-center rounded-lg border border-border bg-transparent text-text-secondary text-xs hover:text-text transition-colors"
+            title="PWA Diagnostics"
+          >
+            📱
           </button>
         )}
         {onOpenImageAgent && (

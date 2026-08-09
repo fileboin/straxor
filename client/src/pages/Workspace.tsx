@@ -65,6 +65,7 @@ import type { OrbState } from "thinking-orbs";
 import AdminCenter from "../components/workspace/AdminCenter.js";
 import VerificationPanel from "../components/workspace/VerificationPanel.js";
 import BusHistoryPanel from "../components/workspace/BusHistoryPanel.js";
+import PwaDiagnosticsPanel from "../components/workspace/PwaDiagnosticsPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -76,7 +77,7 @@ import {
   type Session,
 } from "../lib/sessions.js";
 import type { Command } from "../lib/commands.js";
-import { loadAppState, saveAppState, saveAppStateNow, type AppStateShape } from "../lib/app-state.js";
+import { getLastRestoreMeta, loadAppState, saveAppState, saveAppStateNow, type AppStateShape } from "../lib/app-state.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [];
 
@@ -287,6 +288,8 @@ export default function Workspace() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
   const [showBusHistory, setShowBusHistory] = useState(false);
+  const [showPwaDiagnostics, setShowPwaDiagnostics] = useState(false);
+  const [restoredFromMirror, setRestoredFromMirror] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -536,6 +539,7 @@ export default function Workspace() {
     showVerification,
     showSessionPicker,
     showCommandPalette,
+    showPwaDiagnostics,
     askPrefill,
     agentPrefill,
     askDraftInput,
@@ -572,7 +576,7 @@ export default function Workspace() {
     askPanelMode, agentPanelMode,
     dbSessionId, askSessionId, agentSessionId, askMachineId, agentMachineId,
     gitRemoteSlot, runtimeManagerPanel,
-    showBusHistory, showGitRemote, showRuntimeManager, showSearch, showContext, showVerification, showSessionPicker, showCommandPalette,
+    showBusHistory, showGitRemote, showRuntimeManager, showSearch, showContext, showVerification, showSessionPicker, showCommandPalette, showPwaDiagnostics,
     askPrefill, agentPrefill,
     askDraftInput, agentDraftInput, askDraftAttachments, agentDraftAttachments,
     askMessages, agentMessages, agentTodos, agentBusEvents,
@@ -645,6 +649,7 @@ export default function Workspace() {
         if (typeof s.showVerification === "boolean") setShowVerification(s.showVerification);
         if (typeof s.showSessionPicker === "boolean") setShowSessionPicker(s.showSessionPicker);
         if (typeof s.showCommandPalette === "boolean") setShowCommandPalette(s.showCommandPalette);
+        if (typeof s.showPwaDiagnostics === "boolean") setShowPwaDiagnostics(s.showPwaDiagnostics);
         if (typeof s.askPrefill === "string") setAskPrefill(s.askPrefill);
         if (typeof s.agentPrefill === "string") setAgentPrefill(s.agentPrefill);
         if (typeof s.askDraftInput === "string") setAskDraftInput(s.askDraftInput);
@@ -660,6 +665,8 @@ export default function Workspace() {
         const hydratedBusEvents = sanitizeBusEvents(s.agentBusEvents);
         if (hydratedBusEvents.length > 0) setAgentBusEvents(hydratedBusEvents);
       }
+      const restoreMeta = getLastRestoreMeta();
+      if (restoreMeta?.source === "mirror") setRestoredFromMirror(true);
       if (mounted) setStateReady(true);
     };
     hydrate().catch(() => {
@@ -2379,6 +2386,15 @@ export default function Workspace() {
       keywords: ["prompts", "prompt", "library", "biblioteka"],
       action: () => setShowPromptLibrary(true),
     },
+    {
+      id: "diagnostics-pwa",
+      label: "PWA Diagnostics",
+      description: "Service Worker, resume token, standalone mode, restore source",
+      icon: "📱",
+      category: "settings",
+      keywords: ["pwa", "service worker", "resume", "offline", "mirror", "diagnostics"],
+      action: () => setShowPwaDiagnostics(true),
+    },
 
     // Agent role commands
     {
@@ -2456,6 +2472,25 @@ export default function Workspace() {
           </div>
         </div>
       )}
+      {restoredFromMirror && (
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 text-yellow-300 text-[11px] shadow-lg shadow-black/20">
+          Resume restored from local mirror
+          <button
+            type="button"
+            onClick={() => setShowPwaDiagnostics(true)}
+            className="ml-2 underline hover:no-underline"
+          >
+            View diagnostics
+          </button>
+          <button
+            type="button"
+            onClick={() => setRestoredFromMirror(false)}
+            className="ml-2 text-yellow-200/80 hover:text-yellow-100"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <WorkspaceTopbar
         projectName={projectName}
         template="react"
@@ -2482,6 +2517,7 @@ export default function Workspace() {
           onOpenImage={() => navigate(`/project/${projectIdFromUrl || "unknown"}/image`)}
           onOpenImageAgent={() => navigate(`/project/${projectIdFromUrl || "unknown"}/image-agent`)}
           onOpenVerification={() => setShowVerification(true)}
+          onOpenPwaDiagnostics={() => setShowPwaDiagnostics(true)}
           onOpenKnowledge={() => navigate(`/project/${projectIdFromUrl || "unknown"}/knowledge`)}
         />
 
@@ -3165,6 +3201,10 @@ modelOrch={agentModelOrch}
 
       {showRuntimeManager && (
         <RuntimeSelector machineId={runtimeManagerPanel === "ask" ? askMachineId : agentMachineId} onClose={() => setShowRuntimeManager(false)} />
+      )}
+
+      {showPwaDiagnostics && (
+        <PwaDiagnosticsPanel onClose={() => setShowPwaDiagnostics(false)} />
       )}
 
       {showQuickStart && (
