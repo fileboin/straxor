@@ -6,7 +6,7 @@
 // browser caches are flushed automatically (old caches deleted on activate).
 // Other copies (v0/v1/v2) are purged here too, ensuring a poisoned cache can
 // never survive a deploy.
-const CACHE = "straxor-shell-v5";
+const CACHE = "straxor-shell-v6";
 
 const PRECACHE = [
   "/",
