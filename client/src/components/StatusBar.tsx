@@ -73,7 +73,7 @@ export default function StatusBar() {
         <button
           onClick={() => setLangOpen((o) => !o)}
           className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-text-muted hover:text-text rounded-md hover:bg-surface-2 transition-colors"
-          title="Language / Jezik"
+          title="Language"
         >
           <span>{LANGS.find((l) => l.code === lang)?.short ?? "EN"}</span>
           <span className="text-[9px] opacity-70">▾</span>

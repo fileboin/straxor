@@ -14,7 +14,7 @@ export default function InstallPwaButton() {
     >
       <span className="text-sm leading-none">⬇</span>
       <span>{t("pwa.install")}</span>
-      <span className="hidden sm:inline text-[10px] text-accent/70">(Add to Home Screen)</span>
+      <span className="hidden sm:inline text-[10px] text-accent/70">({t("pwa.install.title")})</span>
     </button>
   );
 }
