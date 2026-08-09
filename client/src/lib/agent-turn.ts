@@ -27,15 +27,16 @@ export interface AgentTurnCtx {
   projectId: string;
   dbSessionId: string | null;
   createDbSession: () => Promise<string | null>;
-  saveMessage: (sessionId: string, role: "user" | "assistant", content: string, label?: string, toolCalls?: ToolCall[]) => Promise<void>;
-  updateSession: (sessionId: string, patch: Record<string, unknown>) => Promise<void>;
+  saveMessage: (sessionId: string, role: "user" | "assistant", content: string, label?: string, toolCalls?: ToolCall[]) => Promise<unknown>;
+  updateSession: (sessionId: string, patch: Record<string, unknown>) => Promise<unknown>;
   onToolAllow: (id: string, name: string, args: Record<string, unknown> | string, assistantMsgId: string) => void;
   setPendingTool: (v: { toolId: string; args: Record<string, unknown> | string; onAllow: () => void; onDeny: () => void } | null) => void;
   setSecurityPackageName: (v: string) => void;
   setPendingInstallAllow: (v: (() => void) | null) => void;
-  setSecurityVerdict: (v: unknown) => void;
+  setSecurityVerdict: (v: any) => void;
   checkBeforeInstall: (name: string, version: string, ecosystem: string, machineId?: string) => Promise<unknown>;
   onRefreshTodos?: () => void;
+  onErrorFallback?: (error: string) => void;
 }
 
 function buildSystemContext(role: AgentRole, prompts: { id: string; name: string; content: string }[], activeIds: Set<string>): string {
@@ -225,6 +226,10 @@ export async function runAgentTurn(msg: string, attachments: Attachment[] | unde
       }
     },
     onError: (error) => {
+      if (ctx.onErrorFallback) {
+        ctx.onErrorFallback(error);
+        return;
+      }
       ctx.setMessages((prev) =>
         prev.map((m) => (m.id === ctx.assistantMsgId ? { ...m, content: m.content + `\n\n[Greška: ${error}]` } : m))
       );

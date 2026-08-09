@@ -230,6 +230,7 @@ export default function Workspace() {
   // engine with its own slot/repo, parallel to Agent).
   const [askSessionId, setAskSessionId] = useState<string | null>(null);
   const [askMachineId, setAskMachineId] = useState<string | null>(null);
+  const askDirectFallbackRef = useRef(false);
 
   // Active repo connection — when set and no VPS machine is configured, the
   // agent runs on the LOCAL engine inside the cloned repo (no VPS needed).
@@ -954,9 +955,8 @@ export default function Workspace() {
     // Ask is a full independent agent on its own local engine/slot. When a
     // machine is configured (e.g. active repo for the ask slot → local engine),
     // run the full agent turn (SSE, tools, permissions) instead of plain chat.
-    if (askMachineId) {
-      const roleConfig = getRoleById(askRole);
-      const activePrompts = savedPrompts.filter((p) => activePromptIds.has(p.id));
+    const localAskEngineOnRemote = !!askMachineId?.startsWith("local:") && !isLocalHost;
+    if (askMachineId && !localAskEngineOnRemote && !askDirectFallbackRef.current) {
       await runAgentTurn(msg, attachments, {
         role: askRole,
         provider: askProvider,
@@ -1003,9 +1003,41 @@ export default function Workspace() {
         setSecurityVerdict,
         checkBeforeInstall,
         onRefreshTodos: () => {},
+        onErrorFallback: (error) => {
+          if (askMachineId?.startsWith("local:") && !askDirectFallbackRef.current) {
+            askDirectFallbackRef.current = true;
+            setAskLoading(false);
+            setAskStreamingId(null);
+            setAskMessages((prev) => prev.filter((m) => m.id !== assistantMsg.id));
+            handleAskSend(msg, attachments);
+            return;
+          }
+          setAskMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsg.id
+                ? { ...m, content: m.content + `\n\n[Greška: ${error}]` }
+                : m
+            )
+          );
+          setAskStreamingId(null);
+          setAskLoading(false);
+        },
+      }).catch((error) => {
+        const message = error instanceof Error ? error.message : "Network error";
+        setAskMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsg.id
+              ? { ...m, content: m.content + `\n\n[Greška: ${message}]` }
+              : m
+          )
+        );
+        setAskStreamingId(null);
+        setAskLoading(false);
       });
       return;
     }
+
+    askDirectFallbackRef.current = false;
 
     // Model orkestracija — route to best model for this task's difficulty.
     // Skipped when images are attached (router is text-only and may pick a
