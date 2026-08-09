@@ -6,6 +6,7 @@ import { fetchDeployments, triggerDeployment, fetchDeployment, fetchBuildLog, st
 import { getPublishLinks, createPublishLink, updatePublishLink, deletePublishLink, type PublishLink } from "../lib/publish.js";
 import { startPreview, stopPreview, getPreviewStatus, type PreviewStatus, DEVICE_PRESETS } from "../lib/preview.js";
 import { listMachines, installCoolify, type MachineRecord, type CoolifyInstallEvent } from "../lib/machines.js";
+import { listInfraConfigs, testInfraConfig, type InfraConfig, type InfraHealthCheck } from "../lib/infrastructure.js";
 
 type Tab = "preview" | "publish" | "deploy";
 
@@ -51,6 +52,9 @@ export default function DeployManager() {
   const [coolifyEvents, setCoolifyEvents] = useState<CoolifyInstallEvent[]>([]);
   const [coolifyInstalling, setCoolifyInstalling] = useState(false);
   const [coolifyError, setCoolifyError] = useState("");
+  const [infraConfigs, setInfraConfigs] = useState<InfraConfig[]>([]);
+  const [coolifyHealth, setCoolifyHealth] = useState<InfraHealthCheck | null>(null);
+  const [coolifyTesting, setCoolifyTesting] = useState(false);
 
   const loadPublish = useCallback(async () => {
     if (!projectId) return;
@@ -76,6 +80,14 @@ export default function DeployManager() {
     }
   }, [projectId]);
 
+  const loadInfraConfigs = useCallback(async () => {
+    try {
+      setInfraConfigs(await listInfraConfigs());
+    } catch {
+      setInfraConfigs([]);
+    }
+  }, []);
+
   const loadPreviewStatus = useCallback(async () => {
     if (!machineId) { setPreviewStatus(null); return; }
     try { setPreviewStatus(await getPreviewStatus(machineId)); } catch { setPreviewStatus(null); }
@@ -84,8 +96,8 @@ export default function DeployManager() {
   useEffect(() => {
     if (tab === "preview") loadPreviewStatus();
     if (tab === "publish") loadPublish();
-    if (tab === "deploy") { loadDeployments(); loadProviders(); loadMachines(); }
-  }, [tab, loadPreviewStatus, loadPublish, loadDeployments, loadProviders, loadMachines]);
+    if (tab === "deploy") { loadDeployments(); loadProviders(); loadMachines(); loadInfraConfigs(); }
+  }, [tab, loadPreviewStatus, loadPublish, loadDeployments, loadProviders, loadMachines, loadInfraConfigs]);
 
   // ── Preview ──
   const handleStartPreview = async () => {
@@ -173,10 +185,39 @@ export default function DeployManager() {
       });
       flash("Coolify instalacija završena");
       loadMachines();
+      loadInfraConfigs();
     } catch (err) {
       setCoolifyError(err instanceof Error ? err.message : "Coolify instalacija nije uspjela");
     } finally {
       setCoolifyInstalling(false);
+    }
+  };
+
+  const handleTestCoolify = async () => {
+    const config = infraConfigs.find((cfg) =>
+      cfg.adapter === "coolify" && (
+        (coolifyMachineId && cfg.machineId === coolifyMachineId) ||
+        (projectId && cfg.projectId === projectId)
+      )
+    );
+
+    if (!config) {
+      setCoolifyHealth(null);
+      setCoolifyError("Nema sačuvanog Coolify infrastructure config-a za ovu mašinu/projekat.");
+      return;
+    }
+
+    setCoolifyTesting(true);
+    setCoolifyError("");
+    try {
+      const result = await testInfraConfig(config.id);
+      setCoolifyHealth(result);
+      flash("Coolify connection tested");
+    } catch (err) {
+      setCoolifyHealth(null);
+      setCoolifyError(err instanceof Error ? err.message : "Coolify test nije uspio");
+    } finally {
+      setCoolifyTesting(false);
     }
   };
 
@@ -328,11 +369,18 @@ export default function DeployManager() {
                       >
                         {coolifyInstalling ? "Installing..." : "🧊 Install Coolify"}
                       </button>
+                      <button
+                        onClick={handleTestCoolify}
+                        disabled={!coolifyMachineId || coolifyTesting}
+                        className="px-3 py-2 rounded-lg border border-border bg-surface-2 text-text text-[11px] hover:border-accent/30 hover:text-accent disabled:opacity-50"
+                      >
+                        {coolifyTesting ? "Testing..." : "🔎 Test Coolify"}
+                      </button>
                     </div>
                   </div>
-                  {(coolifyEvents.length > 0 || coolifyError) && (
+                  {(coolifyEvents.length > 0 || coolifyError || coolifyHealth) && (
                     <div className="rounded-xl border border-border bg-surface p-3 space-y-2">
-                      <div className="text-[12px] font-semibold text-text">Live install progress</div>
+                      <div className="text-[12px] font-semibold text-text">Coolify install / connection status</div>
                       <div className="space-y-1 max-h-56 overflow-auto">
                         {coolifyEvents.map((event, index) => (
                           <div key={`${event.status}-${index}`} className="flex items-start gap-2 text-[11px] font-mono">
@@ -343,6 +391,16 @@ export default function DeployManager() {
                             </div>
                           </div>
                         ))}
+                        {coolifyHealth && (
+                          <div className="mt-2 rounded-lg border border-border bg-surface-2 px-3 py-2 text-[11px]">
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-block w-2 h-2 rounded-full ${coolifyHealth.status === 'ok' ? 'bg-green-500' : coolifyHealth.status === 'degraded' ? 'bg-yellow-400' : coolifyHealth.status === 'down' ? 'bg-red-500' : 'bg-text-muted'}`} />
+                              <span className="text-text">Health: {coolifyHealth.status}</span>
+                              {coolifyHealth.latency != null && <span className="text-text-muted">{coolifyHealth.latency}ms</span>}
+                            </div>
+                            {coolifyHealth.message && <div className="mt-1 text-text-muted">{coolifyHealth.message}</div>}
+                          </div>
+                        )}
                         {coolifyError && <div className="text-[11px] text-red-400">{coolifyError}</div>}
                       </div>
                     </div>
