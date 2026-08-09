@@ -3,8 +3,22 @@ import { requireAuth } from "../middleware/auth.js";
 import { db } from "../db/index.js";
 import { machines } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
-import { connectSSH, detectOS, getNodeVersion, installNode, installOpenCode, startOpenCodeServe, checkOpenCodeRunning, getOpenCodePort } from "../runtime/opencode-adapter/index.js";
-import type { ProvisionEvent } from "../runtime/opencode-adapter/index.js";
+import {
+  connectSSH,
+  detectOS,
+  getNodeVersion,
+  installNode,
+  installOpenCode,
+  startOpenCodeServe,
+  checkOpenCodeRunning,
+  getOpenCodePort,
+  hasDocker,
+  installDocker,
+  isCoolifyInstalled,
+  getCoolifyUrlHint,
+  installCoolify,
+} from "../runtime/opencode-adapter/index.js";
+import type { ProvisionEvent, CoolifyInstallEvent } from "../runtime/opencode-adapter/index.js";
 import { encrypt, decrypt, isEncrypted } from "../lib/crypto.js";
 
 function normalizeHost(value: string): string {
@@ -291,6 +305,101 @@ router.post("/:id/provision", requireAuth, async (req, res) => {
       .set({ status: "error", lastError: message })
       .where(eq(machines.id, id));
 
+    res.write("data: [DONE]\n\n");
+    res.end();
+  }
+});
+
+// POST /api/machines/:id/install-coolify — install Coolify on the VPS via SSH
+router.post("/:id/install-coolify", requireAuth, async (req, res) => {
+  const userId = req.user!.userId;
+  const id = req.params.id as string;
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+
+  const sendEvent = (event: CoolifyInstallEvent) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+
+  try {
+    const result = await db
+      .select()
+      .from(machines)
+      .where(and(eq(machines.id, id), eq(machines.userId, userId)))
+      .limit(1);
+
+    if (result.length === 0) {
+      sendEvent({ status: "error", message: "Machine not found" });
+      res.write("data: [DONE]\n\n");
+      res.end();
+      return;
+    }
+
+    const machine = result[0];
+    const password = machine.password
+      ? (isEncrypted(machine.password) ? decrypt(machine.password) : machine.password)
+      : undefined;
+    const privateKey = machine.privateKey
+      ? (isEncrypted(machine.privateKey) ? decrypt(machine.privateKey) : machine.privateKey)
+      : undefined;
+
+    sendEvent({ status: "connecting", message: "Spajanje na VPS za Coolify instalaciju..." });
+    const ssh = await connectSSH({
+      host: machine.host,
+      port: machine.port,
+      username: machine.username,
+      password,
+      privateKey,
+    });
+
+    try {
+      sendEvent({ status: "checking-os", message: "Detekcija operativnog sistema..." });
+      const os = await detectOS(ssh);
+      sendEvent({ status: "checking-os", message: `OS: ${os}` });
+
+      sendEvent({ status: "checking-docker", message: "Provjera Docker-a..." });
+      const dockerPresent = await hasDocker(ssh);
+      if (!dockerPresent) {
+        sendEvent({ status: "installing-docker", message: "Docker nije pronađen. Instalacija..." });
+        await installDocker(ssh, os);
+        sendEvent({ status: "installing-docker", message: "Docker uspješno instaliran" });
+      } else {
+        sendEvent({ status: "checking-docker", message: "Docker je već dostupan" });
+      }
+
+      sendEvent({ status: "checking-coolify", message: "Provjera Coolify-a..." });
+      const coolifyPresent = await isCoolifyInstalled(ssh);
+      if (!coolifyPresent) {
+        sendEvent({ status: "installing-coolify", message: "Coolify nije pronađen. Instalacija..." });
+        await installCoolify(ssh);
+        sendEvent({ status: "installing-coolify", message: "Coolify instalacija završena" });
+      } else {
+        sendEvent({ status: "checking-coolify", message: "Coolify je već instaliran" });
+      }
+
+      const urlHint = await getCoolifyUrlHint(ssh);
+      sendEvent({
+        status: "ready",
+        message: urlHint
+          ? `Coolify je spreman. Otvori ${urlHint} i dovrši inicijalni setup.`
+          : "Coolify je spreman. Dovrši inicijalni setup kroz web interfejs na VPS-u.",
+      });
+    } finally {
+      ssh.close();
+    }
+
+    res.write("data: [DONE]\n\n");
+    res.end();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    sendEvent({ status: "error", message: `Greška: ${message}` });
+    await db
+      .update(machines)
+      .set({ lastError: message, updatedAt: new Date() })
+      .where(eq(machines.id, id));
     res.write("data: [DONE]\n\n");
     res.end();
   }

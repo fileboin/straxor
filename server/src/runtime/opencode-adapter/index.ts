@@ -15,3 +15,12 @@ export {
   type ProvisionStatus,
   type ProvisionEvent,
 } from "./provisioner.js";
+export {
+  hasDocker,
+  installDocker,
+  isCoolifyInstalled,
+  getCoolifyUrlHint,
+  installCoolify,
+  type CoolifyInstallStatus,
+  type CoolifyInstallEvent,
+} from "./coolify.js";

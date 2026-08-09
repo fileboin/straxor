@@ -257,6 +257,14 @@ export default function DeployManager() {
               {/* Provider selection + config */}
               <div className="p-4 rounded-xl bg-surface-2 border border-border space-y-3">
                 <h4 className="text-[12px] font-semibold text-text">Deploy Target</h4>
+                <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-[11px] text-text-secondary space-y-1.5">
+                  <div className="font-semibold text-text">Coolify prep za VPS hostovanje</div>
+                  <div>1. Poveži aktivni VPS kroz <code>Machines</code> i potvrdi javni host / SSH pristup.</div>
+                  <div>2. U <code>Infrastructure</code> dodaj <code>Coolify</code> config sa URL-om i API tokenom.</div>
+                  <div>3. Na VPS-u instaliraj Coolify i veži domen ili poddomen za aktivni projekat.</div>
+                  <div>4. Poveži repo ili deploy source, zatim koristi ovaj ekran za branch/deploy tok i praćenje logova.</div>
+                  <div>5. Nakon deploy-a dodaj monitor i alert config da produkcioni projekti ostanu pod nadzorom.</div>
+                </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <select value={selectedTarget} onChange={(e) => setSelectedTarget(e.target.value as DeploymentTarget)} className="bg-surface-3 border border-border rounded-lg px-3 py-2 text-[12px] text-text outline-none">
                     {Object.entries(TARGET_LABELS).map(([k, v]) => (

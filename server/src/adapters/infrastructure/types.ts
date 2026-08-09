@@ -166,6 +166,23 @@ export const INFRA_PROVIDERS: InfraProviderDef[] = [
     ],
     credentialFields: [],
   },
+  {
+    id: "coolify", type: "proxy",
+    name: "Coolify",
+    description: "Coolify control plane na VPS-u — app hosting, build/deploy i domeni za aktivne projekte",
+    icon: "🧊",
+    color: "green",
+    docsUrl: "https://coolify.io/docs",
+    configFields: [
+      { key: "base_url", label: "Coolify URL", type: "text", required: true, placeholder: "https://coolify.example.com" },
+      { key: "server_host", label: "Target VPS host", type: "text", required: true, placeholder: "203.0.113.10" },
+      { key: "project_name", label: "Coolify project/workspace", type: "text", required: false, placeholder: "straxor" },
+      { key: "default_domain", label: "Default domain suffix", type: "text", required: false, placeholder: "apps.example.com" },
+    ],
+    credentialFields: [
+      { key: "api_token", label: "Coolify API Token", type: "password", required: true },
+    ],
+  },
 
   // ── Tunnel ──
   {
