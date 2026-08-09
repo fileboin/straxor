@@ -318,6 +318,14 @@ router.post("/push", async (req, res) => {
     res.json({ success: true, repo: conn.fullName, branch: conn.defaultBranch, lastCommit: info.lastCommit, output });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    const lower = message.toLowerCase();
+    if ((lower.includes("permission to") && lower.includes("denied")) || lower.includes("requested url returned error: 403")) {
+      res.status(403).json({
+        error: "Sačuvani GitHub token je pronađen, ali nema write pristup ovom repo-u. Lokalni rad radi normalno; za push koristi token koji ima write dozvolu za ovaj repo.",
+        details: message,
+      });
+      return;
+    }
     res.status(500).json({ error: message });
   }
 });
