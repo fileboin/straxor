@@ -95,6 +95,10 @@ interface Props {
   copyLabel?: string;
   onCopyTo?: (content: string) => void;
   prefill?: string;
+  draftInput?: string;
+  draftAttachments?: Attachment[];
+  onDraftInputChange?: (value: string) => void;
+  onDraftAttachmentsChange?: (attachments: Attachment[]) => void;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
   zoom?: number;
@@ -272,6 +276,10 @@ export default function ChatPanel({
   copyLabel,
   onCopyTo,
   prefill,
+  draftInput,
+  draftAttachments,
+  onDraftInputChange,
+  onDraftAttachmentsChange,
   isExpanded,
   onToggleExpand,
   zoom = 1,
@@ -302,11 +310,11 @@ export default function ChatPanel({
   orbLabel,
   onFocusChange,
 }: Props) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(draftInput || "");
   useLang();
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
-  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>(draftAttachments || []);
   const [uploadingCount, setUploadingCount] = useState(0);
   const [micState, setMicState] = useState<"idle" | "recording" | "processing">("idle");
   const [micError, setMicError] = useState("");
@@ -336,6 +344,22 @@ export default function ChatPanel({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (typeof draftInput === "string") setInput(draftInput);
+  }, [draftInput]);
+
+  useEffect(() => {
+    if (Array.isArray(draftAttachments)) setPendingAttachments(draftAttachments);
+  }, [draftAttachments]);
+
+  useEffect(() => {
+    onDraftInputChange?.(input);
+  }, [input, onDraftInputChange]);
+
+  useEffect(() => {
+    onDraftAttachmentsChange?.(pendingAttachments);
+  }, [pendingAttachments, onDraftAttachmentsChange]);
 
   // Apply prefill from other panel
   useEffect(() => {

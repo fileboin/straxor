@@ -80,6 +80,77 @@ import { loadAppState, saveAppState, saveAppStateNow, type AppStateShape } from 
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [];
 
+function sanitizeAttachments(value: unknown): Attachment[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Attachment => {
+      if (!item || typeof item !== "object") return false;
+      const candidate = item as Record<string, unknown>;
+      return (
+        typeof candidate.id === "string" &&
+        typeof candidate.url === "string" &&
+        typeof candidate.name === "string" &&
+        typeof candidate.size === "number" &&
+        typeof candidate.mimeType === "string"
+      );
+    })
+    .map((item) => ({
+      id: item.id,
+      url: item.url,
+      name: item.name,
+      size: item.size,
+      mimeType: item.mimeType,
+    }));
+}
+
+function sanitizeMessages(value: unknown): ChatMessage[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is ChatMessage => {
+      if (!item || typeof item !== "object") return false;
+      const candidate = item as Record<string, unknown>;
+      return (
+        typeof candidate.id === "string" &&
+        (candidate.role === "user" || candidate.role === "assistant") &&
+        typeof candidate.content === "string"
+      );
+    })
+    .map((item) => ({
+      id: item.id,
+      role: item.role,
+      content: item.content,
+      label: typeof item.label === "string" ? item.label : undefined,
+      toolCalls: Array.isArray(item.toolCalls) ? item.toolCalls as ToolCall[] : undefined,
+      attachments: sanitizeAttachments(item.attachments),
+      orchestrated: Array.isArray(item.orchestrated) ? item.orchestrated as OrchestratedResult[] : undefined,
+    }));
+}
+
+function sanitizeBusEvents(value: unknown): AgentBusEnvelope[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is AgentBusEnvelope => {
+      if (!item || typeof item !== "object") return false;
+      const candidate = item as Record<string, unknown>;
+      return (
+        typeof candidate.id === "string" &&
+        (candidate.from === "ask" || candidate.from === "agent") &&
+        (candidate.to === "ask" || candidate.to === "agent") &&
+        typeof candidate.content === "string" &&
+        typeof candidate.prompt === "string" &&
+        typeof candidate.createdAt === "string"
+      );
+    })
+    .map((item) => ({ ...item }));
+}
+
+function sanitizeTodos(value: unknown): TodoStep[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is TodoStep => !!item && typeof item === "object" && typeof (item as Record<string, unknown>).id === "string")
+    .map((item) => ({ ...(item as TodoStep) }));
+}
+
 export default function Workspace() {
   const navigate = useNavigate();
   const { id: projectIdFromUrl } = useParams<{ id: string }>();
@@ -370,98 +441,7 @@ export default function Workspace() {
     readPanelHeight("straxor.panelHeight.agent")
   );
 
-  // Load persisted state from the DB once on mount, then hydrate UI.
-  useEffect(() => {
-    let mounted = true;
-    const hydrate = async () => {
-      const saved = await loadAppState();
-      // Theme + accent
-      if (saved && typeof saved === "object") {
-        const s = saved as Record<string, unknown>;
-        if (typeof s.theme === "string") setAppTheme(s.theme as "dark" | "light");
-        if (typeof s.accent === "string") setAccent(s.accent as never);
-        // Models per agent
-        if (s.ask && typeof s.ask === "object") {
-          const ask = s.ask as Record<string, unknown>;
-          if (typeof ask.provider === "string") setAskProvider(ask.provider);
-          if (typeof ask.model === "string") setAskModel(ask.model);
-          if (ask.thinking === "low" || ask.thinking === "medium" || ask.thinking === "high") setAskThinking(ask.thinking);
-          if (ask.role && typeof ask.role === "string") setAskRole(ask.role as AgentRole);
-          if (typeof ask.orch === "boolean") setAskModelOrch(ask.orch);
-        }
-        if (s.agent && typeof s.agent === "object") {
-          const agent = s.agent as Record<string, unknown>;
-          if (typeof agent.provider === "string") setAgentProvider(agent.provider);
-          if (typeof agent.model === "string") setAgentModel(agent.model);
-          if (agent.thinking === "low" || agent.thinking === "medium" || agent.thinking === "high") setAgentThinking(agent.thinking);
-          if (agent.role && typeof agent.role === "string") setAgentRole(agent.role as AgentRole);
-          if (typeof agent.orch === "boolean") setAgentModelOrch(agent.orch);
-        }
-        // Panel / layout / zoom / height
-        if (s.panelMode === "ask-full" || s.panelMode === "agent-full") setPanelMode(s.panelMode);
-        if (s.panelsLayout === "stack") setPanelsLayout("stack");
-        if (typeof s.panelWidthPct === "number") {
-          const w = Math.max(25, Math.min(75, s.panelWidthPct));
-          setPanelWidthPct(w);
-        }
-        if (typeof s.askZoom === "number") setAskZoom(Math.max(0.7, Math.min(1.5, s.askZoom)));
-        if (typeof s.agentZoom === "number") setAgentZoom(Math.max(0.7, Math.min(1.5, s.agentZoom)));
-        if (typeof s.askVerticalZoom === "number") setAskVerticalZoom(Math.max(0.5, Math.min(1.5, s.askVerticalZoom)));
-        if (typeof s.agentVerticalZoom === "number") setAgentVerticalZoom(Math.max(0.5, Math.min(1.5, s.agentVerticalZoom)));
-        if (typeof s.askHeight === "number") setAskPanelHeightPct(Math.max(30, Math.min(100, s.askHeight)));
-        if (typeof s.agentHeight === "number") setAgentPanelHeightPct(Math.max(30, Math.min(100, s.agentHeight)));
-      }
-      if (mounted) setStateReady(true);
-    };
-    hydrate().catch(() => {});
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
-  // Debounced save of the full UI state to the DB.
-  useEffect(() => {
-    if (!stateReady) return;
-    const state: AppStateShape = {
-      version: 1,
-      theme,
-      accent,
-      ask: { provider: askProvider, model: askModel, thinking: askThinking, role: askRole, orch: askModelOrch },
-      agent: { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, orch: agentModelOrch },
-      panelMode,
-      panelsLayout,
-      panelWidthPct,
-      askZoom,
-      agentZoom,
-      askVerticalZoom,
-      agentVerticalZoom,
-      askHeight: askPanelHeightPct,
-      agentHeight: agentPanelHeightPct,
-    };
-    saveAppState(state);
-  }, [
-    stateReady, theme, accent, askProvider, askModel, askThinking, askRole, askModelOrch,
-    agentProvider, agentModel, agentThinking, agentRole, agentModelOrch,
-    panelMode, panelsLayout, panelWidthPct, askZoom, agentZoom, askVerticalZoom, agentVerticalZoom, askPanelHeightPct, agentPanelHeightPct,
-  ]);
-
-  // Flush pending save when leaving the page.
-  useEffect(() => {
-    const handler = () => {
-      saveAppStateNow({
-        version: 1,
-        theme, accent,
-        ask: { provider: askProvider, model: askModel, thinking: askThinking, role: askRole, orch: askModelOrch },
-        agent: { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, orch: agentModelOrch },
-        panelMode, panelLayout: panelsLayout, panelWidthPct,
-        askZoom, agentZoom, askVerticalZoom, agentVerticalZoom, askHeight: askPanelHeightPct, agentHeight: agentPanelHeightPct,
-      });
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [stateReady, theme, accent, askProvider, askModel, askThinking, askRole, askModelOrch,
-    agentProvider, agentModel, agentThinking, agentRole, agentModelOrch,
-    panelMode, panelsLayout, panelWidthPct, askZoom, agentZoom, askVerticalZoom, agentVerticalZoom, askPanelHeightPct, agentPanelHeightPct]);
 
   // Resolve the real host once.
   const isLocalHost =
@@ -518,6 +498,87 @@ export default function Workspace() {
   // Panel-to-panel copy
   const [askPrefill, setAskPrefill] = useState("");
   const [agentPrefill, setAgentPrefill] = useState("");
+  const [askDraftInput, setAskDraftInput] = useState("");
+  const [agentDraftInput, setAgentDraftInput] = useState("");
+  const [askDraftAttachments, setAskDraftAttachments] = useState<Attachment[]>([]);
+  const [agentDraftAttachments, setAgentDraftAttachments] = useState<Attachment[]>([]);
+
+  const buildAppStateSnapshot = useCallback((): AppStateShape => ({
+    version: 2,
+    theme,
+    accent,
+    mobileTab,
+    panelMode,
+    panelsLayout,
+    panelWidthPct,
+    askZoom,
+    agentZoom,
+    askVerticalZoom,
+    agentVerticalZoom,
+    askHeight: askPanelHeightPct,
+    agentHeight: agentPanelHeightPct,
+    askPanelAccent,
+    agentPanelAccent,
+    askPanelMode,
+    agentPanelMode,
+    dbSessionId,
+    askSessionId,
+    agentSessionId,
+    askMachineId,
+    agentMachineId,
+    gitRemoteSlot,
+    runtimeManagerPanel,
+    showBusHistory,
+    showGitRemote,
+    showRuntimeManager,
+    showSearch,
+    showContext,
+    showVerification,
+    showSessionPicker,
+    showCommandPalette,
+    askPrefill,
+    agentPrefill,
+    askDraftInput,
+    agentDraftInput,
+    askDraftAttachments,
+    agentDraftAttachments,
+    askMessages,
+    agentMessages,
+    agentTodos,
+    agentBusEvents,
+    ask: {
+      provider: askProvider,
+      model: askModel,
+      thinking: askThinking,
+      role: askRole,
+      orch: askModelOrch,
+      background: askBackground,
+      orchestratedModels: askOrchestratedModels,
+    },
+    agent: {
+      provider: agentProvider,
+      model: agentModel,
+      thinking: agentThinking,
+      role: agentRole,
+      orch: agentModelOrch,
+      background: agentBackground,
+      orchestratedModels: agentOrchestratedModels,
+    },
+  }), [
+    theme, accent, mobileTab, panelMode, panelsLayout, panelWidthPct,
+    askZoom, agentZoom, askVerticalZoom, agentVerticalZoom,
+    askPanelHeightPct, agentPanelHeightPct,
+    askPanelAccent, agentPanelAccent,
+    askPanelMode, agentPanelMode,
+    dbSessionId, askSessionId, agentSessionId, askMachineId, agentMachineId,
+    gitRemoteSlot, runtimeManagerPanel,
+    showBusHistory, showGitRemote, showRuntimeManager, showSearch, showContext, showVerification, showSessionPicker, showCommandPalette,
+    askPrefill, agentPrefill,
+    askDraftInput, agentDraftInput, askDraftAttachments, agentDraftAttachments,
+    askMessages, agentMessages, agentTodos, agentBusEvents,
+    askProvider, askModel, askThinking, askRole, askModelOrch, askBackground, askOrchestratedModels,
+    agentProvider, agentModel, agentThinking, agentRole, agentModelOrch, agentBackground, agentOrchestratedModels,
+  ]);
 
   useEffect(() => {
     try { localStorage.setItem("straxor.ask.mode", askPanelMode); } catch {}
@@ -525,6 +586,112 @@ export default function Workspace() {
   useEffect(() => {
     try { localStorage.setItem("straxor.agent.mode", agentPanelMode); } catch {}
   }, [agentPanelMode]);
+
+  // Load persisted state from the DB once on mount, then hydrate UI.
+  useEffect(() => {
+    let mounted = true;
+    const hydrate = async () => {
+      const saved = await loadAppState();
+      if (saved && typeof saved === "object") {
+        const s = saved as Record<string, unknown>;
+        if (typeof s.theme === "string") setAppTheme(s.theme as "dark" | "light");
+        if (typeof s.accent === "string") setAccent(s.accent as never);
+        if (s.ask && typeof s.ask === "object") {
+          const ask = s.ask as Record<string, unknown>;
+          if (typeof ask.provider === "string") setAskProvider(ask.provider);
+          if (typeof ask.model === "string") setAskModel(ask.model);
+          if (ask.thinking === "low" || ask.thinking === "medium" || ask.thinking === "high") setAskThinking(ask.thinking);
+          if (ask.role && typeof ask.role === "string") setAskRole(ask.role as AgentRole);
+          if (typeof ask.orch === "boolean") setAskModelOrch(ask.orch);
+          if (typeof ask.background === "boolean") setAskBackground(ask.background);
+          if (Array.isArray(ask.orchestratedModels)) setAskOrchestratedModels(ask.orchestratedModels as { providerId: string; modelId: string }[]);
+        }
+        if (s.agent && typeof s.agent === "object") {
+          const agent = s.agent as Record<string, unknown>;
+          if (typeof agent.provider === "string") setAgentProvider(agent.provider);
+          if (typeof agent.model === "string") setAgentModel(agent.model);
+          if (agent.thinking === "low" || agent.thinking === "medium" || agent.thinking === "high") setAgentThinking(agent.thinking);
+          if (agent.role && typeof agent.role === "string") setAgentRole(agent.role as AgentRole);
+          if (typeof agent.orch === "boolean") setAgentModelOrch(agent.orch);
+          if (typeof agent.background === "boolean") setAgentBackground(agent.background);
+          if (Array.isArray(agent.orchestratedModels)) setAgentOrchestratedModels(agent.orchestratedModels as { providerId: string; modelId: string }[]);
+        }
+        if (s.panelMode === "ask-full" || s.panelMode === "agent-full") setPanelMode(s.panelMode);
+        if (s.panelsLayout === "stack") setPanelsLayout("stack");
+        if (typeof s.panelWidthPct === "number") setPanelWidthPct(Math.max(25, Math.min(75, s.panelWidthPct)));
+        if (typeof s.askZoom === "number") setAskZoom(Math.max(0.7, Math.min(1.5, s.askZoom)));
+        if (typeof s.agentZoom === "number") setAgentZoom(Math.max(0.7, Math.min(1.5, s.agentZoom)));
+        if (typeof s.askVerticalZoom === "number") setAskVerticalZoom(Math.max(0.5, Math.min(1.5, s.askVerticalZoom)));
+        if (typeof s.agentVerticalZoom === "number") setAgentVerticalZoom(Math.max(0.5, Math.min(1.5, s.agentVerticalZoom)));
+        if (typeof s.askHeight === "number") setAskPanelHeightPct(Math.max(30, Math.min(100, s.askHeight)));
+        if (typeof s.agentHeight === "number") setAgentPanelHeightPct(Math.max(30, Math.min(100, s.agentHeight)));
+        if (typeof s.askPanelAccent === "string") setAskPanelAccent(s.askPanelAccent);
+        if (typeof s.agentPanelAccent === "string") setAgentPanelAccent(s.agentPanelAccent);
+        if (s.mobileTab === "ask" || s.mobileTab === "agent") setMobileTab(s.mobileTab);
+        if (s.askPanelMode === "agent" || s.askPanelMode === "chat") setAskPanelMode(s.askPanelMode);
+        if (s.agentPanelMode === "agent" || s.agentPanelMode === "chat") setAgentPanelMode(s.agentPanelMode);
+        if (typeof s.dbSessionId === "string") setDbSessionId(s.dbSessionId);
+        if (typeof s.askSessionId === "string") setAskSessionId(s.askSessionId);
+        if (typeof s.agentSessionId === "string") setAgentSessionId(s.agentSessionId);
+        if (typeof s.askMachineId === "string") setAskMachineId(s.askMachineId);
+        if (typeof s.agentMachineId === "string") setAgentMachineId(s.agentMachineId);
+        if (typeof s.gitRemoteSlot === "string") setGitRemoteSlot(s.gitRemoteSlot);
+        if (s.runtimeManagerPanel === "ask" || s.runtimeManagerPanel === "agent") setRuntimeManagerPanel(s.runtimeManagerPanel);
+        if (typeof s.showBusHistory === "boolean") setShowBusHistory(s.showBusHistory);
+        if (typeof s.showGitRemote === "boolean") setShowGitRemote(s.showGitRemote);
+        if (typeof s.showRuntimeManager === "boolean") setShowRuntimeManager(s.showRuntimeManager);
+        if (typeof s.showSearch === "boolean") setShowSearch(s.showSearch);
+        if (typeof s.showContext === "boolean") setShowContext(s.showContext);
+        if (typeof s.showVerification === "boolean") setShowVerification(s.showVerification);
+        if (typeof s.showSessionPicker === "boolean") setShowSessionPicker(s.showSessionPicker);
+        if (typeof s.showCommandPalette === "boolean") setShowCommandPalette(s.showCommandPalette);
+        if (typeof s.askPrefill === "string") setAskPrefill(s.askPrefill);
+        if (typeof s.agentPrefill === "string") setAgentPrefill(s.agentPrefill);
+        if (typeof s.askDraftInput === "string") setAskDraftInput(s.askDraftInput);
+        if (typeof s.agentDraftInput === "string") setAgentDraftInput(s.agentDraftInput);
+        setAskDraftAttachments(sanitizeAttachments(s.askDraftAttachments));
+        setAgentDraftAttachments(sanitizeAttachments(s.agentDraftAttachments));
+        const hydratedAskMessages = sanitizeMessages(s.askMessages);
+        const hydratedAgentMessages = sanitizeMessages(s.agentMessages);
+        if (hydratedAskMessages.length > 0) setAskMessages(hydratedAskMessages);
+        if (hydratedAgentMessages.length > 0) setAgentMessages(hydratedAgentMessages);
+        const hydratedTodos = sanitizeTodos(s.agentTodos);
+        if (hydratedTodos.length > 0) setAgentTodos(hydratedTodos);
+        const hydratedBusEvents = sanitizeBusEvents(s.agentBusEvents);
+        if (hydratedBusEvents.length > 0) setAgentBusEvents(hydratedBusEvents);
+      }
+      if (mounted) setStateReady(true);
+    };
+    hydrate().catch(() => {
+      if (mounted) setStateReady(true);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [setAccent, setAppTheme]);
+
+  // Debounced save of the full UI state to the DB.
+  useEffect(() => {
+    if (!stateReady) return;
+    saveAppState(buildAppStateSnapshot());
+  }, [stateReady, buildAppStateSnapshot]);
+
+  // Flush pending save when the page is backgrounded, hidden, or unloaded.
+  useEffect(() => {
+    if (!stateReady) return;
+    const flush = () => saveAppStateNow(buildAppStateSnapshot());
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [stateReady, buildAppStateSnapshot]);
   useEffect(() => {
     try {
       if (askMachineId) localStorage.setItem("straxor.machine.ask", askMachineId);
@@ -2476,6 +2643,10 @@ export default function Workspace() {
             copyLabel={`→ ${t("chat.send.help")}`}
             onCopyTo={sendToAgentForHelp}
             prefill={askPrefill}
+            draftInput={askDraftInput}
+            draftAttachments={askDraftAttachments}
+            onDraftInputChange={setAskDraftInput}
+            onDraftAttachmentsChange={setAskDraftAttachments}
             isExpanded={panelMode === "ask-full"}
             onToggleExpand={toggleAskExpand}
             onOpenPromptLibrary={() => setShowPromptLibrary(true)}
@@ -2622,6 +2793,10 @@ export default function Workspace() {
             copyLabel={`← ${t("chat.send.review")}`}
             onCopyTo={sendToAskForReview}
             prefill={agentPrefill}
+            draftInput={agentDraftInput}
+            draftAttachments={agentDraftAttachments}
+            onDraftInputChange={setAgentDraftInput}
+            onDraftAttachmentsChange={setAgentDraftAttachments}
             isExpanded={panelMode === "agent-full"}
             onToggleExpand={toggleAgentExpand}
             onOpenPromptLibrary={() => setShowPromptLibrary(true)}
