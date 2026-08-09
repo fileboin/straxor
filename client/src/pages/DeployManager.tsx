@@ -5,6 +5,7 @@ import { useTheme } from "../lib/theme.js";
 import { fetchDeployments, triggerDeployment, fetchDeployment, fetchBuildLog, stopDeployment, fetchProviders, configureDeployProvider, type Deployment, type DeploymentTarget, STATUS_COLORS, STATUS_ICONS, TARGET_LABELS } from "../lib/deployments.js";
 import { getPublishLinks, createPublishLink, updatePublishLink, deletePublishLink, type PublishLink } from "../lib/publish.js";
 import { startPreview, stopPreview, getPreviewStatus, type PreviewStatus, DEVICE_PRESETS } from "../lib/preview.js";
+import { listMachines, installCoolify, type MachineRecord, type CoolifyInstallEvent } from "../lib/machines.js";
 
 type Tab = "preview" | "publish" | "deploy";
 
@@ -45,6 +46,11 @@ export default function DeployManager() {
   const [buildLog, setBuildLog] = useState<any[]>([]);
   const [showProviderConfig, setShowProviderConfig] = useState(false);
   const [providerConfig, setProviderConfig] = useState<Record<string, string>>({});
+  const [machines, setMachines] = useState<MachineRecord[]>([]);
+  const [coolifyMachineId, setCoolifyMachineId] = useState("");
+  const [coolifyEvents, setCoolifyEvents] = useState<CoolifyInstallEvent[]>([]);
+  const [coolifyInstalling, setCoolifyInstalling] = useState(false);
+  const [coolifyError, setCoolifyError] = useState("");
 
   const loadPublish = useCallback(async () => {
     if (!projectId) return;
@@ -60,6 +66,16 @@ export default function DeployManager() {
     try { setProviders(await fetchProviders()); } catch { flash("Error loading providers"); }
   }, []);
 
+  const loadMachines = useCallback(async () => {
+    try {
+      const rows = await listMachines();
+      setMachines(rows);
+      setCoolifyMachineId((current) => current || rows.find((m) => m.projectId === projectId)?.id || rows[0]?.id || "");
+    } catch {
+      setMachines([]);
+    }
+  }, [projectId]);
+
   const loadPreviewStatus = useCallback(async () => {
     if (!machineId) { setPreviewStatus(null); return; }
     try { setPreviewStatus(await getPreviewStatus(machineId)); } catch { setPreviewStatus(null); }
@@ -68,8 +84,8 @@ export default function DeployManager() {
   useEffect(() => {
     if (tab === "preview") loadPreviewStatus();
     if (tab === "publish") loadPublish();
-    if (tab === "deploy") { loadDeployments(); loadProviders(); }
-  }, [tab, loadPreviewStatus, loadPublish, loadDeployments, loadProviders]);
+    if (tab === "deploy") { loadDeployments(); loadProviders(); loadMachines(); }
+  }, [tab, loadPreviewStatus, loadPublish, loadDeployments, loadProviders, loadMachines]);
 
   // ── Preview ──
   const handleStartPreview = async () => {
@@ -141,6 +157,27 @@ export default function DeployManager() {
       setProviderConfig({});
       loadProviders();
     } catch { flash("Error"); }
+  };
+
+  const handleInstallCoolify = async () => {
+    if (!coolifyMachineId) {
+      flash("Izaberi VPS mašinu za Coolify instalaciju");
+      return;
+    }
+    setCoolifyInstalling(true);
+    setCoolifyError("");
+    setCoolifyEvents([]);
+    try {
+      await installCoolify(coolifyMachineId, (event) => {
+        setCoolifyEvents((prev) => [...prev, event]);
+      });
+      flash("Coolify instalacija završena");
+      loadMachines();
+    } catch (err) {
+      setCoolifyError(err instanceof Error ? err.message : "Coolify instalacija nije uspjela");
+    } finally {
+      setCoolifyInstalling(false);
+    }
   };
 
   return (
@@ -264,6 +301,52 @@ export default function DeployManager() {
                   <div>3. Na VPS-u instaliraj Coolify i veži domen ili poddomen za aktivni projekat.</div>
                   <div>4. Poveži repo ili deploy source, zatim koristi ovaj ekran za branch/deploy tok i praćenje logova.</div>
                   <div>5. Nakon deploy-a dodaj monitor i alert config da produkcioni projekti ostanu pod nadzorom.</div>
+                </div>
+                <div className="rounded-xl border border-border bg-surface-3 p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <div className="text-[12px] font-semibold text-text">Install Coolify on VPS</div>
+                      <div className="text-[11px] text-text-muted">Automatska SSH instalacija Docker + Coolify control plane-a na izabranoj mašini.</div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <select
+                        value={coolifyMachineId}
+                        onChange={(e) => setCoolifyMachineId(e.target.value)}
+                        className="bg-surface-2 border border-border rounded-lg px-3 py-2 text-[12px] text-text outline-none"
+                      >
+                        <option value="">Izaberi VPS</option>
+                        {machines.map((machine) => (
+                          <option key={machine.id} value={machine.id}>
+                            {machine.name} · {machine.host}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleInstallCoolify}
+                        disabled={!coolifyMachineId || coolifyInstalling}
+                        className="px-3 py-2 rounded-lg bg-accent text-white text-[11px] hover:bg-accent-light disabled:opacity-50"
+                      >
+                        {coolifyInstalling ? "Installing..." : "🧊 Install Coolify"}
+                      </button>
+                    </div>
+                  </div>
+                  {(coolifyEvents.length > 0 || coolifyError) && (
+                    <div className="rounded-xl border border-border bg-surface p-3 space-y-2">
+                      <div className="text-[12px] font-semibold text-text">Live install progress</div>
+                      <div className="space-y-1 max-h-56 overflow-auto">
+                        {coolifyEvents.map((event, index) => (
+                          <div key={`${event.status}-${index}`} className="flex items-start gap-2 text-[11px] font-mono">
+                            <span className={`mt-0.5 inline-block w-2 h-2 rounded-full ${event.status === 'ready' ? 'bg-green-500' : event.status === 'error' ? 'bg-red-500' : 'bg-accent animate-pulse'}`} />
+                            <div>
+                              <div className="text-text">{event.message}</div>
+                              {event.details && <div className="text-text-muted">{event.details}</div>}
+                            </div>
+                          </div>
+                        ))}
+                        {coolifyError && <div className="text-[11px] text-red-400">{coolifyError}</div>}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <select value={selectedTarget} onChange={(e) => setSelectedTarget(e.target.value as DeploymentTarget)} className="bg-surface-3 border border-border rounded-lg px-3 py-2 text-[12px] text-text outline-none">
