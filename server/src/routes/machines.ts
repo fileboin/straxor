@@ -7,6 +7,23 @@ import { connectSSH, detectOS, getNodeVersion, installNode, installOpenCode, sta
 import type { ProvisionEvent } from "../runtime/opencode-adapter/index.js";
 import { encrypt, decrypt, isEncrypted } from "../lib/crypto.js";
 
+function normalizeHost(value: string): string {
+  return value.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+}
+
+function isBlockedLocalHost(host: string): boolean {
+  const normalized = normalizeHost(host).toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "0.0.0.0" ||
+    normalized === "::1" ||
+    normalized.startsWith("192.168.") ||
+    normalized.startsWith("10.") ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(normalized)
+  );
+}
+
 const router = Router();
 
 // GET /api/machines — listaj sve mašine korisnika (maskirane lozinke)
@@ -68,15 +85,38 @@ router.post("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
     const { projectId, name, host, port, username, authType, password, privateKey } = req.body;
+    const normalizedHost = typeof host === "string" ? normalizeHost(host) : "";
+    const normalizedUsername = typeof username === "string" ? username.trim() : "";
+    const resolvedAuthType = authType === "key" ? "key" : "password";
+    const resolvedPort = Number.isFinite(Number(port)) ? Number(port) : 22;
 
-    if (!projectId || !name || !host || !username) {
+    if (!projectId || !name || !normalizedHost || !normalizedUsername) {
       res.status(400).json({ error: "Missing required fields" });
       return;
     }
 
-    // Encrypt sensitive fields
-    const encryptedPassword = password ? encrypt(password) : null;
-    const encryptedPrivateKey = privateKey ? encrypt(privateKey) : null;
+    if (isBlockedLocalHost(normalizedHost)) {
+      res.status(400).json({ error: "Use the public VPS IP or DNS hostname, not a local/private address." });
+      return;
+    }
+
+    if (resolvedPort <= 0 || resolvedPort > 65535) {
+      res.status(400).json({ error: "Port must be between 1 and 65535." });
+      return;
+    }
+
+    if (resolvedAuthType === "password" && (!password || !String(password).trim())) {
+      res.status(400).json({ error: "Password authentication requires a password." });
+      return;
+    }
+
+    if (resolvedAuthType === "key" && (!privateKey || !String(privateKey).trim())) {
+      res.status(400).json({ error: "SSH key authentication requires a private key." });
+      return;
+    }
+
+    const encryptedPassword = resolvedAuthType === "password" && password ? encrypt(password) : null;
+    const encryptedPrivateKey = resolvedAuthType === "key" && privateKey ? encrypt(privateKey) : null;
 
     const result = await db
       .insert(machines)
@@ -84,10 +124,10 @@ router.post("/", requireAuth, async (req, res) => {
         userId,
         projectId,
         name,
-        host,
-        port: port || 22,
-        username,
-        authType: authType || "password",
+        host: normalizedHost,
+        port: resolvedPort,
+        username: normalizedUsername,
+        authType: resolvedAuthType,
         password: encryptedPassword,
         privateKey: encryptedPrivateKey,
         status: "pending",
