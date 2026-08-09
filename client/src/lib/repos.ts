@@ -92,5 +92,5 @@ export async function connectRepoUrl(repoUrl: string) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || "Connect URL error");
   }
-  return res.json() as Promise<{ success: boolean; id: string; readOnly: boolean; repo: UrlRepoMeta }>;
+  return res.json() as Promise<{ success: boolean; id: string; readOnly: boolean; pushCapable?: boolean; repo: UrlRepoMeta }>;
 }

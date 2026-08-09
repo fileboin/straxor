@@ -1,7 +1,8 @@
-// ── GitHub URL-based (tokenless, read-only) repo connection ──
-// Lets a user connect ANY public GitHub repo by URL, without needing a token.
-// Repos connected this way are read-only: the agent can clone/sync/pull but
-// cannot push. Pushing requires a token (the existing flow).
+// ── GitHub URL-based (tokenless) repo connection ──
+// Lets a user connect a public GitHub repo by URL, without needing a token.
+// Local clone/sync/workspace usage works immediately. Push still requires
+// credentials on GitHub, so the server will later reuse any saved GitHub token
+// slot for this user when available.
 //
 // Endpoints:
 //   POST /api/github/connect-url   body { repoUrl }  → validates + saves
@@ -13,6 +14,7 @@ import { gitConnections, repoConnections } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import { encrypt } from "../lib/crypto.js";
 import { stopLocalEnginesForUser } from "../runtime/local/engine.js";
+import { getGitRemoteToken } from "../adapters/git/remote/registry.js";
 
 const router = Router();
 
@@ -60,7 +62,7 @@ async function fetchRepoMeta(owner: string, repo: string): Promise<RepoMeta> {
   };
 }
 
-// POST /api/github/connect-url — connect a public repo by URL (read-only).
+// POST /api/github/connect-url — connect a public repo by URL.
 router.post("/connect-url", requireAuth, async (req: any, res) => {
   try {
     const userId = req.user!.userId;
@@ -106,7 +108,7 @@ router.post("/connect-url", requireAuth, async (req: any, res) => {
       });
     }
 
-    // Upsert the repo_connections row (read-only clone URL, no token embedded).
+    // Upsert the repo_connections row (plain clone URL, no token embedded).
     const existing = await db
       .select()
       .from(repoConnections)
@@ -155,10 +157,13 @@ router.post("/connect-url", requireAuth, async (req: any, res) => {
       .where(and(eq(repoConnections.userId, userId), eq(repoConnections.id, connectionId)));
     await stopLocalEnginesForUser(userId);
 
+    const pushCapable = !!(await getGitRemoteToken(userId, "github"));
+
     res.json({
       success: true,
       id: connectionId,
-      readOnly: true,
+      readOnly: false,
+      pushCapable,
       repo: {
         fullName,
         name: meta.name,

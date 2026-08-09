@@ -83,7 +83,11 @@ export default function GitRemotePanel({ onClose, onRepoChanged, slot }: Props) 
     try {
       const r = await connectRepoUrl(repoUrl.trim());
       setUrlMeta(r.repo);
-      setActionMsg("Povezan (read-only): " + r.repo.fullName);
+      setActionMsg(
+        r.pushCapable
+          ? "Povezan preko URL-a: " + r.repo.fullName + " (push koristi sačuvani GitHub token)"
+          : "Povezan preko URL-a: " + r.repo.fullName + " (lokalni rad odmah dostupan; push traži sačuvan GitHub token)"
+      );
       await loadConnections();
       onRepoChanged?.();
     } catch (e: any) {

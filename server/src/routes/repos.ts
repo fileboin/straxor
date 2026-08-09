@@ -209,10 +209,9 @@ router.post("/prepare", async (req, res) => {
     }
 
     const conn = active[0];
-    // URL (read-only) connections clone via the plain public URL — no token.
-    const isUrlReadOnly = conn.connectionType === "url";
-    const token = isUrlReadOnly ? undefined : await getGitRemoteToken(userId, conn.platform as GitPlatformId);
-    if (!token && !isUrlReadOnly) {
+    const isUrlConnection = conn.connectionType === "url";
+    const token = isUrlConnection ? undefined : await getGitRemoteToken(userId, conn.platform as GitPlatformId);
+    if (!token && !isUrlConnection) {
       res.status(401).json({ error: "Platform token missing — save a token first" });
       return;
     }
@@ -262,7 +261,9 @@ router.get("/workspace", async (req, res) => {
       branch: conn.defaultBranch,
       sandboxDir: dir,
       cloned: ready,
-      readOnly: conn.connectionType === "url",
+      readOnly: false,
+      connectionType: conn.connectionType,
+      pushCapable: conn.connectionType !== "url" || !!(await getGitRemoteToken(userId, conn.platform as GitPlatformId)),
       gitBinary: await hasGitBinary(),
     });
   } catch (error) {
@@ -290,15 +291,14 @@ router.post("/push", async (req, res) => {
 
     const conn = active[0];
 
-    // Read-only URL connections can never push — token required.
-    if (conn.connectionType === "url") {
-      res.status(403).json({ error: "Read-only — connect with token to enable push" });
-      return;
-    }
-
     const token = await getGitRemoteToken(userId, conn.platform as GitPlatformId);
     if (!token) {
-      res.status(401).json({ error: "Platform token missing — save a token first" });
+      const isUrlConnection = conn.connectionType === "url";
+      res.status(isUrlConnection ? 403 : 401).json({
+        error: isUrlConnection
+          ? "Repo povezan preko URL-a je spreman za lokalni rad, ali push zahteva sačuvan GitHub token na serveru"
+          : "Platform token missing — save a token first",
+      });
       return;
     }
 
