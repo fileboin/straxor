@@ -1,7 +1,7 @@
 ﻿import { Router } from "express";
 import type { Request, Response } from "express";
 import { db } from "../db/index.js";
-import { deployments, deploymentBuildLogs } from "../db/schema.js";
+import { deployments, deploymentBuildLogs, infraConfigs } from "../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import { createBoundDeploymentAdapter } from "../adapters/deployment/db.js";
 import type { DeploymentTarget } from "../adapters/deployment/types.js";
@@ -103,6 +103,33 @@ router.post("/:projectId", async (req: Request, res: Response) => {
   }
 
   try {
+    if (target === "coolify") {
+      const rows = await db
+        .select()
+        .from(infraConfigs)
+        .where(and(eq(infraConfigs.userId, userId), eq(infraConfigs.adapter, "coolify"), eq(infraConfigs.projectId, projectId)))
+        .orderBy(desc(infraConfigs.updatedAt))
+        .limit(1);
+
+      const row = rows[0];
+      if (!row) {
+        res.status(400).json({ error: "Coolify nije konfigurisan za ovaj projekat. Dodaj Coolify infrastructure config prvo." });
+        return;
+      }
+
+      const config = (() => {
+        try { return JSON.parse(row.config || "{}"); } catch { return {}; }
+      })() as Record<string, unknown>;
+      const credentials = (() => {
+        try { return JSON.parse(row.credentials || "{}"); } catch { return {}; }
+      })() as Record<string, string>;
+
+      configureProvider(userId, "coolify", {
+        serverUrl: String(config.base_url || ""),
+        token: String(credentials.api_token || ""),
+      });
+    }
+
     const adapter = createBoundDeploymentAdapter(userId);
     const deployment = await adapter.deploy(projectId, { target, branch, envVars });
     res.status(201).json(deployment);
