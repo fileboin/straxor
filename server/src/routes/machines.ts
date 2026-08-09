@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { db } from "../db/index.js";
-import { machines } from "../db/schema.js";
-import { eq, and } from "drizzle-orm";
+import { machines, infraConfigs } from "../db/schema.js";
+import { eq, and, desc } from "drizzle-orm";
 import {
   connectSSH,
   detectOS,
@@ -381,11 +381,53 @@ router.post("/:id/install-coolify", requireAuth, async (req, res) => {
       }
 
       const urlHint = await getCoolifyUrlHint(ssh);
+
+      const configPayload = {
+        base_url: urlHint || "",
+        server_host: machine.host,
+        project_name: "straxor",
+        default_domain: "",
+      };
+
+      const existingCoolify = await db
+        .select()
+        .from(infraConfigs)
+        .where(and(eq(infraConfigs.userId, userId), eq(infraConfigs.adapter, "coolify"), eq(infraConfigs.machineId, machine.id)))
+        .orderBy(desc(infraConfigs.updatedAt))
+        .limit(1);
+
+      if (existingCoolify[0]) {
+        await db
+          .update(infraConfigs)
+          .set({
+            projectId: machine.projectId,
+            name: `${machine.name} Coolify`,
+            type: "proxy",
+            status: "pending",
+            config: JSON.stringify(configPayload),
+            updatedAt: new Date(),
+            lastError: null,
+          })
+          .where(eq(infraConfigs.id, existingCoolify[0].id));
+      } else {
+        await db.insert(infraConfigs).values({
+          userId,
+          projectId: machine.projectId,
+          machineId: machine.id,
+          type: "proxy",
+          adapter: "coolify",
+          name: `${machine.name} Coolify`,
+          status: "pending",
+          config: JSON.stringify(configPayload),
+          credentials: JSON.stringify({ api_token: "" }),
+        });
+      }
+
       sendEvent({
         status: "ready",
         message: urlHint
-          ? `Coolify je spreman. Otvori ${urlHint} i dovrši inicijalni setup.`
-          : "Coolify je spreman. Dovrši inicijalni setup kroz web interfejs na VPS-u.",
+          ? `Coolify je spreman. Otvori ${urlHint}, dovrši inicijalni setup i dodaj API token u sačuvani Coolify config.`
+          : "Coolify je spreman. Dovrši inicijalni setup kroz web interfejs na VPS-u i dodaj API token u sačuvani Coolify config.",
       });
     } finally {
       ssh.close();
