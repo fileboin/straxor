@@ -41,8 +41,10 @@ router.post("/send", async (req: Request, res: Response) => {
     );
   }
 
-  // The normal Agent panel must use exactly the same prepared clone as the
-  // multi-agent runner. Explicit context prevents OpenCode from answering as
+  // Every OpenCode-facing surface (Agent panel, Ask panel when bound to an
+  // active runtime, GitHub-assisted turns, and remote/mobile PWA clients)
+  // must go through this same server-side path so context sharing stays
+  // consistent. Explicit workspace context prevents OpenCode from answering as
   // if it were in an empty directory, while the registry serializes workspace
   // preparation with any other active agent.
   if (isLocalMachineId(machineId)) {
@@ -53,6 +55,9 @@ router.post("/send", async (req: Request, res: Response) => {
         `Active repository: ${workspace.repo}`,
         `Active branch: ${workspace.branch}`,
         `Workspace directory: ${workspace.dir}`,
+        `Panel slot: ${slotFromMachineId(machineId)}`,
+        `Workspace mode: ${workspace.readOnly ? "read-only" : "read-write"}`,
+        "This context is shared across Straxor OpenCode agents and GitHub integration for the active panel.",
         "You are already running inside this workspace. Inspect its files before answering. Use this repository for all reads, edits, tests, and git operations; never use /tmp or another clone. Do not claim a repository is unavailable unless a tool call proves it.",
         "[/STRAXOR GITHUB CONTEXT]",
         fullText,

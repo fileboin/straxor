@@ -150,6 +150,20 @@ export default function Workspace() {
   const [askMessages, setAskMessages] = useState<ChatMessage[]>(INITIAL_ASK_MESSAGES);
   const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([]);
   const [mobileTab, setMobileTab] = useState<"ask" | "agent">("ask");
+  const [askPanelMode, setAskPanelMode] = useState<"agent" | "chat">(() => {
+    try {
+      return localStorage.getItem("straxor.ask.mode") === "chat" ? "chat" : "agent";
+    } catch {
+      return "agent";
+    }
+  });
+  const [agentPanelMode, setAgentPanelMode] = useState<"agent" | "chat">(() => {
+    try {
+      return localStorage.getItem("straxor.agent.mode") === "chat" ? "chat" : "agent";
+    } catch {
+      return "agent";
+    }
+  });
 
   const [askStreamingId, setAskStreamingId] = useState<string | null>(null);
   const [agentStreamingId, setAgentStreamingId] = useState<string | null>(null);
@@ -464,17 +478,27 @@ export default function Workspace() {
     }
   }, [activeRepo, isLocalHost]);
 
-  // Ask panel is a full independent agent on its own slot. When an active
-  // repo exists for the ask slot, point it at the local engine (:ask).
+  // Ask panel now prefers the ACTIVE OpenCode runtime too: when a VPS runtime
+  // is connected, the left panel should use that same live agent interface as
+  // its primary path. Its own :ask local engine remains the fallback only when
+  // there is no VPS runtime and the ask slot has an active GitHub repo.
   useEffect(() => {
+    if (agentMachineId && !agentMachineId.startsWith("local:")) {
+      setAskMachineId(agentMachineId);
+      console.log("[machine-debug] ask primary runtime <- active VPS", agentMachineId);
+      return;
+    }
     if (askActiveRepo) {
       setAskMachineId((prev) => (prev && !prev.startsWith("local:") ? prev : "local:opencode:ask"));
       console.log("[machine-debug] ask activeRepo=", askActiveRepo.fullName, "-> local:opencode:ask");
+    } else if (agentMachineId && agentMachineId.startsWith("local:")) {
+      setAskMachineId(agentMachineId);
+      console.log("[machine-debug] ask primary runtime <- shared local", agentMachineId);
     } else {
       setAskMachineId((prev) => (prev && prev.startsWith("local:") ? null : prev));
       console.log("[machine-debug] ask no activeRepo -> clearing local");
     }
-  }, [askActiveRepo]);
+  }, [askActiveRepo, agentMachineId]);
 
   // Resume system state
   const [dbSessionId, setDbSessionId] = useState<string | null>(null);
@@ -493,6 +517,13 @@ export default function Workspace() {
   // Panel-to-panel copy
   const [askPrefill, setAskPrefill] = useState("");
   const [agentPrefill, setAgentPrefill] = useState("");
+
+  useEffect(() => {
+    try { localStorage.setItem("straxor.ask.mode", askPanelMode); } catch {}
+  }, [askPanelMode]);
+  useEffect(() => {
+    try { localStorage.setItem("straxor.agent.mode", agentPanelMode); } catch {}
+  }, [agentPanelMode]);
 
   const clampPanelHeight = (v: number) => Math.max(30, Math.min(100, v));
   const startPanelHeightResize = (e: React.MouseEvent, which: "ask" | "agent") => {
@@ -886,7 +917,7 @@ export default function Workspace() {
     if (!agentMachineId || !agentSessionId) return;
 
     // Echo user message in Ask panel
-    const userMsg: ChatMessage = { id: `steer-${Date.now()}`, role: "user", content: msg, label: "Steer \u2192 Agent" };
+    const userMsg: ChatMessage = { id: `steer-${Date.now()}`, role: "user", content: msg, label: "Steer → Agent" };
     setAskMessages((prev) => [...prev, userMsg]);
 
     try {
@@ -896,7 +927,7 @@ export default function Workspace() {
       const ackMsg: ChatMessage = {
         id: `steer-ack-${Date.now()}`,
         role: "assistant",
-        content: `\u2192 ${t("chat.steer.sent")}`,
+        content: `→ ${t("chat.steer.sent")}`,
         label: "System",
       };
       setAskMessages((prev) => [...prev, ackMsg]);
@@ -904,12 +935,36 @@ export default function Workspace() {
       const errMsg: ChatMessage = {
         id: `steer-err-${Date.now()}`,
         role: "assistant",
-        content: `\u26A0 ${t("chat.steer.error")} ${err.message}`,
+        content: `⚠ ${t("chat.steer.error")} ${err.message}`,
         label: "System",
       };
       setAskMessages((prev) => [...prev, errMsg]);
     }
   }, [agentMachineId, agentSessionId]);
+
+  const pushSystemMessage = useCallback((panel: "ask" | "agent", content: string, label = "System") => {
+    const message: ChatMessage = {
+      id: `sys-${panel}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      role: "assistant",
+      content,
+      label,
+    };
+    if (panel === "ask") {
+      setAskMessages((prev) => [...prev, message]);
+      return;
+    }
+    setAgentMessages((prev) => [...prev, message]);
+  }, []);
+
+  const sendToAgentForHelp = useCallback((content: string) => {
+    setAgentPrefill(`[POMOĆ OD LIJEVOG PANELA]\nRepo slot: ask\nZadatak: pomozi lijevom panelu na njegovom aktivnom projektu. Ako se repoi razlikuju, tretiraj ovo kao cross-repo savjetovanje i jasno upozori na razlike.\n\n${content}\n\n[/POMOĆ OD LIJEVOG PANELA]\n`);
+    pushSystemMessage("agent", `↖ ${t("chat.send.help")} — kontekst je prebačen iz lijevog panela.`);
+  }, [pushSystemMessage]);
+
+  const sendToAskForReview = useCallback((content: string) => {
+    setAskPrefill(`[CODE REVIEW ZA LIJEVI PANEL]\nRepo slot: agent\nZadatak: uradi review izlaza iz desnog panela, upozori na bugove, rizike, regresije i predloži konkretne popravke. Ako je repo drugačiji od aktivnog ask repoa, eksplicitno to navedi.\n\n${content}\n\n[/CODE REVIEW ZA LIJEVI PANEL]\n`);
+    pushSystemMessage("ask", `↗ ${t("chat.send.review")} — kontekst je prebačen iz desnog panela.`);
+  }, [pushSystemMessage]);
 
   // Helper: proceed with tool allow after permission/security check
   const proceedToolAllow = useCallback(
@@ -956,7 +1011,7 @@ export default function Workspace() {
     // machine is configured (e.g. active repo for the ask slot → local engine),
     // run the full agent turn (SSE, tools, permissions) instead of plain chat.
     const localAskEngineOnRemote = !!askMachineId?.startsWith("local:") && !isLocalHost;
-    if (askMachineId && !localAskEngineOnRemote && !askDirectFallbackRef.current) {
+    if (askPanelMode === "agent" && askMachineId && !localAskEngineOnRemote && !askDirectFallbackRef.current) {
       await runAgentTurn(msg, attachments, {
         role: askRole,
         provider: askProvider,
@@ -1208,7 +1263,7 @@ export default function Workspace() {
     // the Agent panel must run as plain AI chat (exactly like the Ask panel).
     // The local `opencode` engine is only used when served from localhost.
     const localEngineOnRemote = !!agentMachineId?.startsWith("local:") && !isLocalHost;
-    if (!agentMachineId || localEngineOnRemote || agentDirectFallbackRef.current) {
+    if (agentPanelMode === "chat" || !agentMachineId || localEngineOnRemote || agentDirectFallbackRef.current) {
       // FAZA 5: parallel multi-model execution when 2+ models selected.
       if (agentOrchestratedModels.length >= 2 && (!attachments || attachments.length === 0)) {
         const systemParts: string[] = [];
@@ -1618,7 +1673,7 @@ export default function Workspace() {
         setAgentLoading(false);
       },
     }, attachments);
-  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch, agentOrchestratedModels, availableModels, agentBackground]);
+  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch, agentOrchestratedModels, availableModels, agentBackground, agentPanelMode]);
 
   // Confirm a step — send message to agent to continue
   const handleConfirmStep = useCallback(
@@ -2325,21 +2380,31 @@ export default function Workspace() {
             panelMenuKey="ask"
             role={askRole}
             onRoleChange={setAskRole}
-            copyLabel={`\u2192 ${t("agent.panel2")}`}
-            onCopyTo={(content) => setAgentPrefill(content)}
+            copyLabel={`→ ${t("chat.send.help")}`}
+            onCopyTo={sendToAgentForHelp}
             prefill={askPrefill}
             isExpanded={panelMode === "ask-full"}
             onToggleExpand={toggleAskExpand}
             onOpenPromptLibrary={() => setShowPromptLibrary(true)}
             headerLeft={
-              <RoleSelector role={askRole} onChange={setAskRole} />
+              <div className="flex items-center gap-2">
+                <RoleSelector role={askRole} onChange={setAskRole} />
+                <button
+                  type="button"
+                  onClick={() => setAskPanelMode((prev) => (prev === "agent" ? "chat" : "agent"))}
+                  className={`px-2 h-7 rounded-md border text-[10px] font-medium transition-colors ${askPanelMode === "agent" ? "border-accent/50 bg-accent/10 text-accent" : "border-border bg-transparent text-text-muted hover:text-text hover:border-border-light"}`}
+                  title={askPanelMode === "agent" ? t("chat.ask.agentMode") : t("chat.ask.chatMode")}
+                >
+                  {askPanelMode === "agent" ? "OpenCode" : "Chat"}
+                </button>
+              </div>
             }
             modelOrch={askModelOrch}
             onModelOrchChange={setAskModelOrch}
             modelOrchHint="Model orkestracija — task se automatski rutira na najbolji model prema težini"
-            isSteerable={isAgentSteerable}
+            isSteerable={askPanelMode === "chat" && isAgentSteerable}
             onSteerSend={handleSteerSend}
-            steerStatusText={agentTodos.length > 0 ? t("chat.steer.steps", { n: agentTodos.filter(t => t.status !== "completed").length }) : undefined            }
+            steerStatusText={askPanelMode === "chat" ? (agentTodos.length > 0 ? t("chat.steer.steps", { n: agentTodos.filter(t => t.status !== "completed").length }) : t("chat.dual.independent")) : undefined}
             panelAccent={askPanelAccent || undefined}
             onPanelAccentChange={handleAskPanelAccentChange}
             orchestratedModels={askOrchestratedModels}
@@ -2438,14 +2503,24 @@ export default function Workspace() {
             panelMenuKey="agent"
             role={agentRole}
             onRoleChange={setAgentRole}
-            copyLabel={`\u2190 ${t("agent.panel1")}`}
-            onCopyTo={(content) => setAskPrefill(content)}
+            copyLabel={`← ${t("chat.send.review")}`}
+            onCopyTo={sendToAskForReview}
             prefill={agentPrefill}
             isExpanded={panelMode === "agent-full"}
             onToggleExpand={toggleAgentExpand}
             onOpenPromptLibrary={() => setShowPromptLibrary(true)}
             headerLeft={
-              <RoleSelector role={agentRole} onChange={setAgentRole} />
+              <div className="flex items-center gap-2">
+                <RoleSelector role={agentRole} onChange={setAgentRole} />
+                <button
+                  type="button"
+                  onClick={() => setAgentPanelMode((prev) => (prev === "agent" ? "chat" : "agent"))}
+                  className={`px-2 h-7 rounded-md border text-[10px] font-medium transition-colors ${agentPanelMode === "agent" ? "border-accent/50 bg-accent/10 text-accent" : "border-border bg-transparent text-text-muted hover:text-text hover:border-border-light"}`}
+                  title={agentPanelMode === "agent" ? t("chat.agent.agentMode") : t("chat.agent.chatMode")}
+                >
+                  {agentPanelMode === "agent" ? "OpenCode" : "Chat"}
+                </button>
+              </div>
             }
             runtimeControl={
               <EnginePicker
