@@ -3,6 +3,9 @@ import {
   useContext,
   useState,
   useEffect,
+  useMemo,
+  useCallback,
+  useRef,
   type ReactNode,
 } from "react";
 
@@ -41,7 +44,7 @@ export const ACCENT_COLORS: { id: AccentColor; label: string; color: string }[] 
 ];
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
+  const [theme, setThemeState] = useState<Theme>(() => {
     return (localStorage.getItem("straxor-theme") as Theme) || "dark";
   });
   const [accent, setAccentState] = useState<AccentColor>(() => {
@@ -49,10 +52,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (stored === "olive") return "burnt";
     return (stored as AccentColor) || "burnt";
   });
+  const themeFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("straxor-theme", theme);
+    if (themeFrameRef.current !== null) cancelAnimationFrame(themeFrameRef.current);
+    themeFrameRef.current = requestAnimationFrame(() => {
+      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem("straxor-theme", theme);
+      themeFrameRef.current = null;
+    });
+    return () => {
+      if (themeFrameRef.current !== null) {
+        cancelAnimationFrame(themeFrameRef.current);
+        themeFrameRef.current = null;
+      }
+    };
   }, [theme]);
 
   useEffect(() => {
@@ -60,16 +74,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("straxor-accent", accent);
   }, [accent]);
 
-  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
-  const setAccent = (a: AccentColor) => setAccentState(a);
+  const setTheme = useCallback((next: Theme) => {
+    setThemeState((current) => (current === next ? current : next));
+  }, []);
+  const toggleTheme = useCallback(() => {
+    setThemeState((current) => (current === "dark" ? "light" : "dark"));
+  }, []);
+  const setAccent = useCallback((next: AccentColor) => {
+    setAccentState((current) => (current === next ? current : next));
+  }, []);
 
-  return (
-    <ThemeContext.Provider
-      value={{ theme, accent, toggleTheme, setTheme, setAccent }}
-    >
-      {children}
-    </ThemeContext.Provider>
+  const value = useMemo(
+    () => ({ theme, accent, toggleTheme, setTheme, setAccent }),
+    [theme, accent, toggleTheme, setTheme, setAccent]
   );
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

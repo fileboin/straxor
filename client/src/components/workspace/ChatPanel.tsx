@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type FormEvent, type ChangeEvent } from "react";
+import { memo, useState, useRef, useEffect, type FormEvent, type ChangeEvent } from "react";
 import { createPortal } from "react-dom";
 import { ThinkingOrb, type OrbState } from "thinking-orbs";
 import ProviderModelDropdown from "./ProviderModelDropdown.js";
@@ -250,7 +250,7 @@ function AttachmentChips({
   );
 }
 
-export default function ChatPanel({
+function ChatPanel({
   title,
   icon,
   iconColor,
@@ -1179,3 +1179,5 @@ export default function ChatPanel({
     </div>
   );
 }
+
+export default memo(ChatPanel);

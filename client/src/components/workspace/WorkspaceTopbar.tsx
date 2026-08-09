@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../lib/theme.js";
 import HomeMenu from "./HomeMenu.js";
@@ -50,7 +51,7 @@ const VPS_STATUS_COLORS: Record<string, string> = {
   error: "border-red-500/50 bg-red-500/10 text-red-500",
 };
 
-export default function WorkspaceTopbar({
+function WorkspaceTopbar({
   projectName,
   template,
   status = "idle",
@@ -313,3 +314,5 @@ export default function WorkspaceTopbar({
     </header>
   );
 }
+
+export default memo(WorkspaceTopbar);

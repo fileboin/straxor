@@ -171,7 +171,7 @@ export default function Workspace() {
       .catch(() => {});
   }, [projectId]);
 
-  const { toggleTheme, setTheme: setAppTheme, accent, setAccent, theme } = useTheme();
+  const { setTheme: setAppTheme, accent, setAccent, theme } = useTheme();
   useLang();
   const [askModelOrch, setAskModelOrch] = useState(() => localStorage.getItem("straxor.orch.ask") === "1");
   const [agentModelOrch, setAgentModelOrch] = useState(() => localStorage.getItem("straxor.orch.agent") === "1");
@@ -2639,7 +2639,7 @@ export default function Workspace() {
       action: () => window.location.href = "/dashboard",
     },
   ], [
-    navigate,
+    navigate, theme, setAppTheme,
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
@@ -3333,7 +3333,10 @@ modelOrch={agentModelOrch}
               notifications: () => setShowNotifications(true),
               export: () => setShowExportModal(true),
               sessions: () => setShowSessionPicker(true),
-              theme: () => toggleTheme(),
+              theme: () => {
+                const nextTheme = theme === "dark" ? "light" : "dark";
+                setAppTheme(nextTheme);
+              },
               docs: () => window.open("https://straxor.dev/docs", "_blank"),
               "design-assets": () => setShowDesignAssets(true),
               "design-studio": () => setShowDesignStudio(true),
