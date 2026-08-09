@@ -66,6 +66,7 @@ import AdminCenter from "../components/workspace/AdminCenter.js";
 import VerificationPanel from "../components/workspace/VerificationPanel.js";
 import BusHistoryPanel from "../components/workspace/BusHistoryPanel.js";
 import PwaDiagnosticsPanel from "../components/workspace/PwaDiagnosticsPanel.js";
+import HandshakeSelfTestPanel, { type HandshakeSelfTestResult } from "../components/workspace/HandshakeSelfTestPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -289,7 +290,10 @@ export default function Workspace() {
   const [showVerification, setShowVerification] = useState(false);
   const [showBusHistory, setShowBusHistory] = useState(false);
   const [showPwaDiagnostics, setShowPwaDiagnostics] = useState(false);
+  const [showHandshakeTest, setShowHandshakeTest] = useState(false);
   const [restoredFromMirror, setRestoredFromMirror] = useState(false);
+  const [handshakeTestLoading, setHandshakeTestLoading] = useState(false);
+  const [handshakeTestResult, setHandshakeTestResult] = useState<HandshakeSelfTestResult | null>(null);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -540,6 +544,7 @@ export default function Workspace() {
     showSessionPicker,
     showCommandPalette,
     showPwaDiagnostics,
+    showHandshakeTest,
     askPrefill,
     agentPrefill,
     askDraftInput,
@@ -576,7 +581,7 @@ export default function Workspace() {
     askPanelMode, agentPanelMode,
     dbSessionId, askSessionId, agentSessionId, askMachineId, agentMachineId,
     gitRemoteSlot, runtimeManagerPanel,
-    showBusHistory, showGitRemote, showRuntimeManager, showSearch, showContext, showVerification, showSessionPicker, showCommandPalette, showPwaDiagnostics,
+    showBusHistory, showGitRemote, showRuntimeManager, showSearch, showContext, showVerification, showSessionPicker, showCommandPalette, showPwaDiagnostics, showHandshakeTest,
     askPrefill, agentPrefill,
     askDraftInput, agentDraftInput, askDraftAttachments, agentDraftAttachments,
     askMessages, agentMessages, agentTodos, agentBusEvents,
@@ -650,6 +655,7 @@ export default function Workspace() {
         if (typeof s.showSessionPicker === "boolean") setShowSessionPicker(s.showSessionPicker);
         if (typeof s.showCommandPalette === "boolean") setShowCommandPalette(s.showCommandPalette);
         if (typeof s.showPwaDiagnostics === "boolean") setShowPwaDiagnostics(s.showPwaDiagnostics);
+        if (typeof s.showHandshakeTest === "boolean") setShowHandshakeTest(s.showHandshakeTest);
         if (typeof s.askPrefill === "string") setAskPrefill(s.askPrefill);
         if (typeof s.agentPrefill === "string") setAgentPrefill(s.agentPrefill);
         if (typeof s.askDraftInput === "string") setAskDraftInput(s.askDraftInput);
@@ -1205,6 +1211,111 @@ export default function Workspace() {
   const sendToAskForReview = useCallback((content: string) => {
     void transferByBus("agent", "ask", "review", content);
   }, [transferByBus]);
+
+  const runHandshakeSelfTest = useCallback(async () => {
+    setHandshakeTestLoading(true);
+    const notes: string[] = [];
+    try {
+      const repoCheck = {
+        askRepo: askActiveRepo?.fullName || null,
+        agentRepo: activeRepo?.fullName || null,
+        distinct: !!askActiveRepo?.fullName && !!activeRepo?.fullName && askActiveRepo.fullName !== activeRepo.fullName,
+        ok: !!askActiveRepo?.fullName && !!activeRepo?.fullName && askActiveRepo.fullName !== activeRepo.fullName,
+      };
+      if (!repoCheck.ok) notes.push("Oba panela moraju imati različite aktivne GitHub repozitorijume.");
+
+      const runtimeCheck = {
+        askMachineId: askMachineId || null,
+        agentMachineId: agentMachineId || null,
+        distinct: !!askMachineId && !!agentMachineId && askMachineId !== agentMachineId,
+        ok: !!askMachineId && !!agentMachineId && askMachineId !== agentMachineId,
+      };
+      if (!runtimeCheck.ok) notes.push("Oba panela moraju imati odvojene runtime-ove / machineId vrijednosti.");
+
+      let busCheck: HandshakeSelfTestResult["busCheck"] = {
+        ok: false,
+        eventId: null,
+        chainId: null,
+        status: null,
+        createdAt: null,
+      };
+      let autoReviewCheck: HandshakeSelfTestResult["autoReviewCheck"] = {
+        ok: false,
+        status: null,
+      };
+      let auditSyncCheck: HandshakeSelfTestResult["auditSyncCheck"] = {
+        ok: false,
+        uiCount: agentBusEvents.length,
+        auditCount: 0,
+      };
+
+      if (dbSessionId && repoCheck.ok && runtimeCheck.ok) {
+        const chainId = `selftest-${Date.now()}`;
+        const created = await transferByBus(
+          "ask",
+          "agent",
+          "review",
+          `SELF-TEST handshake between ${askActiveRepo!.fullName} and ${activeRepo!.fullName}`,
+          { autoExecute: true, chainId }
+        );
+
+        busCheck = {
+          ok: !!created.id,
+          eventId: created.id,
+          chainId: created.chainId || chainId,
+          status: created.status || null,
+          createdAt: created.createdAt || null,
+        };
+
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        const auditEvents = await listAgentBusEvents(dbSessionId);
+        const uiEvents = agentBusEvents;
+        const latestAudit = auditEvents.find((event) => event.id === created.id) || null;
+        const latestUi = uiEvents.find((event) => event.id === created.id) || created;
+
+        autoReviewCheck = {
+          ok: (latestAudit?.status || latestUi?.status || "") === "auto_run_executed",
+          status: latestAudit?.status || latestUi?.status || null,
+        };
+        if (!autoReviewCheck.ok) notes.push("Bus event je kreiran, ali auto-review status još nije potvrđen kao auto_run_executed.");
+
+        auditSyncCheck = {
+          ok: !!latestAudit && !!latestUi,
+          uiCount: uiEvents.length,
+          auditCount: auditEvents.length,
+        };
+        if (!auditSyncCheck.ok) notes.push("Bus audit trail i UI history nisu još potpuno sinhronizovani za self-test event.");
+      } else if (!dbSessionId) {
+        notes.push("Nema aktivne DB sesije za bus self-test.");
+      }
+
+      const result: HandshakeSelfTestResult = {
+        checkedAt: new Date().toISOString(),
+        ok: repoCheck.ok && runtimeCheck.ok && busCheck.ok && autoReviewCheck.ok && auditSyncCheck.ok,
+        repoCheck,
+        runtimeCheck,
+        busCheck,
+        autoReviewCheck,
+        auditSyncCheck,
+        notes,
+      };
+      setHandshakeTestResult(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nepoznata greška";
+      setHandshakeTestResult({
+        checkedAt: new Date().toISOString(),
+        ok: false,
+        repoCheck: { ok: false, askRepo: askActiveRepo?.fullName || null, agentRepo: activeRepo?.fullName || null, distinct: false },
+        runtimeCheck: { ok: false, askMachineId: askMachineId || null, agentMachineId: agentMachineId || null, distinct: false },
+        busCheck: { ok: false, eventId: null, chainId: null, status: null, createdAt: null },
+        autoReviewCheck: { ok: false, status: null },
+        auditSyncCheck: { ok: false, uiCount: agentBusEvents.length, auditCount: 0 },
+        notes: [message],
+      });
+    } finally {
+      setHandshakeTestLoading(false);
+    }
+  }, [askActiveRepo, activeRepo, askMachineId, agentMachineId, dbSessionId, transferByBus, agentBusEvents]);
 
   // Helper: proceed with tool allow after permission/security check
   const proceedToolAllow = useCallback(
@@ -2395,6 +2506,15 @@ export default function Workspace() {
       keywords: ["pwa", "service worker", "resume", "offline", "mirror", "diagnostics"],
       action: () => setShowPwaDiagnostics(true),
     },
+    {
+      id: "diagnostics-handshake",
+      label: "Handshake Self-Test",
+      description: "Provjeri repo slotove, runtime razdvajanje, bus event, auto-review i audit sync",
+      icon: "🤝",
+      category: "settings",
+      keywords: ["handshake", "self-test", "bus", "review", "audit", "repo", "runtime"],
+      action: () => setShowHandshakeTest(true),
+    },
 
     // Agent role commands
     {
@@ -2518,6 +2638,7 @@ export default function Workspace() {
           onOpenImageAgent={() => navigate(`/project/${projectIdFromUrl || "unknown"}/image-agent`)}
           onOpenVerification={() => setShowVerification(true)}
           onOpenPwaDiagnostics={() => setShowPwaDiagnostics(true)}
+          onOpenHandshakeTest={() => setShowHandshakeTest(true)}
           onOpenKnowledge={() => navigate(`/project/${projectIdFromUrl || "unknown"}/knowledge`)}
         />
 
@@ -3205,6 +3326,20 @@ modelOrch={agentModelOrch}
 
       {showPwaDiagnostics && (
         <PwaDiagnosticsPanel onClose={() => setShowPwaDiagnostics(false)} />
+      )}
+
+      {showHandshakeTest && (
+        <HandshakeSelfTestPanel
+          open={showHandshakeTest}
+          loading={handshakeTestLoading}
+          result={handshakeTestResult}
+          askRepo={askActiveRepo}
+          agentRepo={activeRepo}
+          askMachineId={askMachineId}
+          agentMachineId={agentMachineId}
+          onRun={runHandshakeSelfTest}
+          onClose={() => setShowHandshakeTest(false)}
+        />
       )}
 
       {showQuickStart && (

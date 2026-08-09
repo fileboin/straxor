@@ -31,6 +31,7 @@ interface Props {
   onOpenImageAgent?: () => void;
   onOpenVerification?: () => void;
   onOpenPwaDiagnostics?: () => void;
+  onOpenHandshakeTest?: () => void;
 }
 
 const VPS_STATUS_LABELS: Record<string, string> = {
@@ -78,6 +79,7 @@ export default function WorkspaceTopbar({
   onOpenImageAgent,
   onOpenVerification,
   onOpenPwaDiagnostics,
+  onOpenHandshakeTest,
 }: Props) {
   const navigate = useNavigate();
   const { toggleTheme, theme } = useTheme();
@@ -239,6 +241,15 @@ export default function WorkspaceTopbar({
             title="PWA Diagnostics"
           >
             📱
+          </button>
+        )}
+        {onOpenHandshakeTest && (
+          <button
+            onClick={onOpenHandshakeTest}
+            className="hidden sm:flex px-2.5 py-1.5 rounded-lg border border-accent/30 bg-accent/5 text-accent text-xs font-medium hover:bg-accent/10 transition-colors"
+            title="Handshake self-test"
+          >
+            🤝
           </button>
         )}
         {onOpenImageAgent && (
