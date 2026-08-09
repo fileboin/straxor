@@ -5,6 +5,9 @@ import { requireAuth } from "../middleware/auth.js";
 import { resolveAttachments, type AttachmentRef } from "../lib/attachments.js";
 import { isLocalMachineId, slotFromMachineId } from "../runtime/local/engine.js";
 import { withSharedWorkspace } from "../runtime/local/shared-workspace.js";
+import { db } from "../db/index.js";
+import { agentBusEvents } from "../db/schema.js";
+import { and, desc, eq } from "drizzle-orm";
 
 type AgentBusAction = "help" | "review" | "warn";
 type PanelSlot = "ask" | "agent";
@@ -83,7 +86,9 @@ router.post("/bus/analyze", async (req: Request, res: Response) => {
 });
 
 router.post("/bus/transfer", async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
   const {
+    sessionId,
     from,
     to,
     action,
@@ -97,6 +102,7 @@ router.post("/bus/transfer", async (req: Request, res: Response) => {
     hopCount,
     chainId,
   } = req.body as {
+    sessionId?: string;
     from: PanelSlot;
     to: PanelSlot;
     action: AgentBusAction;
@@ -111,17 +117,43 @@ router.post("/bus/transfer", async (req: Request, res: Response) => {
     chainId?: string;
   };
 
-  if (!from || !to || !action || !content) {
-    res.status(400).json({ error: "Missing required fields: from, to, action, content" });
+  if (!sessionId || !from || !to || !action || !content) {
+    res.status(400).json({ error: "Missing required fields: sessionId, from, to, action, content" });
     return;
   }
 
   const resolvedHopCount = Number.isFinite(hopCount) ? Math.max(0, Number(hopCount)) : 0;
   const resolvedChainId = chainId || `chain-${Date.now()}`;
   const analysis = buildAgentBusPrompt({ from, to, action, content, sourceRepo, targetRepo, hopCount: resolvedHopCount, chainId: resolvedChainId });
+  const status = resolvedHopCount > 0 ? "loop_guarded" : action === "warn" ? "warning_received" : "review_pending";
+  const metadata = {
+    sourceMachineId: sourceMachineId || null,
+    targetMachineId: targetMachineId || null,
+    sourceSessionId: sourceSessionId || null,
+    targetSessionId: targetSessionId || null,
+    sourceRepo: sourceRepo || null,
+    targetRepo: targetRepo || null,
+  };
+
+  const [event] = await db.insert(agentBusEvents).values({
+    sessionId,
+    userId,
+    chainId: resolvedChainId,
+    fromPanel: from,
+    toPanel: to,
+    action,
+    status,
+    hopCount: resolvedHopCount,
+    warning: analysis.warning || null,
+    prompt: analysis.prompt,
+    content,
+    metadata: JSON.stringify(metadata),
+    updatedAt: new Date(),
+  }).returning();
+
   res.json({
-    id: `bus-${Date.now()}`,
-    createdAt: new Date().toISOString(),
+    id: event.id,
+    createdAt: event.createdAt,
     from,
     to,
     action,
@@ -136,10 +168,63 @@ router.post("/bus/transfer", async (req: Request, res: Response) => {
     chainId: resolvedChainId,
     prompt: analysis.prompt,
     warning: analysis.warning,
+    status,
   });
 });
 
 // POST /api/agent/send — send message to OpenCode via adapter
+router.get("/bus/:sessionId", async (req: Request, res: Response) => {
+  const userId = String(req.user!.userId);
+  const sessionId = String(req.params.sessionId);
+
+  const rows = await db
+    .select()
+    .from(agentBusEvents)
+    .where(and(eq(agentBusEvents.sessionId, sessionId), eq(agentBusEvents.userId, userId)))
+    .orderBy(desc(agentBusEvents.createdAt));
+
+  res.json(rows.map((row) => ({
+    id: row.id,
+    sessionId: row.sessionId,
+    chainId: row.chainId,
+    from: row.fromPanel,
+    to: row.toPanel,
+    action: row.action,
+    status: row.status,
+    hopCount: row.hopCount,
+    warning: row.warning,
+    prompt: row.prompt,
+    content: row.content,
+    metadata: row.metadata ? JSON.parse(row.metadata) : null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  })));
+});
+
+router.post("/bus/:eventId/status", async (req: Request, res: Response) => {
+  const userId = String(req.user!.userId);
+  const eventId = String(req.params.eventId);
+  const { status } = req.body as { status?: string };
+
+  if (!status) {
+    res.status(400).json({ error: "status required" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(agentBusEvents)
+    .set({ status, updatedAt: new Date() })
+    .where(and(eq(agentBusEvents.id, eventId), eq(agentBusEvents.userId, userId)))
+    .returning();
+
+  if (!updated) {
+    res.status(404).json({ error: "Bus event not found" });
+    return;
+  }
+
+  res.json(updated);
+});
+
 router.post("/send", async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   const { machineId, sessionId, text, message, mode, attachments } = req.body as {

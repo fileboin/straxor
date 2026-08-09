@@ -91,6 +91,7 @@ interface Props {
   onApiKeyChange?: () => void;
   headerContent?: React.ReactNode;
   headerLeft?: React.ReactNode;
+  headerStatus?: React.ReactNode;
   copyLabel?: string;
   onCopyTo?: (content: string) => void;
   prefill?: string;
@@ -267,6 +268,7 @@ export default function ChatPanel({
   onApiKeyChange,
   headerContent,
   headerLeft,
+  headerStatus,
   copyLabel,
   onCopyTo,
   prefill,
@@ -817,6 +819,7 @@ export default function ChatPanel({
             {badge}
           </span>
           {headerLeft}
+          {headerStatus}
         </div>
         <div className="flex items-center gap-1 shrink-0 sm:gap-2">
           {orbState && orbLabel && (

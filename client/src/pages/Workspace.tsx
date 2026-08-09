@@ -18,7 +18,7 @@ import { PROVIDERS } from "../lib/models.js";
 import { streamChat, hasApiKey, getApiKey } from "../lib/chat.js";
 import { routeChat, orchestrateChat, type OrchestrateModel } from "../lib/orchestrator.js";
 import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges, sendSteerInstruction, startAgentBackground, fetchBackgroundStatus, type BackgroundTimelineEntry } from "../lib/agent.js";
-import { createAgentBusTransfer } from "../lib/agent-bus.js";
+import { createAgentBusTransfer, listAgentBusEvents, updateAgentBusEventStatus, type AgentBusEnvelope } from "../lib/agent-bus.js";
 import { runAgentTurn } from "../lib/agent-turn.js";
 import { listRepoConnections, type RepoConnection } from "../lib/repos.js";
 import { fetchProjects } from "../lib/projects.js";
@@ -502,7 +502,8 @@ export default function Workspace() {
   const [showSessionPicker, setShowSessionPicker] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(false);
   const agentBusGuardsRef = useRef<Set<string>>(new Set());
-  const [pendingBusAutoExec, setPendingBusAutoExec] = useState<null | { target: "ask" | "agent"; message: string; guardKey: string }>(null);
+  const [pendingBusAutoExec, setPendingBusAutoExec] = useState<null | { target: "ask" | "agent"; message: string; guardKey: string; eventId?: string }>(null);
+  const [agentBusEvents, setAgentBusEvents] = useState<AgentBusEnvelope[]>([]);
 
   // Agent todo state
   const [agentTodos, setAgentTodos] = useState<TodoStep[]>([]);
@@ -766,6 +767,11 @@ export default function Workspace() {
     }
   }, [dbSessions, dbSessionId, sessionLoading, restoreLatestSession]);
 
+  useEffect(() => {
+    if (!dbSessionId) return;
+    listAgentBusEvents(dbSessionId).then(setAgentBusEvents).catch(() => {});
+  }, [dbSessionId]);
+
   // Auto-save todos to DB session when they change
   useEffect(() => {
     if (dbSessionId && agentTodos.length > 0) {
@@ -981,7 +987,10 @@ export default function Workspace() {
     const sourceSessionId = from === "ask" ? askSessionId : agentSessionId;
     const targetSessionId = to === "ask" ? askSessionId : agentSessionId;
 
+    if (!dbSessionId) throw new Error("No active DB session for agent bus");
+
     const bus = await createAgentBusTransfer({
+      sessionId: dbSessionId,
       from,
       to,
       action,
@@ -994,11 +1003,12 @@ export default function Workspace() {
       targetRepo,
       hopCount: meta?.hopCount ?? 0,
       chainId: meta?.chainId,
-    });
+    } as any);
 
     if (to === "ask") setAskPrefill(`${bus.prompt}\n\n`);
     else setAgentPrefill(`${bus.prompt}\n\n`);
 
+    setAgentBusEvents((prev) => [bus, ...prev]);
     pushSystemMessage(to, `${action === "review" ? "↗" : action === "warn" ? "⚠" : "↖"} Agent bus: ${from} → ${to}${bus.warning ? `\n${bus.warning}` : ""}`);
 
     const hopCount = bus.hopCount ?? 0;
@@ -1006,7 +1016,7 @@ export default function Workspace() {
     const guardKey = `${bus.chainId}:${to}:${action}:${hopCount}`;
     if (shouldAutoExecute && !agentBusGuardsRef.current.has(guardKey)) {
       agentBusGuardsRef.current.add(guardKey);
-      setPendingBusAutoExec({ target: to, message: bus.prompt, guardKey });
+      setPendingBusAutoExec({ target: to, message: bus.prompt, guardKey, eventId: bus.id });
     }
 
     return bus;
@@ -1736,6 +1746,10 @@ export default function Workspace() {
   useEffect(() => {
     if (!pendingBusAutoExec) return;
     const run = async () => {
+      if (pendingBusAutoExec.eventId) {
+        await updateAgentBusEventStatus(pendingBusAutoExec.eventId, "auto_run_executed").catch(() => {});
+        setAgentBusEvents((prev) => prev.map((e) => e.id === pendingBusAutoExec.eventId ? { ...e, status: "auto_run_executed" } : e));
+      }
       if (pendingBusAutoExec.target === "ask") {
         await handleAskSend(pendingBusAutoExec.message);
       } else {
@@ -2463,6 +2477,19 @@ export default function Workspace() {
             isExpanded={panelMode === "ask-full"}
             onToggleExpand={toggleAskExpand}
             onOpenPromptLibrary={() => setShowPromptLibrary(true)}
+            headerStatus={(() => {
+              const pending = agentBusEvents.find((e) => e.to === "ask" && e.status === "review_pending");
+              const warning = agentBusEvents.find((e) => e.to === "ask" && e.status === "warning_received");
+              const autoRun = agentBusEvents.find((e) => e.to === "ask" && e.status === "auto_run_executed");
+              if (!pending && !warning && !autoRun) return null;
+              return (
+                <div className="flex items-center gap-1.5 ml-1">
+                  {pending && <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">Review pending</span>}
+                  {warning && <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">Warning received</span>}
+                  {autoRun && <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Auto-run executed</span>}
+                </div>
+              );
+            })()}
             headerLeft={
               <div className="flex items-center gap-2">
                 <RoleSelector role={askRole} onChange={setAskRole} />
@@ -2588,6 +2615,19 @@ export default function Workspace() {
             isExpanded={panelMode === "agent-full"}
             onToggleExpand={toggleAgentExpand}
             onOpenPromptLibrary={() => setShowPromptLibrary(true)}
+            headerStatus={(() => {
+              const pending = agentBusEvents.find((e) => e.to === "agent" && e.status === "review_pending");
+              const warning = agentBusEvents.find((e) => e.to === "agent" && e.status === "warning_received");
+              const autoRun = agentBusEvents.find((e) => e.to === "agent" && e.status === "auto_run_executed");
+              if (!pending && !warning && !autoRun) return null;
+              return (
+                <div className="flex items-center gap-1.5 ml-1">
+                  {pending && <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">Review pending</span>}
+                  {warning && <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">Warning received</span>}
+                  {autoRun && <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Auto-run executed</span>}
+                </div>
+              );
+            })()}
             headerLeft={
               <div className="flex items-center gap-2">
                 <RoleSelector role={agentRole} onChange={setAgentRole} />

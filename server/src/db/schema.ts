@@ -355,9 +355,9 @@ export const sessions = pgTable("sessions", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  // project_id is a varchar (not a uuid FK) so the Agent panel's virtual
-  // project ("agents") can be stored alongside real UUID project ids.
-  projectId: varchar("project_id", { length: 255 }).notNull(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
   machineId: varchar("machine_id", { length: 255 }).notNull(),
   opencodeSessionId: varchar("opencode_session_id", { length: 255 }),
   title: varchar("title", { length: 255 }),
@@ -375,6 +375,7 @@ export const sessions = pgTable("sessions", {
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, { fields: [sessions.userId], references: [users.id] }),
+  project: one(projects, { fields: [sessions.projectId], references: [projects.id] }),
 }));
 
 export const sessionMessages = pgTable("session_messages", {
@@ -391,6 +392,33 @@ export const sessionMessages = pgTable("session_messages", {
 
 export const sessionMessagesRelations = relations(sessionMessages, ({ one }) => ({
   session: one(sessions, { fields: [sessionMessages.sessionId], references: [sessions.id] }),
+}));
+
+export const agentBusEvents = pgTable("agent_bus_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => sessions.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  chainId: varchar("chain_id", { length: 255 }).notNull(),
+  fromPanel: varchar("from_panel", { length: 20 }).notNull(),
+  toPanel: varchar("to_panel", { length: 20 }).notNull(),
+  action: varchar("action", { length: 20 }).notNull(),
+  status: varchar("status", { length: 30 }).notNull().default("pending"),
+  hopCount: integer("hop_count").notNull().default(0),
+  warning: text("warning"),
+  prompt: text("prompt").notNull(),
+  content: text("content").notNull(),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const agentBusEventsRelations = relations(agentBusEvents, ({ one }) => ({
+  session: one(sessions, { fields: [agentBusEvents.sessionId], references: [sessions.id] }),
+  user: one(users, { fields: [agentBusEvents.userId], references: [users.id] }),
 }));
 
 export const restorePoints = pgTable("restore_points", {

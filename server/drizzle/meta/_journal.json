@@ -43,6 +43,20 @@
       "when": 1785777391591,
       "tag": "0005_flippant_talkback",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786074922065,
+      "tag": "0006_sessions_project_id_varchar",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786377600000,
+      "tag": "0008_agent_bus_events",
+      "breakpoints": true
     }
   ]
 }

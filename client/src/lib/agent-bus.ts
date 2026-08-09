@@ -23,6 +23,10 @@ export interface AgentBusEnvelope extends AgentBusPayload {
   createdAt: string;
   prompt: string;
   warning?: string;
+  status?: string;
+  sessionId?: string;
+  metadata?: Record<string, unknown> | null;
+  updatedAt?: string;
 }
 
 export async function createAgentBusTransfer(payload: AgentBusPayload): Promise<AgentBusEnvelope> {
@@ -36,5 +40,16 @@ export async function analyzeAgentBusWarning(payload: AgentBusPayload): Promise<
   return api("/agent/bus/analyze", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function listAgentBusEvents(sessionId: string): Promise<AgentBusEnvelope[]> {
+  return api(`/agent/bus/${sessionId}`);
+}
+
+export async function updateAgentBusEventStatus(eventId: string, status: string): Promise<AgentBusEnvelope> {
+  return api(`/agent/bus/${eventId}/status`, {
+    method: "POST",
+    body: JSON.stringify({ status }),
   });
 }
