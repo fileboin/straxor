@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
 import { eq, or, count } from "drizzle-orm";
@@ -10,6 +10,9 @@ import { sendEmail, buildAppUrl } from "../lib/mail.js";
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+const GITHUB_CLIENT_ID = (process.env.GITHUB_CLIENT_ID || "").trim();
+const GITHUB_CLIENT_SECRET = (process.env.GITHUB_CLIENT_SECRET || "").trim();
+const GITHUB_OAUTH_SCOPE = "read:user user:email";
 
 // ── Admin role resolution ──
 // ADMIN_EMAIL (comma-separated) always has admin access as a failsafe.
@@ -77,6 +80,109 @@ function signToken(user: PublicUser): string {
   return jwt.sign({ userId: user.id, email: user.email, role: user.role }, JWT_SECRET, {
     expiresIn: "7d",
   });
+}
+
+function oauthStateSecret(): string {
+  return process.env.OAUTH_STATE_SECRET || JWT_SECRET;
+}
+
+function signOauthState(payload: { nonce: string; returnTo?: string | null }) {
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const sig = createHash("sha256").update(`${body}.${oauthStateSecret()}`).digest("base64url");
+  return `${body}.${sig}`;
+}
+
+function verifyOauthState(raw: string | undefined): { nonce: string; returnTo?: string | null } | null {
+  if (!raw) return null;
+  const parts = raw.split(".");
+  if (parts.length !== 2) return null;
+  const [body, sig] = parts;
+  const expected = createHash("sha256").update(`${body}.${oauthStateSecret()}`).digest();
+  const actual = Buffer.from(sig, "base64url");
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null;
+  try {
+    return JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function buildGithubCallbackUrl(req: Parameters<typeof buildAppUrl>[0]): string {
+  const appUrl = buildAppUrl(req).replace(/\/$/, "");
+  return `${appUrl}/api/auth/github/callback`;
+}
+
+function sanitizeReturnTo(returnTo: unknown): string {
+  if (typeof returnTo !== "string" || !returnTo.startsWith("/")) return "/";
+  if (returnTo.startsWith("//") || returnTo.startsWith("/api/")) return "/";
+  return returnTo;
+}
+
+async function exchangeGithubCode(code: string, redirectUri: string) {
+  const res = await fetch("https://github.com/login/oauth/access_token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "User-Agent": "straxor",
+    },
+    body: JSON.stringify({
+      client_id: GITHUB_CLIENT_ID,
+      client_secret: GITHUB_CLIENT_SECRET,
+      code,
+      redirect_uri: redirectUri,
+    }),
+  });
+  const data: any = await res.json().catch(() => ({}));
+  if (!res.ok || !data.access_token) {
+    const message = data.error_description || data.error || `GitHub OAuth exchange failed (${res.status})`;
+    throw new Error(message);
+  }
+  return String(data.access_token);
+}
+
+async function githubApi(path: string, accessToken: string) {
+  const res = await fetch(`https://api.github.com${path}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${accessToken}`,
+      "User-Agent": "straxor",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+  const data: any = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || `GitHub API failed (${res.status})`);
+  }
+  return data;
+}
+
+async function resolveGithubEmail(accessToken: string): Promise<string> {
+  const profile = await githubApi("/user", accessToken);
+  if (profile?.email) return String(profile.email).toLowerCase();
+  const emails: any[] = await githubApi("/user/emails", accessToken);
+  const primary = emails.find((e) => e?.primary && e?.verified) || emails.find((e) => e?.verified) || emails[0];
+  if (!primary?.email) throw new Error("GitHub account nema dostupan email");
+  return String(primary.email).toLowerCase();
+}
+
+async function findOrCreateGithubUser(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const [existing] = await db.select().from(users).where(eq(users.email, normalizedEmail));
+  if (existing) return publicUserWithFailsafe(existing);
+  const role = await resolveRoleForEmail(normalizedEmail);
+  const passwordHash = await bcrypt.hash(randomBytes(32).toString("hex"), 10);
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: normalizedEmail,
+      passwordHash,
+      role,
+      emailVerified: true,
+      verificationToken: null,
+    })
+    .returning({ id: users.id, email: users.email, role: users.role, emailVerified: users.emailVerified });
+  return toPublicUser(user);
 }
 
 function verificationEmailHtml(link: string): string {
@@ -177,6 +283,65 @@ router.get("/admin-status", async (_req, res) => {
   } catch (err) {
     console.error("Admin status error:", err);
     res.status(500).json({ error: "Greška" });
+  }
+});
+
+router.get("/github", async (req, res) => {
+  try {
+    if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
+      return res.status(503).json({ error: "GitHub OAuth nije konfigurisan na serveru" });
+    }
+    const returnTo = sanitizeReturnTo(req.query.returnTo);
+    const nonce = randomBytes(24).toString("hex");
+    const state = signOauthState({ nonce, returnTo });
+    const redirect = new URL("https://github.com/login/oauth/authorize");
+    redirect.searchParams.set("client_id", GITHUB_CLIENT_ID);
+    redirect.searchParams.set("redirect_uri", buildGithubCallbackUrl(req));
+    redirect.searchParams.set("scope", GITHUB_OAUTH_SCOPE);
+    redirect.searchParams.set("state", state);
+    res.redirect(302, redirect.toString());
+  } catch (err) {
+    console.error("GitHub OAuth start error:", err);
+    res.status(500).json({ error: "Greška pri pokretanju GitHub prijave" });
+  }
+});
+
+router.get("/github/callback", async (req, res) => {
+  const appUrl = buildAppUrl(req).replace(/\/$/, "");
+  const redirectError = (message: string, returnTo = "/login") => {
+    const url = new URL(`${appUrl}${sanitizeReturnTo(returnTo)}`);
+    url.searchParams.set("oauth", "error");
+    url.searchParams.set("message", message);
+    res.redirect(302, url.toString());
+  };
+
+  try {
+    if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
+      redirectError("GitHub OAuth nije konfigurisan na serveru");
+      return;
+    }
+
+    const code = typeof req.query.code === "string" ? req.query.code : "";
+    const stateRaw = typeof req.query.state === "string" ? req.query.state : undefined;
+    const state = verifyOauthState(stateRaw);
+    if (!code || !state?.nonce) {
+      redirectError("Neispravan GitHub OAuth odgovor");
+      return;
+    }
+
+    const returnTo = sanitizeReturnTo(state.returnTo || "/");
+    const accessToken = await exchangeGithubCode(code, buildGithubCallbackUrl(req));
+    const email = await resolveGithubEmail(accessToken);
+    const publicUser = await findOrCreateGithubUser(email);
+    const token = signToken(publicUser);
+
+    const url = new URL(`${appUrl}${returnTo}`);
+    url.searchParams.set("oauth", "success");
+    url.searchParams.set("token", token);
+    res.redirect(302, url.toString());
+  } catch (err) {
+    console.error("GitHub OAuth callback error:", err);
+    redirectError(err instanceof Error ? err.message : "GitHub prijava nije uspjela");
   }
 });
 

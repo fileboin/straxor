@@ -8,6 +8,7 @@ import Register from "./pages/Register.js";
 import ForgotPassword from "./pages/ForgotPassword.js";
 import ResetPassword from "./pages/ResetPassword.js";
 import VerifyEmail from "./pages/VerifyEmail.js";
+import GitHubAuthCallback from "./pages/GitHubAuthCallback.js";
 import Dashboard from "./pages/Dashboard.js";
 import Workspace from "./pages/Workspace.js";
 import OnboardingPage from "./pages/Onboarding.js";
@@ -94,6 +95,14 @@ export default function App() {
               element={
                 <GuestRoute>
                   <VerifyEmail />
+                </GuestRoute>
+              }
+            />
+            <Route
+              path="/auth/github/callback"
+              element={
+                <GuestRoute>
+                  <GitHubAuthCallback />
                 </GuestRoute>
               }
             />

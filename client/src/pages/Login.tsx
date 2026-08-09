@@ -1,17 +1,29 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "../lib/auth.js";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useTheme } from "../lib/theme.js";
 import { t, useLang } from "../lib/i18n.js";
 
 export default function Login() {
   const { login } = useAuth();
   const { toggleTheme, theme } = useTheme();
+  const location = useLocation();
+  const [params] = useSearchParams();
   useLang();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const oauthError = useMemo(() => {
+    if (params.get("oauth") !== "error") return "";
+    return params.get("message") || "GitHub prijava nije uspjela";
+  }, [params]);
+  const githubLoginHref = useMemo(() => {
+    const returnTo = location.state && typeof location.state === 'object' && 'from' in location.state
+      ? String((location.state as { from?: string }).from || '/')
+      : '/';
+    return `/api/auth/github?returnTo=${encodeURIComponent(returnTo)}`;
+  }, [location.state]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -80,7 +92,7 @@ export default function Login() {
               required
             />
           </div>
-          {error && <p className="text-danger text-sm">{error}</p>}
+          {(error || oauthError) && <p className="text-danger text-sm">{error || oauthError}</p>}
           <div className="flex justify-end">
             <Link to="/forgot-password" className="text-[13px] text-text-muted hover:text-accent transition-colors">
               {t("auth.forgot")}
@@ -93,6 +105,21 @@ export default function Login() {
           >
             {loading ? t("auth.loginLoading") : t("auth.loginTab")}
           </button>
+          <div className="relative py-1">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-[11px] uppercase tracking-[0.18em] text-text-muted">
+              <span className="bg-background px-2">or</span>
+            </div>
+          </div>
+          <a
+            href={githubLoginHref}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border bg-surface-2 hover:bg-surface-3 text-text text-sm font-semibold transition-colors"
+          >
+            <span aria-hidden="true">🐙</span>
+            <span>Continue with GitHub</span>
+          </a>
         </form>
       </div>
     </div>
