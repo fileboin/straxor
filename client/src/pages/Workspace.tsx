@@ -79,6 +79,7 @@ import {
 } from "../lib/sessions.js";
 import type { Command } from "../lib/commands.js";
 import { getLastRestoreMeta, loadAppState, saveAppState, saveAppStateNow, type AppStateShape } from "../lib/app-state.js";
+import { listHandshakeSelfTestHistory, runHandshakeSelfTestRecord, updateHandshakeSelfTestRecord, type StoredHandshakeSelfTest } from "../lib/handshake-self-test.js";
 
 const INITIAL_ASK_MESSAGES: ChatMessage[] = [];
 
@@ -294,6 +295,7 @@ export default function Workspace() {
   const [restoredFromMirror, setRestoredFromMirror] = useState(false);
   const [handshakeTestLoading, setHandshakeTestLoading] = useState(false);
   const [handshakeTestResult, setHandshakeTestResult] = useState<HandshakeSelfTestResult | null>(null);
+  const [handshakeTestHistory, setHandshakeTestHistory] = useState<StoredHandshakeSelfTest[]>([]);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -952,6 +954,7 @@ export default function Workspace() {
   useEffect(() => {
     if (!dbSessionId) return;
     listAgentBusEvents(dbSessionId).then(setAgentBusEvents).catch(() => {});
+    listHandshakeSelfTestHistory(dbSessionId).then(setHandshakeTestHistory).catch(() => {});
   }, [dbSessionId]);
 
   // Auto-save todos to DB session when they change
@@ -1215,6 +1218,7 @@ export default function Workspace() {
   const runHandshakeSelfTest = useCallback(async () => {
     setHandshakeTestLoading(true);
     const notes: string[] = [];
+    let storedTestId: string | null = null;
     try {
       const repoCheck = {
         askRepo: askActiveRepo?.fullName || null,
@@ -1249,15 +1253,46 @@ export default function Workspace() {
         auditCount: 0,
       };
 
+      const chainId = `live-handshake-${Date.now()}`;
+
+      if (dbSessionId) {
+        const initialResult: HandshakeSelfTestResult = {
+          checkedAt: new Date().toISOString(),
+          ok: false,
+          repoCheck,
+          runtimeCheck,
+          busCheck,
+          autoReviewCheck,
+          auditSyncCheck,
+          notes: [...notes],
+        };
+        const stored = await runHandshakeSelfTestRecord({
+          sessionId: dbSessionId,
+          projectId: projectId || null,
+          askRepo: repoCheck.askRepo,
+          agentRepo: repoCheck.agentRepo,
+          askMachineId: runtimeCheck.askMachineId,
+          agentMachineId: runtimeCheck.agentMachineId,
+          chainId,
+          result: initialResult as unknown as Record<string, unknown>,
+        });
+        storedTestId = stored.test.id;
+      }
+
       if (dbSessionId && repoCheck.ok && runtimeCheck.ok) {
-        const chainId = `selftest-${Date.now()}`;
-        const created = await transferByBus(
-          "ask",
-          "agent",
-          "review",
-          `SELF-TEST handshake between ${askActiveRepo!.fullName} and ${activeRepo!.fullName}`,
-          { autoExecute: true, chainId }
-        );
+        const livePrompt = [
+          `FULL LIVE HANDSHAKE TEST`,
+          `Ask panel repo: ${askActiveRepo!.fullName}`,
+          `Agent panel repo: ${activeRepo!.fullName}`,
+          `Review the cross-repo boundary explicitly.`,
+          `Confirm runtime separation, repo separation, and log the review through the agent bus.`,
+          `If assumptions are uncertain, say so clearly.`,
+        ].join("\n");
+
+        const created = await transferByBus("ask", "agent", "review", livePrompt, {
+          autoExecute: true,
+          chainId,
+        });
 
         busCheck = {
           ok: !!created.id,
@@ -1267,26 +1302,35 @@ export default function Workspace() {
           createdAt: created.createdAt || null,
         };
 
-        await new Promise((resolve) => setTimeout(resolve, 1200));
+        if (storedTestId) {
+          await updateHandshakeSelfTestRecord(storedTestId, {
+            busEventId: created.id,
+            status: "running",
+          }).catch(() => {});
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 1800));
         const auditEvents = await listAgentBusEvents(dbSessionId);
-        const uiEvents = agentBusEvents;
         const latestAudit = auditEvents.find((event) => event.id === created.id) || null;
+        const uiEvents = auditEvents;
         const latestUi = uiEvents.find((event) => event.id === created.id) || created;
 
         autoReviewCheck = {
           ok: (latestAudit?.status || latestUi?.status || "") === "auto_run_executed",
           status: latestAudit?.status || latestUi?.status || null,
         };
-        if (!autoReviewCheck.ok) notes.push("Bus event je kreiran, ali auto-review status još nije potvrđen kao auto_run_executed.");
+        if (!autoReviewCheck.ok) notes.push("Live handshake bus event je kreiran, ali auto-review status još nije potvrđen kao auto_run_executed.");
 
         auditSyncCheck = {
           ok: !!latestAudit && !!latestUi,
           uiCount: uiEvents.length,
           auditCount: auditEvents.length,
         };
-        if (!auditSyncCheck.ok) notes.push("Bus audit trail i UI history nisu još potpuno sinhronizovani za self-test event.");
+        if (!auditSyncCheck.ok) notes.push("Bus audit trail i UI history nisu još potpuno sinhronizovani za live handshake event.");
+
+        setAgentBusEvents(auditEvents);
       } else if (!dbSessionId) {
-        notes.push("Nema aktivne DB sesije za bus self-test.");
+        notes.push("Nema aktivne DB sesije za live handshake test.");
       }
 
       const result: HandshakeSelfTestResult = {
@@ -1300,9 +1344,19 @@ export default function Workspace() {
         notes,
       };
       setHandshakeTestResult(result);
+      if (storedTestId) {
+        await updateHandshakeSelfTestRecord(storedTestId, {
+          result: result as unknown as Record<string, unknown>,
+          status: result.ok ? "passed" : "failed",
+          busEventId: result.busCheck.eventId,
+        }).catch(() => {});
+        if (dbSessionId) {
+          listHandshakeSelfTestHistory(dbSessionId).then(setHandshakeTestHistory).catch(() => {});
+        }
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Nepoznata greška";
-      setHandshakeTestResult({
+      const failure: HandshakeSelfTestResult = {
         checkedAt: new Date().toISOString(),
         ok: false,
         repoCheck: { ok: false, askRepo: askActiveRepo?.fullName || null, agentRepo: activeRepo?.fullName || null, distinct: false },
@@ -1311,11 +1365,21 @@ export default function Workspace() {
         autoReviewCheck: { ok: false, status: null },
         auditSyncCheck: { ok: false, uiCount: agentBusEvents.length, auditCount: 0 },
         notes: [message],
-      });
+      };
+      setHandshakeTestResult(failure);
+      if (storedTestId) {
+        await updateHandshakeSelfTestRecord(storedTestId, {
+          result: failure as unknown as Record<string, unknown>,
+          status: "failed",
+        }).catch(() => {});
+      }
     } finally {
+      if (dbSessionId) {
+        listHandshakeSelfTestHistory(dbSessionId).then(setHandshakeTestHistory).catch(() => {});
+      }
       setHandshakeTestLoading(false);
     }
-  }, [askActiveRepo, activeRepo, askMachineId, agentMachineId, dbSessionId, transferByBus, agentBusEvents]);
+  }, [askActiveRepo, activeRepo, askMachineId, agentMachineId, dbSessionId, transferByBus, agentBusEvents, projectId]);
 
   // Helper: proceed with tool allow after permission/security check
   const proceedToolAllow = useCallback(
@@ -3333,6 +3397,7 @@ modelOrch={agentModelOrch}
           open={showHandshakeTest}
           loading={handshakeTestLoading}
           result={handshakeTestResult}
+          history={handshakeTestHistory}
           askRepo={askActiveRepo}
           agentRepo={activeRepo}
           askMachineId={askMachineId}

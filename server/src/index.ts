@@ -71,6 +71,7 @@ import { createConnectionsRouter } from "./connections/api/routes.js";
 import { imageAgentRoutes } from "./agents/image-agent/api/routes.js";
 import { verificationRoutes } from "./verification/api/routes.js";
 import appStateRoutes from "./routes/app-state.js";
+import handshakeSelfTestRoutes from "./routes/handshake-self-test.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -212,6 +213,7 @@ app.use("/api/connections", connectionsRouter);
 app.use("/api/image-agent", imageAgentRoutes);
 app.use("/api/verification", verificationRoutes);
 app.use("/api/app-state", appStateRoutes);
+app.use("/api/handshake-self-test", handshakeSelfTestRoutes);
 
 // ── Serve client build in production ──
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

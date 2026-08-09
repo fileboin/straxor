@@ -1,5 +1,5 @@
-import type { AgentBusEnvelope } from "../../lib/agent-bus.js";
 import type { RepoConnection } from "../../lib/repos.js";
+import type { StoredHandshakeSelfTest } from "../../lib/handshake-self-test.js";
 
 export interface HandshakeSelfTestResult {
   checkedAt: string;
@@ -16,6 +16,7 @@ interface Props {
   open: boolean;
   loading: boolean;
   result: HandshakeSelfTestResult | null;
+  history: StoredHandshakeSelfTest[];
   askRepo: RepoConnection | null;
   agentRepo: RepoConnection | null;
   askMachineId: string | null;
@@ -45,6 +46,7 @@ export default function HandshakeSelfTestPanel({
   open,
   loading,
   result,
+  history,
   askRepo,
   agentRepo,
   askMachineId,
@@ -60,7 +62,7 @@ export default function HandshakeSelfTestPanel({
         <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
           <div>
             <div className="text-sm font-semibold text-text">Handshake self-test</div>
-            <div className="text-[11px] text-text-muted mt-0.5">Automatska provjera dva panela, repo slotova, runtime-a, bus eventa i audit/UI sinhronizacije</div>
+            <div className="text-[11px] text-text-muted mt-0.5">Full live handshake sa stvarnim promptom između agenata, bus event provjerom i istorijom u bazi</div>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -132,6 +134,26 @@ export default function HandshakeSelfTestPanel({
                     result.notes.map((note, index) => (
                       <div key={`${index}-${note}`} className="text-[11px] text-text bg-surface border border-border rounded-lg px-3 py-2">
                         {note}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-surface-2/40 overflow-hidden">
+                <div className="px-4 py-3 border-b border-border bg-surface/60 text-[12px] font-semibold text-text">Poslednje provjere</div>
+                <div className="divide-y divide-border">
+                  {history.length === 0 ? (
+                    <div className="px-4 py-6 text-[11px] text-text-muted">Još nema sačuvanih self-test rezultata.</div>
+                  ) : (
+                    history.slice(0, 8).map((item) => (
+                      <div key={item.id} className="px-4 py-3 flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="text-[11px] text-text font-medium break-all">{item.chainId}</div>
+                          <div className="text-[10px] text-text-muted mt-1">{new Date(item.createdAt).toLocaleString()}</div>
+                          <div className="text-[10px] text-text-muted mt-1 break-all">{item.askRepo || "N/A"} → {item.agentRepo || "N/A"}</div>
+                        </div>
+                        <StatusPill ok={item.status === "passed"} label={item.status.toUpperCase()} />
                       </div>
                     ))
                   )}

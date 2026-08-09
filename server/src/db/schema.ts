@@ -421,6 +421,35 @@ export const agentBusEventsRelations = relations(agentBusEvents, ({ one }) => ({
   user: one(users, { fields: [agentBusEvents.userId], references: [users.id] }),
 }));
 
+export const handshakeSelfTests = pgTable("handshake_self_tests", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => sessions.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id")
+    .references(() => projects.id, { onDelete: "cascade" }),
+  chainId: varchar("chain_id", { length: 255 }).notNull(),
+  mode: varchar("mode", { length: 30 }).notNull().default("full_live_handshake"),
+  status: varchar("status", { length: 30 }).notNull().default("pending"),
+  askRepo: varchar("ask_repo", { length: 511 }),
+  agentRepo: varchar("agent_repo", { length: 511 }),
+  askMachineId: varchar("ask_machine_id", { length: 255 }),
+  agentMachineId: varchar("agent_machine_id", { length: 255 }),
+  busEventId: uuid("bus_event_id"),
+  result: jsonb("result").notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const handshakeSelfTestsRelations = relations(handshakeSelfTests, ({ one }) => ({
+  session: one(sessions, { fields: [handshakeSelfTests.sessionId], references: [sessions.id] }),
+  user: one(users, { fields: [handshakeSelfTests.userId], references: [users.id] }),
+  project: one(projects, { fields: [handshakeSelfTests.projectId], references: [projects.id] }),
+}));
+
 export const restorePoints = pgTable("restore_points", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
