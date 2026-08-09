@@ -3,6 +3,7 @@ import { useAuth } from "../lib/auth.js";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useTheme } from "../lib/theme.js";
 import { t, useLang } from "../lib/i18n.js";
+import { startGitHubOAuth } from "../lib/oauth.js";
 
 export default function Login() {
   const { login } = useAuth();
@@ -18,12 +19,20 @@ export default function Login() {
     if (params.get("oauth") !== "error") return "";
     return params.get("message") || "GitHub prijava nije uspjela";
   }, [params]);
-  const githubLoginHref = useMemo(() => {
-    const returnTo = location.state && typeof location.state === 'object' && 'from' in location.state
+  const returnTo = useMemo(() => {
+    return location.state && typeof location.state === 'object' && 'from' in location.state
       ? String((location.state as { from?: string }).from || '/')
       : '/';
-    return `/api/auth/github?returnTo=${encodeURIComponent(returnTo)}`;
   }, [location.state]);
+
+  const handleGitHubLogin = async () => {
+    setError("");
+    try {
+      await startGitHubOAuth(returnTo);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "GitHub prijava nije dostupna");
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -113,13 +122,17 @@ export default function Login() {
               <span className="bg-background px-2">or</span>
             </div>
           </div>
-          <a
-            href={githubLoginHref}
+          <button
+            type="button"
+            onClick={handleGitHubLogin}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border bg-surface-2 hover:bg-surface-3 text-text text-sm font-semibold transition-colors"
           >
             <span aria-hidden="true">🐙</span>
             <span>Continue with GitHub</span>
-          </a>
+          </button>
+          <p className="text-[12px] text-text-muted text-center">
+            Ako GitHub OAuth nije podešen na serveru, ovde će se prikazati jasna poruka umesto preusmerenja.
+          </p>
         </form>
       </div>
     </div>

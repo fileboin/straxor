@@ -1,9 +1,10 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useMemo, useState, useEffect, type FormEvent } from "react";
 import { useAuth } from "../lib/auth.js";
 import { Link } from "react-router-dom";
 import { useTheme } from "../lib/theme.js";
 import { t, useLang } from "../lib/i18n.js";
 import { api } from "../lib/api.js";
+import { startGitHubOAuth } from "../lib/oauth.js";
 
 export default function Register() {
   const { register } = useAuth();
@@ -15,6 +16,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
   const [noAdmin, setNoAdmin] = useState<boolean | null>(null);
+  const returnTo = useMemo(() => "/", []);
 
   useEffect(() => {
     let active = true;
@@ -29,6 +31,15 @@ export default function Register() {
       active = false;
     };
   }, []);
+
+  const handleGitHubLogin = async () => {
+    setError("");
+    try {
+      await startGitHubOAuth(returnTo);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "GitHub prijava nije dostupna");
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -114,6 +125,25 @@ export default function Register() {
           >
             {loading ? t("auth.registerLoading") : t("auth.registerTab")}
           </button>
+          <div className="relative py-1">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-[11px] uppercase tracking-[0.18em] text-text-muted">
+              <span className="bg-background px-2">or</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleGitHubLogin}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border bg-surface-2 hover:bg-surface-3 text-text text-sm font-semibold transition-colors"
+          >
+            <span aria-hidden="true">🐙</span>
+            <span>Continue with GitHub</span>
+          </button>
+          <p className="text-[12px] text-text-muted text-center">
+            Ako GitHub OAuth nije podešen na serveru, ovde će se prikazati jasna poruka umesto preusmerenja.
+          </p>
         </form>
         {registered && (
           <div className="mt-4 bg-surface-2 border border-border rounded-xl p-4 text-[13px] text-text-muted leading-relaxed">
