@@ -18,6 +18,7 @@ import { PROVIDERS } from "../lib/models.js";
 import { streamChat, hasApiKey, getApiKey } from "../lib/chat.js";
 import { routeChat, orchestrateChat, type OrchestrateModel } from "../lib/orchestrator.js";
 import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges, sendSteerInstruction, startAgentBackground, fetchBackgroundStatus, type BackgroundTimelineEntry } from "../lib/agent.js";
+import { createAgentBusTransfer } from "../lib/agent-bus.js";
 import { runAgentTurn } from "../lib/agent-turn.js";
 import { listRepoConnections, type RepoConnection } from "../lib/repos.js";
 import { fetchProjects } from "../lib/projects.js";
@@ -198,6 +199,7 @@ export default function Workspace() {
   const [gitRemoteSlot, setGitRemoteSlot] = useState<string | undefined>(undefined);
   const [showUsage, setShowUsage] = useState(false);
   const [showRuntimeManager, setShowRuntimeManager] = useState(false);
+  const [runtimeManagerPanel, setRuntimeManagerPanel] = useState<"ask" | "agent">("agent");
   const [showQuickStart, setShowQuickStart] = useState(false);
   const [showKanban, setShowKanban] = useState(false);
   const [showMcpMarketplace, setShowMcpMarketplace] = useState(false);
@@ -238,12 +240,16 @@ export default function Workspace() {
 
   // Agent session state
   const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
-  const [agentMachineId, setAgentMachineId] = useState<string | null>(null);
+  const [agentMachineId, setAgentMachineId] = useState<string | null>(() => {
+    try { return localStorage.getItem("straxor.machine.agent"); } catch { return null; }
+  });
 
   // Ask panel session state (Ask is a full independent agent on the local
   // engine with its own slot/repo, parallel to Agent).
   const [askSessionId, setAskSessionId] = useState<string | null>(null);
-  const [askMachineId, setAskMachineId] = useState<string | null>(null);
+  const [askMachineId, setAskMachineId] = useState<string | null>(() => {
+    try { return localStorage.getItem("straxor.machine.ask"); } catch { return null; }
+  });
   const askDirectFallbackRef = useRef(false);
 
   // Active repo connection — when set and no VPS machine is configured, the
@@ -466,45 +472,37 @@ export default function Workspace() {
   // localEngineOnRemote guard turns the panel into plain AI chat. We must NOT
   // keep a stale VPS machineId from a restored session here, otherwise the
   // agent panel would hang on a VPS that doesn't exist on this host.
+  // When a GitHub repo is active and no explicit VPS machine is selected for a
+  // panel, bind that panel to its slot-specific local OpenCode runtime.
   useEffect(() => {
+    if (agentMachineId && !agentMachineId.startsWith("local:")) return;
     if (activeRepo) {
-      setAgentMachineId((prev) =>
-        !isLocalHost || prev?.startsWith("local:") ? "local:opencode" : prev
-      );
+      setAgentMachineId("local:opencode");
       console.log("[machine-debug] agent activeRepo=", activeRepo.fullName, "-> local:opencode", isLocalHost ? "(localhost)" : "(remote)");
     } else {
       setAgentMachineId((prev) => (prev && prev.startsWith("local:") ? null : prev));
       console.log("[machine-debug] agent no activeRepo -> clearing local");
     }
-  }, [activeRepo, isLocalHost]);
+  }, [activeRepo, isLocalHost, agentMachineId]);
 
-  // Ask panel now prefers the ACTIVE OpenCode runtime too: when a VPS runtime
-  // is connected, the left panel should use that same live agent interface as
-  // its primary path. Its own :ask local engine remains the fallback only when
-  // there is no VPS runtime and the ask slot has an active GitHub repo.
   useEffect(() => {
-    if (agentMachineId && !agentMachineId.startsWith("local:")) {
-      setAskMachineId(agentMachineId);
-      console.log("[machine-debug] ask primary runtime <- active VPS", agentMachineId);
-      return;
-    }
+    if (askMachineId && !askMachineId.startsWith("local:")) return;
     if (askActiveRepo) {
-      setAskMachineId((prev) => (prev && !prev.startsWith("local:") ? prev : "local:opencode:ask"));
+      setAskMachineId("local:opencode:ask");
       console.log("[machine-debug] ask activeRepo=", askActiveRepo.fullName, "-> local:opencode:ask");
-    } else if (agentMachineId && agentMachineId.startsWith("local:")) {
-      setAskMachineId(agentMachineId);
-      console.log("[machine-debug] ask primary runtime <- shared local", agentMachineId);
     } else {
       setAskMachineId((prev) => (prev && prev.startsWith("local:") ? null : prev));
       console.log("[machine-debug] ask no activeRepo -> clearing local");
     }
-  }, [askActiveRepo, agentMachineId]);
+  }, [askActiveRepo, askMachineId]);
 
   // Resume system state
   const [dbSessionId, setDbSessionId] = useState<string | null>(null);
   const [dbSessions, setDbSessions] = useState<Session[]>([]);
   const [showSessionPicker, setShowSessionPicker] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(false);
+  const agentBusGuardsRef = useRef<Set<string>>(new Set());
+  const [pendingBusAutoExec, setPendingBusAutoExec] = useState<null | { target: "ask" | "agent"; message: string; guardKey: string }>(null);
 
   // Agent todo state
   const [agentTodos, setAgentTodos] = useState<TodoStep[]>([]);
@@ -524,6 +522,18 @@ export default function Workspace() {
   useEffect(() => {
     try { localStorage.setItem("straxor.agent.mode", agentPanelMode); } catch {}
   }, [agentPanelMode]);
+  useEffect(() => {
+    try {
+      if (askMachineId) localStorage.setItem("straxor.machine.ask", askMachineId);
+      else localStorage.removeItem("straxor.machine.ask");
+    } catch {}
+  }, [askMachineId]);
+  useEffect(() => {
+    try {
+      if (agentMachineId) localStorage.setItem("straxor.machine.agent", agentMachineId);
+      else localStorage.removeItem("straxor.machine.agent");
+    } catch {}
+  }, [agentMachineId]);
 
   const clampPanelHeight = (v: number) => Math.max(30, Math.min(100, v));
   const startPanelHeightResize = (e: React.MouseEvent, which: "ask" | "agent") => {
@@ -676,23 +686,9 @@ export default function Workspace() {
       // Restore DB session ID
       setDbSessionId(full.id);
 
-      // Restore OpenCode session ID — only meaningful for a VPS machine.
-      // A restored session ID belongs to a specific machine; reusing it on the
-      // local engine would cause the SSE filter to discard every event.
-      if (full.machineId && !full.machineId.startsWith("local:")) {
-        if (full.opencodeSessionId) {
-          setAgentSessionId(full.opencodeSessionId);
-        }
-      }
-
-      // Restore machine ID — but only for a real VPS machine. Local engines
-      // ("local:*") are assigned automatically from the active repo for each
-      // panel slot, so restoring one here would override the agent panel with
-      // the ask-slot engine (or vice-versa) and leave it unresponsive.
-      if (full.machineId && !full.machineId.startsWith("local:")) {
-        setAgentMachineId(full.machineId);
-        setVpsStatus("ready");
-      }
+      // Restore panel-local machine/session metadata from saved configs.
+      let restoredAskVps = false;
+      let restoredAgentVps = false;
 
       // Restore agent config
       if (full.agentConfig) {
@@ -702,6 +698,11 @@ export default function Workspace() {
           if (cfg.model) setAgentModel(cfg.model);
           if (cfg.thinking) setAgentThinking(cfg.thinking);
           if (cfg.role) setAgentRole(cfg.role);
+          if (cfg.sessionId) setAgentSessionId(cfg.sessionId);
+          if (cfg.machineId && !String(cfg.machineId).startsWith("local:")) {
+            setAgentMachineId(cfg.machineId);
+            restoredAgentVps = true;
+          }
         } catch {}
       }
 
@@ -713,6 +714,11 @@ export default function Workspace() {
           if (cfg.model) setAskModel(cfg.model);
           if (cfg.thinking) setAskThinking(cfg.thinking);
           if (cfg.role) setAskRole(cfg.role);
+          if (cfg.sessionId) setAskSessionId(cfg.sessionId);
+          if (cfg.machineId && !String(cfg.machineId).startsWith("local:")) {
+            setAskMachineId(cfg.machineId);
+            restoredAskVps = true;
+          }
         } catch {}
       }
 
@@ -722,6 +728,17 @@ export default function Workspace() {
           const ids = JSON.parse(full.activePromptIds);
           setActivePromptIds(new Set(ids));
         } catch {}
+      }
+
+      // Backward-compatible fallback for older sessions.
+      if (!restoredAgentVps && full.machineId && !full.machineId.startsWith("local:")) {
+        setAgentMachineId(full.machineId);
+      }
+      if (!agentSessionId && full.machineId && !full.machineId.startsWith("local:") && full.opencodeSessionId) {
+        setAgentSessionId(full.opencodeSessionId);
+      }
+      if (restoredAskVps || restoredAgentVps || (full.machineId && !full.machineId.startsWith("local:"))) {
+        setVpsStatus("ready");
       }
 
       // Restore messages
@@ -956,15 +973,52 @@ export default function Workspace() {
     setAgentMessages((prev) => [...prev, message]);
   }, []);
 
+  const transferByBus = useCallback(async (from: "ask" | "agent", to: "ask" | "agent", action: "help" | "review" | "warn", content: string, meta?: { hopCount?: number; chainId?: string; autoExecute?: boolean }): Promise<Awaited<ReturnType<typeof createAgentBusTransfer>>> => {
+    const sourceRepo = from === "ask" ? askActiveRepo?.fullName || null : activeRepo?.fullName || null;
+    const targetRepo = to === "ask" ? askActiveRepo?.fullName || null : activeRepo?.fullName || null;
+    const sourceMachineId = from === "ask" ? askMachineId : agentMachineId;
+    const targetMachineId = to === "ask" ? askMachineId : agentMachineId;
+    const sourceSessionId = from === "ask" ? askSessionId : agentSessionId;
+    const targetSessionId = to === "ask" ? askSessionId : agentSessionId;
+
+    const bus = await createAgentBusTransfer({
+      from,
+      to,
+      action,
+      content,
+      sourceMachineId,
+      targetMachineId,
+      sourceSessionId,
+      targetSessionId,
+      sourceRepo,
+      targetRepo,
+      hopCount: meta?.hopCount ?? 0,
+      chainId: meta?.chainId,
+    });
+
+    if (to === "ask") setAskPrefill(`${bus.prompt}\n\n`);
+    else setAgentPrefill(`${bus.prompt}\n\n`);
+
+    pushSystemMessage(to, `${action === "review" ? "↗" : action === "warn" ? "⚠" : "↖"} Agent bus: ${from} → ${to}${bus.warning ? `\n${bus.warning}` : ""}`);
+
+    const hopCount = bus.hopCount ?? 0;
+    const shouldAutoExecute = !!meta?.autoExecute && hopCount < 1;
+    const guardKey = `${bus.chainId}:${to}:${action}:${hopCount}`;
+    if (shouldAutoExecute && !agentBusGuardsRef.current.has(guardKey)) {
+      agentBusGuardsRef.current.add(guardKey);
+      setPendingBusAutoExec({ target: to, message: bus.prompt, guardKey });
+    }
+
+    return bus;
+  }, [askActiveRepo, activeRepo, askMachineId, agentMachineId, askSessionId, agentSessionId, pushSystemMessage]);
+
   const sendToAgentForHelp = useCallback((content: string) => {
-    setAgentPrefill(`[POMOĆ OD LIJEVOG PANELA]\nRepo slot: ask\nZadatak: pomozi lijevom panelu na njegovom aktivnom projektu. Ako se repoi razlikuju, tretiraj ovo kao cross-repo savjetovanje i jasno upozori na razlike.\n\n${content}\n\n[/POMOĆ OD LIJEVOG PANELA]\n`);
-    pushSystemMessage("agent", `↖ ${t("chat.send.help")} — kontekst je prebačen iz lijevog panela.`);
-  }, [pushSystemMessage]);
+    void transferByBus("ask", "agent", "help", content);
+  }, [transferByBus]);
 
   const sendToAskForReview = useCallback((content: string) => {
-    setAskPrefill(`[CODE REVIEW ZA LIJEVI PANEL]\nRepo slot: agent\nZadatak: uradi review izlaza iz desnog panela, upozori na bugove, rizike, regresije i predloži konkretne popravke. Ako je repo drugačiji od aktivnog ask repoa, eksplicitno to navedi.\n\n${content}\n\n[/CODE REVIEW ZA LIJEVI PANEL]\n`);
-    pushSystemMessage("ask", `↗ ${t("chat.send.review")} — kontekst je prebačen iz desnog panela.`);
-  }, [pushSystemMessage]);
+    void transferByBus("agent", "ask", "review", content);
+  }, [transferByBus]);
 
   // Helper: proceed with tool allow after permission/security check
   const proceedToolAllow = useCallback(
@@ -1039,8 +1093,8 @@ export default function Workspace() {
               PROJECT_ID,
               askMachineId,
               msg.slice(0, 100),
-              { provider: askProvider, model: askModel, thinking: askThinking, role: askRole },
-              { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole }
+              { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, machineId: agentMachineId, sessionId: agentSessionId },
+              { provider: askProvider, model: askModel, thinking: askThinking, role: askRole, machineId: askMachineId, sessionId: askSessionId }
             );
             setDbSessionId(sess.id);
             fetchSessions(PROJECT_ID).then(setDbSessions);
@@ -1403,8 +1457,8 @@ export default function Workspace() {
           PROJECT_ID,
           agentMachineId,
           msg.slice(0, 100),
-          { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole },
-          { provider: askProvider, model: askModel, thinking: askThinking, role: askRole }
+          { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, machineId: agentMachineId, sessionId: agentSessionId },
+          { provider: askProvider, model: askModel, thinking: askThinking, role: askRole, machineId: askMachineId, sessionId: askSessionId }
         );
         activeDbSessionId = sess.id;
         setDbSessionId(sess.id);
@@ -1626,7 +1680,7 @@ export default function Workspace() {
         // Refresh todos after agent finishes
         setTimeout(() => refreshTodos(), 300);
 
-        // Save assistant message to DB
+        // Save assistant message to DB and trigger peer review from the final content.
         if (dbSessionId) {
           const msgId = assistantMsg.id;
           // Get the assistant message content from the current state
@@ -1640,6 +1694,9 @@ export default function Workspace() {
                 found.label,
                 found.toolCalls
               ).catch(() => {});
+              if (agentPanelMode === "agent") {
+                void transferByBus("agent", "ask", "review", found.content, { autoExecute: true, hopCount: 0 });
+              }
             }
             return prev;
           });
@@ -1647,7 +1704,8 @@ export default function Workspace() {
           // Save session metadata
           updateSession(dbSessionId, {
             lastTask: msg.slice(0, 500),
-            agentConfig: JSON.stringify({ provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole }),
+            agentConfig: JSON.stringify({ provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, machineId: agentMachineId, sessionId: agentSessionId }),
+            askConfig: JSON.stringify({ provider: askProvider, model: askModel, thinking: askThinking, role: askRole, machineId: askMachineId, sessionId: askSessionId }),
             activePromptIds: JSON.stringify(Array.from(activePromptIds)),
           }).catch(() => {});
         }
@@ -1673,7 +1731,20 @@ export default function Workspace() {
         setAgentLoading(false);
       },
     }, attachments);
-  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch, agentOrchestratedModels, availableModels, agentBackground, agentPanelMode]);
+  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch, agentOrchestratedModels, availableModels, agentBackground, agentPanelMode, transferByBus]);
+
+  useEffect(() => {
+    if (!pendingBusAutoExec) return;
+    const run = async () => {
+      if (pendingBusAutoExec.target === "ask") {
+        await handleAskSend(pendingBusAutoExec.message);
+      } else {
+        await handleAgentSend(pendingBusAutoExec.message);
+      }
+      setPendingBusAutoExec((current) => current?.guardKey === pendingBusAutoExec.guardKey ? null : current);
+    };
+    void run();
+  }, [pendingBusAutoExec, handleAskSend, handleAgentSend]);
 
   // Confirm a step — send message to agent to continue
   const handleConfirmStep = useCallback(
@@ -1700,10 +1771,16 @@ export default function Workspace() {
   }, []);
 
   const handleVpsConnected = useCallback((machineId: string) => {
-    setAgentMachineId(machineId);
+    if (runtimeManagerPanel === "ask") {
+      setAskMachineId(machineId);
+      setAskSessionId(null);
+    } else {
+      setAgentMachineId(machineId);
+      setAgentSessionId(null);
+    }
     setVpsStatus("ready");
     setShowSshModal(false);
-  }, []);
+  }, [runtimeManagerPanel]);
 
   const toggleAskExpand = useCallback(() => {
     setPanelMode((prev) => (prev === "ask-full" ? "split" : "ask-full"));
@@ -2417,10 +2494,12 @@ export default function Workspace() {
                 machineId={askMachineId}
                 hasRepo={!!askActiveRepo}
                 repoName={askActiveRepo?.fullName}
+                panelLabel="Ask"
                 onSelectLocal={() => setAskMachineId("local:opencode:ask")}
-                onConnectVps={() => setShowSshModal(true)}
+                onConnectVps={() => { setRuntimeManagerPanel("ask"); setShowSshModal(true); }}
+                onDisconnectVps={() => setAskMachineId(askActiveRepo ? "local:opencode:ask" : null)}
                 onOpenGitRemote={() => { setGitRemoteSlot("ask"); setShowGitRemote(true); }}
-                onOpenRuntimeManager={() => setShowRuntimeManager(true)}
+                onOpenRuntimeManager={() => { setRuntimeManagerPanel("ask"); setShowRuntimeManager(true); }}
               />
             }
             onFocusChange={setAskFocused}
@@ -2527,10 +2606,12 @@ export default function Workspace() {
                 machineId={agentMachineId}
                 hasRepo={!!activeRepo}
                 repoName={activeRepo?.fullName}
+                panelLabel="Agent"
                 onSelectLocal={() => setAgentMachineId("local:opencode")}
-                onConnectVps={() => setShowSshModal(true)}
+                onConnectVps={() => { setRuntimeManagerPanel("agent"); setShowSshModal(true); }}
+                onDisconnectVps={() => setAgentMachineId(activeRepo ? "local:opencode" : null)}
                 onOpenGitRemote={() => { setGitRemoteSlot("agent"); setShowGitRemote(true); }}
-                onOpenRuntimeManager={() => setShowRuntimeManager(true)}
+                onOpenRuntimeManager={() => { setRuntimeManagerPanel("agent"); setShowRuntimeManager(true); }}
               />
             }
 modelOrch={agentModelOrch}
@@ -2850,7 +2931,7 @@ modelOrch={agentModelOrch}
       )}
 
       {showRuntimeManager && (
-        <RuntimeSelector machineId={agentMachineId} onClose={() => setShowRuntimeManager(false)} />
+        <RuntimeSelector machineId={runtimeManagerPanel === "ask" ? askMachineId : agentMachineId} onClose={() => setShowRuntimeManager(false)} />
       )}
 
       {showQuickStart && (
@@ -2928,35 +3009,48 @@ modelOrch={agentModelOrch}
           onSelect={async (session) => {
             setShowSessionPicker(false);
             setDbSessionId(session.id);
-            if (session.opencodeSessionId) {
-              setAgentSessionId(session.opencodeSessionId);
-            }
-            if (session.machineId) {
-              setAgentMachineId(session.machineId);
-              setVpsStatus("ready");
-            }
-            // Load full session with messages
+            // Load full session with panel-separated restore data
             const full = await fetchSession(session.id);
-            if (full?.messages) {
-              setAgentMessages(restoreMessages(full.messages) as ChatMessage[]);
-            }
-            if (full?.todoSnapshot) {
-              try { setAgentTodos(JSON.parse(full.todoSnapshot)); } catch {}
-            }
             if (full?.agentConfig) {
               try {
                 const cfg = JSON.parse(full.agentConfig);
                 if (cfg.provider) setAgentProvider(cfg.provider);
                 if (cfg.model) setAgentModel(cfg.model);
                 if (cfg.role) setAgentRole(cfg.role);
+                if (cfg.sessionId) setAgentSessionId(cfg.sessionId);
+                if (cfg.machineId) setAgentMachineId(cfg.machineId);
               } catch {}
+            } else {
+              if (session.opencodeSessionId) setAgentSessionId(session.opencodeSessionId);
+              if (session.machineId) setAgentMachineId(session.machineId);
+            }
+            if (full?.askConfig) {
+              try {
+                const cfg = JSON.parse(full.askConfig);
+                if (cfg.provider) setAskProvider(cfg.provider);
+                if (cfg.model) setAskModel(cfg.model);
+                if (cfg.role) setAskRole(cfg.role);
+                if (cfg.sessionId) setAskSessionId(cfg.sessionId);
+                if (cfg.machineId) setAskMachineId(cfg.machineId);
+              } catch {}
+            }
+            if ((session.machineId && !session.machineId.startsWith("local:")) || askMachineId || agentMachineId) {
+              setVpsStatus("ready");
+            }
+            if (full?.messages) {
+              setAgentMessages(restoreMessages(full.messages) as ChatMessage[]);
+            }
+            if (full?.todoSnapshot) {
+              try { setAgentTodos(JSON.parse(full.todoSnapshot)); } catch {}
             }
           }}
           onNewSession={() => {
             setShowSessionPicker(false);
             setDbSessionId(null);
             setAgentSessionId(null);
+            setAskSessionId(null);
             setAgentMessages([]);
+            setAskMessages([]);
             setAgentTodos([]);
             setConfirmedSteps(new Set());
           }}
@@ -2966,7 +3060,9 @@ modelOrch={agentModelOrch}
             if (dbSessionId === id) {
               setDbSessionId(null);
               setAgentSessionId(null);
+              setAskSessionId(null);
               setAgentMessages([]);
+              setAskMessages([]);
             }
           }}
           onClose={() => setShowSessionPicker(false)}

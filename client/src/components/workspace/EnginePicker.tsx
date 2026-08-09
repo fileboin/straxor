@@ -4,8 +4,10 @@ interface Props {
   machineId: string | null;
   hasRepo: boolean;
   repoName?: string | null;
+  panelLabel?: string;
   onSelectLocal: () => void;
   onConnectVps: () => void;
+  onDisconnectVps?: () => void;
   onOpenGitRemote: () => void;
   onOpenRuntimeManager: () => void;
 }
@@ -16,8 +18,10 @@ export default function EnginePicker({
   machineId,
   hasRepo,
   repoName,
+  panelLabel = "Panel",
   onSelectLocal,
   onConnectVps,
+  onDisconnectVps,
   onOpenGitRemote,
   onOpenRuntimeManager,
 }: Props) {
@@ -77,8 +81,8 @@ export default function EnginePicker({
       {open && (
         <div className="absolute right-0 top-8 z-50 w-64 rounded-xl border border-border bg-surface shadow-2xl shadow-black/50 overflow-hidden">
           <div className="px-3 py-2 border-b border-border bg-surface-2">
-            <div className="text-[10px] font-semibold text-text">Agent engine</div>
-            <div className="text-[9px] text-text-muted mt-0.5">Gdje agent izvršava zadatke</div>
+            <div className="text-[10px] font-semibold text-text">{panelLabel} engine</div>
+            <div className="text-[9px] text-text-muted mt-0.5">Gdje ovaj panel izvršava zadatke</div>
           </div>
 
           <button
@@ -129,6 +133,19 @@ export default function EnginePicker({
               </span>
             </span>
           </button>
+
+          {mode === "vps" && onDisconnectVps && (
+            <button
+              onClick={() => { setOpen(false); onDisconnectVps(); }}
+              className="w-full flex items-start gap-2 px-3 py-2.5 text-left hover:bg-surface-2 transition-colors border-t border-border"
+            >
+              <span className="text-base leading-none mt-0.5">⨯</span>
+              <span className="min-w-0">
+                <span className="block text-[11px] font-medium text-text">Odvoji VPS runtime</span>
+                <span className="block text-[9px] text-text-muted">Vrati ovaj panel na repo/local chat izbor</span>
+              </span>
+            </button>
+          )}
 
           <div className="border-t border-border">
             <button

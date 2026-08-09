@@ -6,10 +6,138 @@ import { resolveAttachments, type AttachmentRef } from "../lib/attachments.js";
 import { isLocalMachineId, slotFromMachineId } from "../runtime/local/engine.js";
 import { withSharedWorkspace } from "../runtime/local/shared-workspace.js";
 
+type AgentBusAction = "help" | "review" | "warn";
+type PanelSlot = "ask" | "agent";
+
+function buildAgentBusPrompt(input: {
+  from: PanelSlot;
+  to: PanelSlot;
+  action: AgentBusAction;
+  content: string;
+  sourceRepo?: string | null;
+  targetRepo?: string | null;
+  hopCount?: number;
+  chainId?: string;
+}) {
+  const crossRepo = input.sourceRepo && input.targetRepo && input.sourceRepo !== input.targetRepo;
+  const sourceRepoLabel = input.sourceRepo || "unknown";
+  const targetRepoLabel = input.targetRepo || "unknown";
+  const warning = crossRepo
+    ? `Panels are currently bound to different repositories (${sourceRepoLabel} → ${targetRepoLabel}). Treat this as cross-repo collaboration and call out any path, dependency, branch, or architectural mismatch explicitly.`
+    : undefined;
+
+  const actionLine =
+    input.action === "review"
+      ? "Perform a strict code review. Focus on bugs, regressions, security risks, missing tests, broken assumptions, and unsafe edits."
+      : input.action === "warn"
+        ? "Produce a concise warning with concrete risks, failure modes, and the most urgent next checks."
+        : "Help the other panel solve its task. Keep advice implementation-focused and repo-aware.";
+
+  const hopCount = Number.isFinite(input.hopCount) ? Math.max(0, Number(input.hopCount)) : 0;
+  const chainId = input.chainId || `chain-${Date.now()}`;
+
+  const prompt = [
+    `[STRAXOR AGENT BUS]`,
+    `Chain ID: ${chainId}`,
+    `Hop Count: ${hopCount}`,
+    `From panel: ${input.from}`,
+    `To panel: ${input.to}`,
+    `Action: ${input.action}`,
+    `Source repository: ${sourceRepoLabel}`,
+    `Target repository: ${targetRepoLabel}`,
+    warning || "Panels appear to target the same repository or one repo is not set.",
+    actionLine,
+    "When repository context differs, never assume files, branches, or runtime state are shared. State uncertainty clearly.",
+    "---",
+    input.content,
+    `[/STRAXOR AGENT BUS]`,
+  ].join("\n");
+
+  return { prompt, warning };
+}
+
 const CONNECTION_TIMEOUT_MS = 30 * 60 * 1000; // 30 min hard timeout
 const router = Router();
 
 router.use(requireAuth);
+
+router.post("/bus/analyze", async (req: Request, res: Response) => {
+  const { from, to, action, content, sourceRepo, targetRepo, hopCount, chainId } = req.body as {
+    from: PanelSlot;
+    to: PanelSlot;
+    action: AgentBusAction;
+    content: string;
+    sourceRepo?: string | null;
+    targetRepo?: string | null;
+    hopCount?: number;
+    chainId?: string;
+  };
+
+  if (!from || !to || !action || !content) {
+    res.status(400).json({ error: "Missing required fields: from, to, action, content" });
+    return;
+  }
+
+  const analysis = buildAgentBusPrompt({ from, to, action, content, sourceRepo, targetRepo, hopCount, chainId });
+  res.json(analysis);
+});
+
+router.post("/bus/transfer", async (req: Request, res: Response) => {
+  const {
+    from,
+    to,
+    action,
+    content,
+    sourceMachineId,
+    targetMachineId,
+    sourceSessionId,
+    targetSessionId,
+    sourceRepo,
+    targetRepo,
+    hopCount,
+    chainId,
+  } = req.body as {
+    from: PanelSlot;
+    to: PanelSlot;
+    action: AgentBusAction;
+    content: string;
+    sourceMachineId?: string | null;
+    targetMachineId?: string | null;
+    sourceSessionId?: string | null;
+    targetSessionId?: string | null;
+    sourceRepo?: string | null;
+    targetRepo?: string | null;
+    hopCount?: number;
+    chainId?: string;
+  };
+
+  if (!from || !to || !action || !content) {
+    res.status(400).json({ error: "Missing required fields: from, to, action, content" });
+    return;
+  }
+
+  const resolvedHopCount = Number.isFinite(hopCount) ? Math.max(0, Number(hopCount)) : 0;
+  const resolvedChainId = chainId || `chain-${Date.now()}`;
+  const analysis = buildAgentBusPrompt({ from, to, action, content, sourceRepo, targetRepo, hopCount: resolvedHopCount, chainId: resolvedChainId });
+  res.json({
+    id: `bus-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    from,
+    to,
+    action,
+    content,
+    sourceMachineId: sourceMachineId || null,
+    targetMachineId: targetMachineId || null,
+    sourceSessionId: sourceSessionId || null,
+    targetSessionId: targetSessionId || null,
+    sourceRepo: sourceRepo || null,
+    targetRepo: targetRepo || null,
+    hopCount: resolvedHopCount,
+    chainId: resolvedChainId,
+    prompt: analysis.prompt,
+    warning: analysis.warning,
+  });
+});
 
 // POST /api/agent/send — send message to OpenCode via adapter
 router.post("/send", async (req: Request, res: Response) => {
