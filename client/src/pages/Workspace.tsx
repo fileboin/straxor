@@ -64,6 +64,7 @@ import OrganizationDashboard from "../components/workspace/OrganizationDashboard
 import type { OrbState } from "thinking-orbs";
 import AdminCenter from "../components/workspace/AdminCenter.js";
 import VerificationPanel from "../components/workspace/VerificationPanel.js";
+import BusHistoryPanel from "../components/workspace/BusHistoryPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
 import {
   fetchSessions,
@@ -214,6 +215,7 @@ export default function Workspace() {
   const [showResilience, setShowResilience] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
+  const [showBusHistory, setShowBusHistory] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
 
   // Permissions state
@@ -2501,6 +2503,14 @@ export default function Workspace() {
                 >
                   {askPanelMode === "agent" ? "OpenCode" : "Chat"}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBusHistory(true)}
+                  className="px-2 h-7 rounded-md border border-border bg-transparent text-[10px] font-medium text-text-muted hover:text-text hover:border-border-light transition-colors"
+                  title="Bus history"
+                >
+                  Bus
+                </button>
               </div>
             }
             modelOrch={askModelOrch}
@@ -2638,6 +2648,14 @@ export default function Workspace() {
                   title={agentPanelMode === "agent" ? t("chat.agent.agentMode") : t("chat.agent.chatMode")}
                 >
                   {agentPanelMode === "agent" ? "OpenCode" : "Chat"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBusHistory(true)}
+                  className="px-2 h-7 rounded-md border border-border bg-transparent text-[10px] font-medium text-text-muted hover:text-text hover:border-border-light transition-colors"
+                  title="Bus history"
+                >
+                  Bus
                 </button>
               </div>
             }
@@ -3116,6 +3134,12 @@ modelOrch={agentModelOrch}
           onClose={() => setShowVerification(false)}
         />
       )}
+
+      <BusHistoryPanel
+        open={showBusHistory}
+        events={agentBusEvents}
+        onClose={() => setShowBusHistory(false)}
+      />
 
       {/* Search Panel */}
       <SearchPanel
