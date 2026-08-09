@@ -6,7 +6,7 @@ import { fetchDeployments, triggerDeployment, fetchDeployment, fetchBuildLog, st
 import { getPublishLinks, createPublishLink, updatePublishLink, deletePublishLink, type PublishLink } from "../lib/publish.js";
 import { startPreview, stopPreview, getPreviewStatus, type PreviewStatus, DEVICE_PRESETS } from "../lib/preview.js";
 import { listMachines, installCoolify, type MachineRecord, type CoolifyInstallEvent } from "../lib/machines.js";
-import { listInfraConfigs, testInfraConfig, type InfraConfig, type InfraHealthCheck } from "../lib/infrastructure.js";
+import { listInfraConfigs, testInfraConfig, updateInfraConfig, type InfraConfig, type InfraHealthCheck } from "../lib/infrastructure.js";
 
 type Tab = "preview" | "publish" | "deploy";
 
@@ -55,6 +55,8 @@ export default function DeployManager() {
   const [infraConfigs, setInfraConfigs] = useState<InfraConfig[]>([]);
   const [coolifyHealth, setCoolifyHealth] = useState<InfraHealthCheck | null>(null);
   const [coolifyTesting, setCoolifyTesting] = useState(false);
+  const [coolifyApiToken, setCoolifyApiToken] = useState("");
+  const [coolifyTokenSaving, setCoolifyTokenSaving] = useState(false);
 
   const loadPublish = useCallback(async () => {
     if (!projectId) return;
@@ -193,13 +195,45 @@ export default function DeployManager() {
     }
   };
 
+  const getSelectedCoolifyConfig = () => infraConfigs.find((cfg) =>
+    cfg.adapter === "coolify" && (
+      (coolifyMachineId && cfg.machineId === coolifyMachineId) ||
+      (projectId && cfg.projectId === projectId)
+    )
+  );
+
+  const handleSaveCoolifyToken = async () => {
+    const config = getSelectedCoolifyConfig();
+    if (!config) {
+      setCoolifyError("Coolify config još nije kreiran za ovu mašinu/projekat.");
+      return;
+    }
+    if (!coolifyApiToken.trim()) {
+      setCoolifyError("Unesi Coolify API token prije snimanja.");
+      return;
+    }
+    setCoolifyTokenSaving(true);
+    setCoolifyError("");
+    try {
+      await updateInfraConfig(config.id, {
+        credentials: {
+          ...config.credentials,
+          api_token: coolifyApiToken.trim(),
+        },
+        lastError: "",
+      });
+      setCoolifyApiToken("");
+      await loadInfraConfigs();
+      flash("Coolify API token saved");
+    } catch (err) {
+      setCoolifyError(err instanceof Error ? err.message : "Coolify token nije sačuvan");
+    } finally {
+      setCoolifyTokenSaving(false);
+    }
+  };
+
   const handleTestCoolify = async () => {
-    const config = infraConfigs.find((cfg) =>
-      cfg.adapter === "coolify" && (
-        (coolifyMachineId && cfg.machineId === coolifyMachineId) ||
-        (projectId && cfg.projectId === projectId)
-      )
-    );
+    const config = getSelectedCoolifyConfig();
 
     if (!config) {
       setCoolifyHealth(null);
@@ -376,6 +410,33 @@ export default function DeployManager() {
                       >
                         {coolifyTesting ? "Testing..." : "🔎 Test Coolify"}
                       </button>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-surface p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div>
+                        <div className="text-[12px] font-semibold text-text">Coolify API token</div>
+                        <div className="text-[11px] text-text-muted">
+                          {getSelectedCoolifyConfig()?.credentials?.api_token ? "Token je već sačuvan za ovaj Coolify config." : "Posle prvog login-a u Coolify generiši API token i sačuvaj ga ovde."}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <input
+                        type="password"
+                        value={coolifyApiToken}
+                        onChange={(e) => setCoolifyApiToken(e.target.value)}
+                        placeholder="Coolify API token"
+                        className="flex-1 min-w-[240px] px-3 py-2 bg-surface-2 border border-border rounded-lg text-[12px] text-text outline-none focus:border-accent"
+                      />
+                      <button
+                        onClick={handleSaveCoolifyToken}
+                        disabled={!getSelectedCoolifyConfig() || coolifyTokenSaving}
+                        className="px-3 py-2 rounded-lg bg-accent text-white text-[11px] hover:bg-accent-light disabled:opacity-50"
+                      >
+                        {coolifyTokenSaving ? "Saving..." : "💾 Save Token"}
+                      </button>
+                    </div>
                     </div>
                   </div>
                   {(coolifyEvents.length > 0 || coolifyError || coolifyHealth) && (
