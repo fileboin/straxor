@@ -503,30 +503,9 @@ export default function DeployManager() {
                 )}
               </div>
 
-              {/* Active deployment detail */}
-              {activeDeployment && (
-                <div className="p-4 rounded-xl bg-surface-2 border border-border space-y-3">
-                  <div className="flex items-center justify-between"><h4 className="text-[12px] font-semibold text-text">Deployment #{activeDeployment.id.slice(0, 8)}</h4><button onClick={() => setActiveDeployment(null)} className="text-[10px] text-text-muted hover:text-text">Close</button></div>
-                  <div className="flex items-center gap-3 flex-wrap text-[11px]">
-                    <span className={`px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[activeDeployment.status]}`}>{STATUS_ICONS[activeDeployment.status]} {activeDeployment.status}</span>
-                    <span className="text-text-muted">Target: {TARGET_LABELS[activeDeployment.target] || activeDeployment.target}</span>
-                    {activeDeployment.liveUrl && <a href={activeDeployment.liveUrl} target="_blank" rel="noopener noreferrer" className="text-accent underline">Live URL</a>}
-                    <span className="text-text-muted">{activeDeployment.branch && `Branch: ${activeDeployment.branch}`}</span>
-                    {activeDeployment.duration && <span className="text-text-muted">Duration: {activeDeployment.duration}s</span>}
-                  </div>
-                  {activeDeployment.commitMessage && <div className="text-[11px] text-text-muted">{activeDeployment.commitMessage}</div>}
-                  {/* Build log */}
-                  <div className="space-y-1">{buildLog.length === 0 && <div className="text-[11px] text-text-muted">No build log entries.</div>}
-                    {buildLog.map((l, i) => (
-                      <div key={i} className="flex items-start gap-2 text-[11px] font-mono">
-                        <span className="text-text-muted shrink-0">{new Date(l.timestamp).toLocaleTimeString()}</span>
-                        <span className={`shrink-0 ${l.level === "error" ? "text-red-400" : l.level === "warn" ? "text-yellow-400" : "text-text-muted"}`}>{l.level}</span>
-                        <span className="text-text">{l.message}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              { /* Active deployment detail removed for build stability */ }
+
+              {/* Deployment history */}
 
               {/* Deployment history */}
               <div className="space-y-2">
