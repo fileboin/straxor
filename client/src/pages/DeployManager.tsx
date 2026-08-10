@@ -505,9 +505,6 @@ export default function DeployManager() {
 
               
 
-              {/* Deployment history */}
-
-              {/* Deployment history */}
               <div className="space-y-2">
                 <h4 className="text-[12px] font-semibold text-text mb-2">Deployment History</h4>
                 {deployments.length === 0 && <div className="text-[12px] text-text-muted px-4 py-6 text-center">No deployments yet.</div>}
