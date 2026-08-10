@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { db } from "../db/index.js";
-import { machines, infraConfigs } from "../db/schema.js";
+import { machines, infraConfigs, projects } from "../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import {
   connectSSH,
@@ -36,6 +36,33 @@ function isBlockedLocalHost(host: string): boolean {
     normalized.startsWith("10.") ||
     /^172\.(1[6-9]|2\d|3[0-1])\./.test(normalized)
   );
+}
+
+function normalizeProjectRef(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+async function resolveProjectId(userId: string, projectRef: string): Promise<string | null> {
+  const trimmed = String(projectRef || "").trim();
+  if (!trimmed) return null;
+
+  const rows = await db
+    .select({ id: projects.id, name: projects.name })
+    .from(projects)
+    .where(eq(projects.userId, userId));
+
+  const direct = rows.find((row) => row.id === trimmed);
+  if (direct) return direct.id;
+
+  const normalizedRef = normalizeProjectRef(trimmed);
+  const byName = rows.find((row) => normalizeProjectRef(row.name) === normalizedRef);
+  return byName?.id || null;
 }
 
 const router = Router();
@@ -100,7 +127,7 @@ router.post("/", requireAuth, async (req, res) => {
     const userId = req.user!.userId;
     // Robustly read fields (support both camelCase and snake_case)
     const body: any = req.body || {};
-    const projectId = body.projectId ?? body.project_id;
+    const projectIdRaw = body.projectId ?? body.project_id;
     const name = body.name ?? body.name;
     const hostRaw = body.host ?? body.host;
     const portRaw = body.port ?? body.port;
@@ -114,8 +141,15 @@ router.post("/", requireAuth, async (req, res) => {
     const resolvedAuthType = (authTypeRaw === "key" ? "key" : "password");
     const resolvedPort = Number.isFinite(Number(portRaw)) ? Number(portRaw) : 22;
 
-    if (!projectId || !name || !normalizedHost || !normalizedUsername) {
+    if (!projectIdRaw || !name || !normalizedHost || !normalizedUsername) {
       res.status(400).json({ error: "Missing required fields" });
+      return;
+    }
+
+    const projectId = await resolveProjectId(userId, String(projectIdRaw));
+
+    if (!projectId) {
+      res.status(400).json({ error: `Unknown project: ${String(projectIdRaw)}` });
       return;
     }
 

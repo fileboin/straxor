@@ -154,22 +154,41 @@ function sanitizeTodos(value: unknown): TodoStep[] {
     .map((item) => ({ ...(item as TodoStep) }));
 }
 
+function normalizeProjectRef(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export default function Workspace() {
   const navigate = useNavigate();
   const { id: projectIdFromUrl } = useParams<{ id: string }>();
-  const projectId = projectIdFromUrl || "";
+  const routeProjectRef = projectIdFromUrl || "";
+  const [projectId, setProjectId] = useState<string>(routeProjectRef);
   const [projectName, setProjectName] = useState<string>("straxor-landing");
   const projectPath = `/root/${projectName.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-+|-+$/g, "") || "straxor-landing"}`;
 
   useEffect(() => {
-    if (!projectId) return;
+    if (!routeProjectRef) return;
     fetchProjects()
       .then((list) => {
-        const found = list.find((p) => p.id === projectId);
-        if (found) setProjectName(found.name);
+        const normalizedRef = normalizeProjectRef(routeProjectRef);
+        const found = list.find((p) => p.id === routeProjectRef || normalizeProjectRef(p.name) === normalizedRef);
+        if (found) {
+          setProjectId(found.id);
+          setProjectName(found.name);
+          return;
+        }
+        setProjectId(routeProjectRef);
       })
-      .catch(() => {});
-  }, [projectId]);
+      .catch(() => {
+        setProjectId(routeProjectRef);
+      });
+  }, [routeProjectRef]);
 
   const { setTheme: setAppTheme, accent, setAccent, theme } = useTheme();
   useLang();
@@ -2708,12 +2727,12 @@ export default function Workspace() {
           onOpenUsage={() => setShowUsage(true)}
           onOpenRuntimeManager={() => setShowRuntimeManager(true)}
           onOpenQuickStart={() => setShowQuickStart(true)}
-          onOpenImage={() => navigate(`/project/${projectIdFromUrl || "unknown"}/image`)}
-          onOpenImageAgent={() => navigate(`/project/${projectIdFromUrl || "unknown"}/image-agent`)}
+          onOpenImage={() => navigate(`/project/${projectId || routeProjectRef || "unknown"}/image`)}
+          onOpenImageAgent={() => navigate(`/project/${projectId || routeProjectRef || "unknown"}/image-agent`)}
           onOpenVerification={() => setShowVerification(true)}
           onOpenPwaDiagnostics={() => setShowPwaDiagnostics(true)}
           onOpenHandshakeTest={() => setShowHandshakeTest(true)}
-          onOpenKnowledge={() => navigate(`/project/${projectIdFromUrl || "unknown"}/knowledge`)}
+          onOpenKnowledge={() => navigate(`/project/${projectId || routeProjectRef || "unknown"}/knowledge`)}
         />
 
       {/* Mobile tab switcher — pill segmented control */}
