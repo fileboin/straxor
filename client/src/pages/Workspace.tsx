@@ -2165,7 +2165,6 @@ export default function Workspace() {
 
   const openSshModalForPanel = useCallback((panel: "ask" | "agent") => {
     setRuntimeManagerPanel(panel);
-    setVpsStatus("connecting");
     setShowSshModal(true);
   }, []);
 
@@ -3155,7 +3154,11 @@ modelOrch={agentModelOrch}
             <SshInput
               projectId={projectId}
               onConnected={handleVpsConnected}
-              onCancel={() => setShowSshModal(false)}
+              onStatusChange={setVpsStatus}
+              onCancel={() => {
+                setShowSshModal(false);
+                setVpsStatus((current) => (current === "ready" ? "ready" : "disconnected"));
+              }}
             />
           </div>
         </div>

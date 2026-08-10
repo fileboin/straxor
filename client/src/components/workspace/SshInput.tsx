@@ -6,6 +6,7 @@ interface Props {
   projectId: string;
   onConnected: (machineId: string) => void;
   onCancel: () => void;
+  onStatusChange?: (status: "disconnected" | "connecting" | "provisioning" | "ready" | "error") => void;
 }
 
 export type ProvisionStatus =
@@ -108,7 +109,7 @@ async function readErrorResponse(response: Response): Promise<string> {
   }
 }
 
-export default function SshInput({ projectId, onConnected, onCancel }: Props) {
+export default function SshInput({ projectId, onConnected, onCancel, onStatusChange }: Props) {
   const [host, setHost] = useState("");
   const [port, setPort] = useState("22");
   const [username, setUsername] = useState("root");
@@ -169,6 +170,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
     setError("");
     setStatus("connecting");
     setStatusMessage("Spajanje na VPS...");
+    onStatusChange?.("connecting");
 
     try {
       const machine = await api<{ id: string }>("/machines", {
@@ -230,13 +232,19 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
             setStatusMessage(event.message || STATUS_LABELS[event.status] || "");
 
             if (event.status === "ready") {
+              onStatusChange?.("ready");
               onConnected(machine.id);
               return;
             }
 
             if (event.status === "error") {
+              onStatusChange?.("error");
               setError(event.message || "Provisioning nije uspio");
               return;
+            }
+
+            if (event.status === "checking-os" || event.status === "checking-node" || event.status === "starting-opencode") {
+              onStatusChange?.("provisioning");
             }
           } catch {
             // Ignore malformed SSE payloads and continue streaming.
@@ -247,6 +255,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
       throw new Error("Provisioning je prekinut prije završetka");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Greška";
+      onStatusChange?.("error");
       setError(message);
       setStatus("error");
       setStatusMessage(message);
@@ -272,6 +281,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
           <div className="flex gap-2">
             <button
               onClick={() => {
+                onStatusChange?.("disconnected");
                 setStatus("idle");
                 setStatusMessage("");
                 setError("");
