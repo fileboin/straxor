@@ -1,0 +1,1 @@
+export const DeploymentDetailPlaceholder = () => null;
