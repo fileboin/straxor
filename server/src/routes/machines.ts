@@ -98,11 +98,21 @@ router.get("/:id", requireAuth, async (req, res) => {
 router.post("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { projectId, name, host, port, username, authType, password, privateKey } = req.body;
-    const normalizedHost = typeof host === "string" ? normalizeHost(host) : "";
-    const normalizedUsername = typeof username === "string" ? username.trim() : "";
-    const resolvedAuthType = authType === "key" ? "key" : "password";
-    const resolvedPort = Number.isFinite(Number(port)) ? Number(port) : 22;
+    // Robustly read fields (support both camelCase and snake_case)
+    const body: any = req.body || {};
+    const projectId = body.projectId ?? body.project_id;
+    const name = body.name ?? body.name;
+    const hostRaw = body.host ?? body.host;
+    const portRaw = body.port ?? body.port;
+    const usernameRaw = body.username ?? body.username;
+    const authTypeRaw = (body.authType ?? body.auth_type ?? "password");
+    const passwordRaw = body.password ?? body.password ?? null;
+    const privateKeyRaw = body.privateKey ?? body.private_key ?? null;
+
+    const normalizedHost = typeof hostRaw === "string" ? normalizeHost(hostRaw) : "";
+    const normalizedUsername = typeof usernameRaw === "string" ? usernameRaw.trim() : "";
+    const resolvedAuthType = (authTypeRaw === "key" ? "key" : "password");
+    const resolvedPort = Number.isFinite(Number(portRaw)) ? Number(portRaw) : 22;
 
     if (!projectId || !name || !normalizedHost || !normalizedUsername) {
       res.status(400).json({ error: "Missing required fields" });
@@ -119,18 +129,23 @@ router.post("/", requireAuth, async (req, res) => {
       return;
     }
 
-    if (resolvedAuthType === "password" && (!password || !String(password).trim())) {
+    if (resolvedAuthType === "password" && (!passwordRaw || !String(passwordRaw).trim())) {
       res.status(400).json({ error: "Password authentication requires a password." });
       return;
     }
 
-    if (resolvedAuthType === "key" && (!privateKey || !String(privateKey).trim())) {
+    if (resolvedAuthType === "key" && (!privateKeyRaw || !String(privateKeyRaw).trim())) {
       res.status(400).json({ error: "SSH key authentication requires a private key." });
       return;
     }
 
-    const encryptedPassword = resolvedAuthType === "password" && password ? encrypt(password) : null;
-    const encryptedPrivateKey = resolvedAuthType === "key" && privateKey ? encrypt(privateKey) : null;
+    // Encrypt passwords/keys if needed; if already encrypted (3-part format), keep as-is
+    const encryptedPassword = resolvedAuthType === "password" && passwordRaw
+      ? (isEncrypted(passwordRaw) ? passwordRaw : encrypt(passwordRaw))
+      : null;
+    const encryptedPrivateKey = resolvedAuthType === "key" && privateKeyRaw
+      ? (isEncrypted(privateKeyRaw) ? privateKeyRaw : encrypt(privateKeyRaw))
+      : null;
 
     const result = await db
       .insert(machines)
