@@ -36,7 +36,7 @@ function parseSshTarget(value: string): { host: string; username?: string; port?
 
   const tokens = raw.split(/\s+/).filter(Boolean);
   let target = tokens[tokens.length - 1] || raw;
-  target = target.replace(/^['"]|['"]$/g, "");
+  target = target.replace(/^[`'"]+|[`'"]+$/g, "");
   target = target.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 
   let username: string | undefined;
