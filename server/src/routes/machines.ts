@@ -259,26 +259,19 @@ router.get("/:id", requireAuth, async (req, res) => {
 router.post("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    // Robustly read fields (support both camelCase and snake_case)
     const body: any = req.body || {};
     const projectIdRaw = body.projectId ?? body.project_id;
-    const name = body.name ?? body.name;
-    const hostRaw = body.host ?? body.host;
-    const portRaw = body.port ?? body.port;
-    const usernameRaw = body.username ?? body.username;
+    // Direktan trim po polju — bez parsiranja SSH stringa
+    const name = stripMarkdown(String(body.name ?? ""));
+    const normalizedHost = stripMarkdown(String(body.host ?? ""));
+    const normalizedUsername = stripMarkdown(String(body.username ?? ""));
     const authTypeRaw = (body.authType ?? body.auth_type ?? "password");
-    const passwordRaw = body.password ?? body.password ?? null;
-    const privateKeyRaw = body.privateKey ?? body.private_key ?? null;
-
-    const parsedTarget = typeof hostRaw === "string" ? parseSshTarget(hostRaw) : { host: "" };
-    const normalizedHost = parsedTarget.host;
-    const normalizedUsername = typeof usernameRaw === "string" && usernameRaw.trim()
-      ? usernameRaw.trim()
-      : (parsedTarget.username || "");
     const resolvedAuthType = (authTypeRaw === "key" ? "key" : "password");
-    const resolvedPort = Number.isFinite(Number(portRaw))
-      ? Number(portRaw)
-      : (parsedTarget.port && Number.isFinite(parsedTarget.port) ? parsedTarget.port : 22);
+    const resolvedPort = Number.isFinite(Number(body.port)) ? Number(body.port) : 22;
+    const passwordRaw = body.password ? String(body.password).trim() : null;
+    const privateKeyRaw = (body.privateKey ?? body.private_key)
+      ? String(body.privateKey ?? body.private_key).trim()
+      : null;
 
     if (!projectIdRaw || !name || !normalizedHost || !normalizedUsername) {
       res.status(400).json({ error: "Missing required fields" });

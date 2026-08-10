@@ -134,17 +134,22 @@ export async function startOpenCodeServe(
   ssh: SSHClient,
   port: number = 4096
 ): Promise<void> {
+  // Gasi stari proces i ceka da se stvarno ugasi
   await ssh.exec("pkill -f 'opencode serve' 2>/dev/null || true");
+  await new Promise((resolve) => setTimeout(resolve, 2000));
 
-  const available = await isPortAvailable(ssh, port);
-  if (!available) {
-    for (let p = port; p < port + 10; p++) {
-      if (await isPortAvailable(ssh, p)) {
-        port = p;
-        break;
-      }
+  // Trazi slobodan port
+  let freePort: number | null = null;
+  for (let p = port; p < port + 20; p++) {
+    if (await isPortAvailable(ssh, p)) {
+      freePort = p;
+      break;
     }
   }
+  if (freePort === null) {
+    throw new Error(`Nema slobodnog porta u opsegu ${port}-${port + 19}`);
+  }
+  port = freePort;
 
   const { code: binaryCode } = await ssh.exec(withNodeEnv("command -v opencode >/dev/null 2>&1"));
   if (binaryCode !== 0) {
@@ -160,7 +165,7 @@ export async function startOpenCodeServe(
     throw new Error(`Failed to start opencode serve: ${stderr}`);
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 2500));
+  await new Promise((resolve) => setTimeout(resolve, 3000));
 
   const { stdout } = await ssh.exec("pgrep -f 'opencode serve' || true");
   if (!stdout.trim()) {
@@ -176,11 +181,28 @@ export async function checkOpenCodeRunning(ssh: SSHClient): Promise<boolean> {
 }
 
 export async function getOpenCodePort(ssh: SSHClient): Promise<number | null> {
-  const { stdout } = await ssh.exec(
-    "ss -tlnp 2>/dev/null | grep 'opencode' || true"
-  );
-  const match = stdout.match(/:(\d+)/);
-  return match ? parseInt(match[1], 10) : null;
+  // Pokusaj 1: pgrep da dobijemo PID, pa ss po PID-u
+  try {
+    const { stdout: pid } = await ssh.exec("pgrep -f 'opencode serve' 2>/dev/null | head -1 || true");
+    if (pid.trim()) {
+      const { stdout } = await ssh.exec(`ss -tlnp 2>/dev/null | grep 'pid=${pid.trim()},' || true`);
+      const match = stdout.match(/:(\d{4,5})/);
+      if (match) return parseInt(match[1], 10);
+    }
+  } catch {}
+
+  // Pokusaj 2: trazimo opencode u imenu procesa u ss izlazu
+  try {
+    const { stdout } = await ssh.exec("ss -tlnp 2>/dev/null || true");
+    for (const line of stdout.split("\n")) {
+      if (line.includes("opencode")) {
+        const match = line.match(/:(\d{4,5})/);
+        if (match) return parseInt(match[1], 10);
+      }
+    }
+  } catch {}
+
+  return null;
 }
 
 export async function getOpenCodeVersion(ssh: SSHClient): Promise<string | null> {
