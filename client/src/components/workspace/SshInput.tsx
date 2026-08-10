@@ -28,8 +28,21 @@ const STATUS_LABELS: Record<ProvisionStatus, string> = {
   error: "Greška",
 };
 
+function stripMarkdown(value: string): string {
+  return value
+    .replace(/\*+/g, "")     // ** bold, * italic
+    .replace(/`+/g, "")      // `` backticks
+    .replace(/_+/g, "")      // __ underline
+    .replace(/~+/g, "")      // ~~ strikethrough
+    .replace(/\[|\]/g, "")   // [ ] brackets
+    .replace(/\(|\)/g, "")   // ( ) parens used in markdown links
+    .replace(/#+/g, "")      // # headings
+    .replace(/>/g, "")       // > blockquote
+    .trim();
+}
+
 function parseSshTarget(value: string): { host: string; username?: string; port?: number } {
-  let raw = value.trim();
+  let raw = stripMarkdown(value).trim();
   if (!raw) return { host: "" };
 
   raw = raw.replace(/^ssh:\/\//i, "");

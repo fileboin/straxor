@@ -21,8 +21,21 @@ import {
 import type { ProvisionEvent, CoolifyInstallEvent } from "../runtime/opencode-adapter/index.js";
 import { encrypt, decrypt, isEncrypted } from "../lib/crypto.js";
 
+function stripMarkdown(value: string): string {
+  return value
+    .replace(/\*+/g, "")     // ** bold, * italic
+    .replace(/`+/g, "")      // `` backticks
+    .replace(/_+/g, "")      // __ underline
+    .replace(/~+/g, "")      // ~~ strikethrough
+    .replace(/\[|\]/g, "")   // [ ] brackets
+    .replace(/\(|\)/g, "")   // ( ) parens used in markdown links
+    .replace(/#+/g, "")      // # headings
+    .replace(/>/g, "")       // > blockquote
+    .trim();
+}
+
 function parseSshTarget(value: string): { host: string; username?: string; port?: number } {
-  let raw = value.trim();
+  let raw = stripMarkdown(value).trim();
   if (!raw) return { host: "" };
 
   raw = raw.replace(/^ssh:\/\//i, "");
