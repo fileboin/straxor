@@ -505,27 +505,7 @@ export default function DeployManager() {
 
               
 
-              <div className="space-y-2">
-                <h4 className="text-[12px] font-semibold text-text mb-2">Deployment History</h4>
-                {deployments.length === 0 && <div className="text-[12px] text-text-muted px-4 py-6 text-center">No deployments yet.</div>}
-                <div className="space-y-1.5">
-                  {deployments.map((d) => (
-                    <div key={d.id} className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors" onClick={() => handleViewDeployment(d)}>
-                      <div className="flex items-center gap-3">
-                        <span className={`text-[14px] ${d.status === "running" ? "animate-pulse" : ""}`}>{STATUS_ICONS[d.status]}</span>
-                        <div>
-                          <div className="text-[12px] font-medium text-text">{TARGET_LABELS[d.target] || d.target} {d.branch && `· ${d.branch}`}</div>
-                          <div className="text-[10px] text-text-muted">{new Date(d.createdAt).toLocaleString()} {d.duration && `· ${d.duration}s`}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[d.status].split(" ")[0]} ${STATUS_COLORS[d.status].split(" ")[1]}`}>{d.status}</span>
-                        {d.status === "building" && <button onClick={(e) => { e.stopPropagation(); handleStopDeployment(d.id); }} className="text-[10px] px-2 py-1 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20">Stop</button>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <></>
             </div>
           )}
         </main>
