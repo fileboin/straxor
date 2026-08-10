@@ -79,6 +79,14 @@ export default function Dashboard() {
     setProjects((prev) => prev.filter((p) => p.id !== id));
   };
 
+  const handleOpenAgents = () => {
+    if (projects[0]?.id) {
+      navigate(`/project/${projects[0].id}`);
+      return;
+    }
+    setShowCreate(true);
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface">
@@ -116,7 +124,7 @@ export default function Dashboard() {
           <h2 className="text-xl font-semibold">Projekti</h2>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => navigate("/project/agents")}
+              onClick={handleOpenAgents}
               className="px-4 py-2 rounded-xl bg-accent hover:opacity-90 text-sm font-semibold text-white transition-opacity"
             >
               🤖 Agenti

@@ -178,17 +178,23 @@ export default function Workspace() {
       .then((list) => {
         const normalizedRef = normalizeProjectRef(routeProjectRef);
         const found = list.find((p) => p.id === routeProjectRef || normalizeProjectRef(p.name) === normalizedRef);
-        if (found) {
-          setProjectId(found.id);
-          setProjectName(found.name);
+        const resolved = found || list[0] || null;
+
+        if (resolved) {
+          setProjectId(resolved.id);
+          setProjectName(resolved.name);
+          if (routeProjectRef !== resolved.id) {
+            navigate(`/project/${resolved.id}`, { replace: true });
+          }
           return;
         }
-        setProjectId(routeProjectRef);
+
+        setProjectId("");
       })
       .catch(() => {
-        setProjectId(routeProjectRef);
+        setProjectId("");
       });
-  }, [routeProjectRef]);
+  }, [navigate, routeProjectRef]);
 
   const { setTheme: setAppTheme, accent, setAccent, theme } = useTheme();
   useLang();
@@ -872,8 +878,11 @@ export default function Workspace() {
 
   // Resume system — load sessions on mount
   useEffect(() => {
-    const PROJECT_ID = projectId || "straxor-landing";
-    fetchSessions(PROJECT_ID).then(setDbSessions);
+    if (!projectId) {
+      setDbSessions([]);
+      return;
+    }
+    fetchSessions(projectId).then(setDbSessions);
   }, [projectId]);
 
   // Resume system — restore latest active session
