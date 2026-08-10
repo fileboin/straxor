@@ -129,6 +129,78 @@ async function resolveProjectId(userId: string, projectRef: string): Promise<str
 
 const router = Router();
 
+// POST /api/machines/test-ssh — dijagnostički test SSH konekcije, bez DB inserta
+router.post("/test-ssh", requireAuth, async (req, res) => {
+  const body: any = req.body || {};
+
+  // --- 1. Loguj šta je primljeno (raw, pre bilo kakvog parsiranja) ---
+  const hostRaw: string = String(body.host ?? "");
+  const portRaw: string = String(body.port ?? "22");
+  const usernameRaw: string = String(body.username ?? "");
+  const authTypeRaw: string = String(body.authType ?? "password");
+  const hasPassword: boolean = !!(body.password && String(body.password).trim());
+  const hasKey: boolean = !!(body.privateKey && String(body.privateKey).trim());
+
+  // --- 2. Parsiraj i sanitizuj ---
+  const parsed = parseSshTarget(hostRaw);
+  const host = parsed.host;
+  const username = (usernameRaw.trim() || parsed.username || "").trim();
+  const port = Number.isFinite(Number(portRaw)) ? Number(portRaw) : (parsed.port ?? 22);
+  const authType = authTypeRaw === "key" ? "key" : "password";
+
+  const diagnostic = {
+    received: {
+      hostRaw,
+      portRaw,
+      usernameRaw,
+      authType: authTypeRaw,
+      hasPassword,
+      hasKey,
+    },
+    parsed: {
+      host,
+      port,
+      username,
+      authType,
+    },
+    sshResult: "not_attempted" as string,
+    sshDetail: "" as string,
+    sshError: "" as string,
+  };
+
+  // --- 3. Pokušaj SSH konekciju ---
+  if (!host || !username) {
+    diagnostic.sshResult = "skipped";
+    diagnostic.sshDetail = `Nedostaje ${!host ? "host" : "username"}`;
+    res.json(diagnostic);
+    return;
+  }
+
+  let ssh: Awaited<ReturnType<typeof connectSSH>> | null = null;
+  try {
+    const password = authType === "password" && body.password
+      ? String(body.password)
+      : undefined;
+    const privateKey = authType === "key" && body.privateKey
+      ? String(body.privateKey)
+      : undefined;
+
+    ssh = await connectSSH({ host, port, username, password, privateKey });
+
+    // Uspješno spojen — provjeri OS
+    const { stdout: osOut } = await ssh.exec("uname -a 2>/dev/null || echo unknown");
+    diagnostic.sshResult = "success";
+    diagnostic.sshDetail = osOut.trim().slice(0, 200);
+  } catch (err) {
+    diagnostic.sshResult = "failed";
+    diagnostic.sshError = err instanceof Error ? err.message : String(err);
+  } finally {
+    try { ssh?.close(); } catch {}
+  }
+
+  res.json(diagnostic);
+});
+
 // GET /api/machines — listaj sve mašine korisnika (maskirane lozinke)
 router.get("/", requireAuth, async (req, res) => {
   try {

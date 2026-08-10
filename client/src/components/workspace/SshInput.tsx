@@ -122,6 +122,26 @@ async function readErrorResponse(response: Response): Promise<string> {
   }
 }
 
+interface SshDiagnostic {
+  received: {
+    hostRaw: string;
+    portRaw: string;
+    usernameRaw: string;
+    authType: string;
+    hasPassword: boolean;
+    hasKey: boolean;
+  };
+  parsed: {
+    host: string;
+    port: number;
+    username: string;
+    authType: string;
+  };
+  sshResult: string;
+  sshDetail: string;
+  sshError: string;
+}
+
 export default function SshInput({ projectId, onConnected, onCancel, onStatusChange }: Props) {
   const [host, setHost] = useState("");
   const [port, setPort] = useState("22");
@@ -134,6 +154,8 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
   const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState("");
   const [prefilled, setPrefilled] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
+  const [diagnostic, setDiagnostic] = useState<SshDiagnostic | null>(null);
 
   const parsedTarget = useMemo(() => parseSshTarget(host), [host]);
   const normalizedHost = parsedTarget.host;
@@ -160,6 +182,41 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
       mounted = false;
     };
   }, [prefilled]);
+
+  const handleTestSsh = async () => {
+    const resolvedUsername = (parsedTarget.username || username).trim();
+    const resolvedPort = parsedTarget.port ?? parseInt(port, 10);
+
+    setTestLoading(true);
+    setDiagnostic(null);
+    setError("");
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/machines/test-ssh", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          host: normalizedHost || host,
+          port: resolvedPort,
+          username: resolvedUsername,
+          authType,
+          password: authType === "password" ? password : undefined,
+          privateKey: authType === "key" ? privateKey : undefined,
+        }),
+      });
+
+      const data = await response.json() as SshDiagnostic;
+      setDiagnostic(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Test nije uspio");
+    } finally {
+      setTestLoading(false);
+    }
+  };
 
   const handleConnect = async () => {
     const resolvedUsername = (parsedTarget.username || username).trim();
@@ -437,14 +494,64 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
         <div className="text-xs text-red-400">{error}</div>
       )}
 
-      <button
-        type="button"
-        onClick={handleConnect}
-        disabled={!normalizedHost || !((parsedTarget.username || username).trim()) || hostLooksInvalid}
-        className="w-full py-2 text-sm font-medium rounded-lg bg-accent text-white hover:opacity-85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        Validiraj, poveži i pokreni
-      </button>
+      {/* Dijagnostički panel */}
+      {diagnostic && (
+        <div className="rounded-lg border border-border bg-surface-2 p-3 space-y-2 text-[11px] font-mono">
+          <div className="font-semibold text-text text-[12px] mb-1">
+            {diagnostic.sshResult === "success" ? "✅ SSH test uspješan" : "❌ SSH test neuspješan"}
+          </div>
+
+          <div className="text-text-muted">Primljeno (raw):</div>
+          <div className="bg-surface-3 rounded p-2 space-y-0.5">
+            <div><span className="text-accent">host: </span><span className="text-text">{JSON.stringify(diagnostic.received.hostRaw)}</span></div>
+            <div><span className="text-accent">port: </span><span className="text-text">{JSON.stringify(diagnostic.received.portRaw)}</span></div>
+            <div><span className="text-accent">user: </span><span className="text-text">{JSON.stringify(diagnostic.received.usernameRaw)}</span></div>
+            <div><span className="text-accent">auth: </span><span className="text-text">{diagnostic.received.authType}</span></div>
+            <div><span className="text-accent">hasPassword: </span><span className="text-text">{String(diagnostic.received.hasPassword)}</span></div>
+          </div>
+
+          <div className="text-text-muted">Posle sanitizacije:</div>
+          <div className="bg-surface-3 rounded p-2 space-y-0.5">
+            <div><span className="text-accent">host: </span><span className="text-text">{JSON.stringify(diagnostic.parsed.host)}</span></div>
+            <div><span className="text-accent">port: </span><span className="text-text">{diagnostic.parsed.port}</span></div>
+            <div><span className="text-accent">user: </span><span className="text-text">{JSON.stringify(diagnostic.parsed.username)}</span></div>
+          </div>
+
+          <div className="text-text-muted">Rezultat SSH:</div>
+          <div className="bg-surface-3 rounded p-2">
+            <div><span className="text-accent">status: </span>
+              <span className={diagnostic.sshResult === "success" ? "text-green-400" : "text-red-400"}>
+                {diagnostic.sshResult}
+              </span>
+            </div>
+            {diagnostic.sshDetail && (
+              <div className="mt-1"><span className="text-accent">detail: </span><span className="text-text">{diagnostic.sshDetail}</span></div>
+            )}
+            {diagnostic.sshError && (
+              <div className="mt-1"><span className="text-accent">error: </span><span className="text-red-400">{diagnostic.sshError}</span></div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={handleTestSsh}
+          disabled={testLoading || !normalizedHost || !((parsedTarget.username || username).trim())}
+          className="flex-1 py-2 text-sm font-medium rounded-lg border border-border bg-surface-2 text-text-secondary hover:text-text transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {testLoading ? "Testiranje..." : "🔍 Test SSH"}
+        </button>
+        <button
+          type="button"
+          onClick={handleConnect}
+          disabled={!normalizedHost || !((parsedTarget.username || username).trim()) || hostLooksInvalid}
+          className="flex-1 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:opacity-85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Poveži i pokreni
+        </button>
+      </div>
     </div>
   );
 }
