@@ -13,7 +13,6 @@ export type ProvisionStatus =
   | "connecting"
   | "checking-os"
   | "checking-node"
-  | "installing-node"
   | "starting-opencode"
   | "ready"
   | "error";
@@ -23,8 +22,7 @@ const STATUS_LABELS: Record<ProvisionStatus, string> = {
   connecting: "Spajanje na VPS...",
   "checking-os": "Detekcija operativnog sustava...",
   "checking-node": "Provjera Node.js...",
-  "installing-node": "Instalacija Node.js...",
-  "starting-opencode": "Pokretanje opencode serve...",
+  "starting-opencode": "Pokretanje opencode servera...",
   ready: "Spremno!",
   error: "Greška",
 };
@@ -47,6 +45,20 @@ function isLikelyPrivateHost(host: string): boolean {
   );
 }
 
+async function readErrorResponse(response: Response): Promise<string> {
+  const text = await response.text();
+  if (!text) {
+    return `Zahtjev je vraćen sa statusom ${response.status}`;
+  }
+
+  try {
+    const parsed = JSON.parse(text) as { error?: string; message?: string };
+    return parsed.error || parsed.message || text;
+  } catch {
+    return text;
+  }
+}
+
 export default function SshInput({ projectId, onConnected, onCancel }: Props) {
   const [host, setHost] = useState("");
   const [port, setPort] = useState("22");
@@ -58,7 +70,6 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
   const [status, setStatus] = useState<ProvisionStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState("");
-  const [connectedMachineId, setConnectedMachineId] = useState<string | null>(null);
   const [prefilled, setPrefilled] = useState(false);
 
   const normalizedHost = useMemo(() => normalizeHost(host), [host]);
@@ -105,6 +116,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
 
     setError("");
     setStatus("connecting");
+    setStatusMessage("Spajanje na VPS...");
 
     try {
       const machine = await api<{ id: string }>("/machines", {
@@ -121,7 +133,6 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
         }),
       });
 
-      // Start provisioning via SSE
       const token = localStorage.getItem("token");
       const response = await fetch(`/api/machines/${machine.id}/provision`, {
         method: "POST",
@@ -131,11 +142,14 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
         },
       });
 
+      if (!response.ok) {
+        const message = await readErrorResponse(response);
+        throw new Error(message || "Provisioning nije mogao da se pokrene");
+      }
+
       const reader = response.body?.getReader();
       if (!reader) {
-        setError("Greška pri povezivanju");
-        setStatus("idle");
-        return;
+        throw new Error("SSE konekcija za provisioning nije dostupna");
       }
 
       const decoder = new TextDecoder();
@@ -155,29 +169,35 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
 
           const data = trimmed.slice(6);
           if (data === "[DONE]") {
-            break;
+            continue;
           }
 
           try {
-            const event = JSON.parse(data);
+            const event = JSON.parse(data) as { status: ProvisionStatus; message: string };
             setStatus(event.status);
-            setStatusMessage(event.message);
+            setStatusMessage(event.message || STATUS_LABELS[event.status] || "");
 
             if (event.status === "ready") {
-              setConnectedMachineId(machine.id);
+              onConnected(machine.id);
               return;
             }
+
             if (event.status === "error") {
-              setError(event.message);
+              setError(event.message || "Provisioning nije uspio");
               return;
             }
-          } catch {}
+          } catch {
+            // Ignore malformed SSE payloads and continue streaming.
+          }
         }
       }
+
+      throw new Error("Provisioning je prekinut prije završetka");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Greška";
       setError(message);
-      setStatus("idle");
+      setStatus("error");
+      setStatusMessage(message);
     }
   };
 
@@ -196,24 +216,25 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
         {error && (
           <div className="text-xs text-red-400 mb-3">{error}</div>
         )}
-        {status === "ready" && (
-          <button
-            onClick={() => onConnected(connectedMachineId || "")}
-            className="w-full py-2 text-sm font-medium rounded-lg bg-accent text-white hover:opacity-85 transition-colors"
-          >
-            Nastavi
-          </button>
-        )}
         {status === "error" && (
-          <button
-            onClick={() => {
-              setStatus("idle");
-              setError("");
-            }}
-            className="w-full py-2 text-sm font-medium rounded-lg border border-border bg-surface-2 text-text-secondary hover:text-text transition-colors"
-          >
-            Pokušaj ponovo
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setStatus("idle");
+                setStatusMessage("");
+                setError("");
+              }}
+              className="flex-1 py-2 text-sm font-medium rounded-lg border border-border bg-surface-2 text-text-secondary hover:text-text transition-colors"
+            >
+              Pokušaj ponovo
+            </button>
+            <button
+              onClick={onCancel}
+              className="flex-1 py-2 text-sm font-medium rounded-lg border border-border bg-transparent text-text-secondary hover:text-text transition-colors"
+            >
+              Zatvori
+            </button>
+          </div>
         )}
       </div>
     );
@@ -222,7 +243,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
   return (
     <div className="p-4 border border-border rounded-xl bg-surface space-y-3">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold">Poveži VPS</h3>
+        <h3 className="text-sm font-semibold">SSH / VPS konekcija</h3>
         <button
           onClick={onCancel}
           className="text-text-muted hover:text-text text-xs transition-colors"
@@ -237,7 +258,6 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
         </div>
       )}
 
-      {/* Machine name */}
       <div>
         <label className="block text-[11px] text-text-muted mb-1">Naziv (opcionalno)</label>
         <input
@@ -249,7 +269,6 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
         />
       </div>
 
-      {/* Host + Port */}
       <div className="flex gap-2">
         <div className="flex-1">
           <label className="block text-[11px] text-text-muted mb-1">Public VPS Host / IP</label>
@@ -262,7 +281,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
           />
           <div className="mt-1 text-[10px] text-text-muted">Koristi javnu IP adresu VPS-a ili DNS hostname — ne lokalni `192.168.x.x`, `10.x.x.x` ili `localhost`.</div>
         </div>
-        <div className="w-20">
+        <div className="w-20 shrink-0">
           <label className="block text-[11px] text-text-muted mb-1">Port</label>
           <input
             type="text"
@@ -274,7 +293,6 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
         </div>
       </div>
 
-      {/* Username */}
       <div>
         <label className="block text-[11px] text-text-muted mb-1">Korisničko ime</label>
         <input
@@ -287,12 +305,12 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
         <div className="mt-1 text-[10px] text-text-muted">Podrazumevano je `root`. Promeni samo ako tvoj VPS koristi drugog SSH korisnika.</div>
       </div>
 
-      {/* Auth type toggle */}
       <div>
         <label className="block text-[11px] text-text-muted mb-1">Autentikacija</label>
-        <div className="mb-1 text-[10px] text-text-muted">Preporučeno: `SSH Key`. Lozinku koristi samo ako tvoj VPS zaista podržava password login za izabranog korisnika.</div>
+        <div className="mb-1 text-[10px] text-text-muted">Koristi lozinku ili private key — oba toka sada prolaze kroz isti backend provisioning i istu SSH validaciju.</div>
         <div className="flex gap-1">
           <button
+            type="button"
             onClick={() => setAuthType("password")}
             className={`flex-1 px-2 py-1.5 text-[11px] rounded-lg border transition-colors ${
               authType === "password"
@@ -303,6 +321,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
             Lozinka
           </button>
           <button
+            type="button"
             onClick={() => setAuthType("key")}
             className={`flex-1 px-2 py-1.5 text-[11px] rounded-lg border transition-colors ${
               authType === "key"
@@ -315,7 +334,6 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
         </div>
       </div>
 
-      {/* Password or Private Key */}
       {authType === "password" ? (
         <div>
           <label className="block text-[11px] text-text-muted mb-1">Lozinka</label>
@@ -334,7 +352,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
             value={privateKey}
             onChange={(e) => setPrivateKey(e.target.value)}
             placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
-            rows={4}
+            rows={5}
             className="w-full px-2.5 py-1.5 text-[11px] rounded-lg border border-border bg-surface-2 text-text placeholder-text-muted outline-none focus:border-accent transition-colors font-mono resize-none"
           />
         </div>
@@ -345,6 +363,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
       )}
 
       <button
+        type="button"
         onClick={handleConnect}
         disabled={!normalizedHost || !username.trim() || hostLooksInvalid}
         className="w-full py-2 text-sm font-medium rounded-lg bg-accent text-white hover:opacity-85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"

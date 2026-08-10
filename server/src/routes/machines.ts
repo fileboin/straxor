@@ -160,6 +160,7 @@ router.post("/", requireAuth, async (req, res) => {
         password: encryptedPassword,
         privateKey: encryptedPrivateKey,
         status: "pending",
+        opencodePort: 4096,
       })
       .returning();
 
@@ -175,7 +176,6 @@ router.post("/:id/provision", requireAuth, async (req, res) => {
   const userId = req.user!.userId;
   const id = req.params.id as string;
 
-  // Set SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -185,8 +185,29 @@ router.post("/:id/provision", requireAuth, async (req, res) => {
     res.write(`data: ${JSON.stringify(event)}\n\n`);
   };
 
+  let ssh: Awaited<ReturnType<typeof connectSSH>> | null = null;
+
+  const finish = () => {
+    res.write("data: [DONE]\n\n");
+    res.end();
+  };
+
+  const failProvision = async (message: string) => {
+    sendEvent({ status: "error", message });
+    try {
+      await db
+        .update(machines)
+        .set({
+          status: "error",
+          opencodeRunning: false,
+          lastError: message,
+        })
+        .where(eq(machines.id, id));
+    } catch {}
+    finish();
+  };
+
   try {
-    // Get machine from DB
     const result = await db
       .select()
       .from(machines)
@@ -194,15 +215,11 @@ router.post("/:id/provision", requireAuth, async (req, res) => {
       .limit(1);
 
     if (result.length === 0) {
-      sendEvent({ status: "error", message: "Machine not found" });
-      res.write("data: [DONE]\n\n");
-      res.end();
+      await failProvision("Machine not found");
       return;
     }
 
     const machine = result[0];
-
-    // Decrypt sensitive fields for SSH connection
     const password = machine.password
       ? (isEncrypted(machine.password) ? decrypt(machine.password) : machine.password)
       : undefined;
@@ -210,16 +227,14 @@ router.post("/:id/provision", requireAuth, async (req, res) => {
       ? (isEncrypted(machine.privateKey) ? decrypt(machine.privateKey) : machine.privateKey)
       : undefined;
 
-    // Update status to connecting
     await db
       .update(machines)
-      .set({ status: "connecting", lastError: null })
+      .set({ status: "connecting", opencodeRunning: false, lastError: null })
       .where(eq(machines.id, id));
 
     sendEvent({ status: "connecting", message: "Spajanje na VPS..." });
 
-    // Connect via SSH
-    const ssh = await connectSSH({
+    ssh = await connectSSH({
       host: machine.host,
       port: machine.port,
       username: machine.username,
@@ -227,101 +242,64 @@ router.post("/:id/provision", requireAuth, async (req, res) => {
       privateKey,
     });
 
-    sendEvent({ status: "checking-os", message: "Detekcija operativnog sustava..." });
+    await db
+      .update(machines)
+      .set({ status: "provisioning", lastError: null })
+      .where(eq(machines.id, id));
 
-    // Detect OS
+    sendEvent({ status: "checking-os", message: "Detekcija operativnog sustava..." });
     const os = await detectOS(ssh);
-    sendEvent({ status: "checking-os", message: `OS: ${os}` });
+    sendEvent({ status: "checking-os", message: `Detektovan OS: ${os}` });
 
     sendEvent({ status: "checking-node", message: "Provjera Node.js..." });
-
-    // Check Node.js
-    const nodeVersion = await getNodeVersion(ssh);
+    let nodeVersion = await getNodeVersion(ssh);
 
     if (nodeVersion) {
       sendEvent({ status: "checking-node", message: `Node.js pronađen: ${nodeVersion}` });
     } else {
-      sendEvent({ status: "installing-node", message: "Node.js nije pronađen. Instalacija..." });
-
-      try {
-        await installNode(ssh, os);
-        sendEvent({ status: "installing-node", message: "Node.js uspješno instaliran" });
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : "Unknown error";
-        sendEvent({ status: "error", message: `Greška pri instalaciji Node.js: ${errorMsg}` });
-
-        await db
-          .update(machines)
-          .set({ status: "error", lastError: errorMsg })
-          .where(eq(machines.id, id));
-
-        ssh.close();
-        res.write("data: [DONE]\n\n");
-        res.end();
-        return;
+      sendEvent({ status: "checking-node", message: "Node.js nije pronađen. Instalacija..." });
+      await installNode(ssh, os);
+      nodeVersion = await getNodeVersion(ssh);
+      if (!nodeVersion) {
+        throw new Error("Node.js je instaliran, ali shell ga i dalje ne vidi");
       }
+      sendEvent({ status: "checking-node", message: `Node.js uspješno instaliran: ${nodeVersion}` });
     }
 
-    // Update DB
     await db
       .update(machines)
-      .set({ nodeInstalled: true })
+      .set({ nodeInstalled: true, lastError: null })
       .where(eq(machines.id, id));
 
-    sendEvent({ status: "starting-opencode", message: "Pokretanje opencode serve..." });
+    sendEvent({ status: "starting-opencode", message: "Pokretanje opencode servera..." });
+    await installOpenCode(ssh);
 
-    // Install opencode if not present
-    try {
-      await installOpenCode(ssh);
-    } catch (err) {
-      // opencode might already be installed, continue
-    }
+    const requestedPort = machine.opencodePort && machine.opencodePort > 0 ? machine.opencodePort : 4096;
+    await startOpenCodeServe(ssh, requestedPort);
 
-    // Start opencode serve
-    const opencodePort = machine.opencodePort || 4096;
+    const actualPort = await getOpenCodePort(ssh);
+    const resolvedPort = actualPort || requestedPort;
 
-    try {
-      await startOpenCodeServe(ssh, opencodePort);
-      sendEvent({ status: "ready", message: `Opencode serve pokrenut na portu ${opencodePort}` });
+    await db
+      .update(machines)
+      .set({
+        status: "ready",
+        nodeInstalled: true,
+        opencodeRunning: true,
+        opencodePort: resolvedPort,
+        lastError: null,
+      })
+      .where(eq(machines.id, id));
 
-      // Get actual port (might have been different if original was occupied)
-      const actualPort = await getOpenCodePort(ssh);
-
-      await db
-        .update(machines)
-        .set({
-          status: "ready",
-          opencodeRunning: true,
-          opencodePort: actualPort || opencodePort,
-        })
-        .where(eq(machines.id, id));
-
-      ssh.close();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error";
-      sendEvent({ status: "error", message: `Greška pri pokretanju opencode: ${errorMsg}` });
-
-      await db
-        .update(machines)
-        .set({ status: "error", lastError: errorMsg })
-        .where(eq(machines.id, id));
-
-      ssh.close();
-    }
-
-    res.write("data: [DONE]\n\n");
-    res.end();
+    sendEvent({ status: "ready", message: `Spremno! OpenCode server radi na portu ${resolvedPort}.` });
+    finish();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    sendEvent({ status: "error", message: `Greška: ${message}` });
-
-    await db
-      .update(machines)
-      .set({ status: "error", lastError: message })
-      .where(eq(machines.id, id));
-
-    res.write("data: [DONE]\n\n");
-    res.end();
+    await failProvision(message.startsWith("Greška") ? message : `Greška: ${message}`);
+  } finally {
+    try {
+      ssh?.close();
+    } catch {}
   }
 });
 

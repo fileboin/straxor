@@ -2135,6 +2135,16 @@ export default function Workspace() {
     );
   }, []);
 
+  const openSshModalForPanel = useCallback((panel: "ask" | "agent") => {
+    setRuntimeManagerPanel(panel);
+    setVpsStatus("connecting");
+    setShowSshModal(true);
+  }, []);
+
+  const openSshModalForCurrentPanel = useCallback(() => {
+    openSshModalForPanel(askFocused || mobileTab === "ask" ? "ask" : "agent");
+  }, [askFocused, mobileTab, openSshModalForPanel]);
+
   const handleVpsConnected = useCallback((machineId: string) => {
     if (runtimeManagerPanel === "ask") {
       setAskMachineId(machineId);
@@ -2247,7 +2257,7 @@ export default function Workspace() {
       icon: "⏻",
       category: "action",
       keywords: ["vps", "ssh", "connect", "server"],
-      action: () => setShowSshModal(true),
+      action: () => openSshModalForCurrentPanel(),
     },
     {
       id: "action-deploy",
@@ -2641,7 +2651,7 @@ export default function Workspace() {
   ], [
     navigate, theme, setAppTheme,
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
-    setShowSshModal, setShowDeployModal, setShowExportModal, setShowEnvModal,
+    openSshModalForCurrentPanel, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
     setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization, setShowEnterprise, setShowPlugins, setShowMarketplace, setShowScale, setShowResilience, setShowAdmin,
   ]);
@@ -2680,7 +2690,7 @@ export default function Workspace() {
         template="react"
         status="active"
         vpsStatus={vpsStatus}
-        onConnectVps={() => setShowSshModal(true)}
+        onConnectVps={openSshModalForCurrentPanel}
         onOpenEnv={() => setShowEnvModal(true)}
         onOpenDeploy={() => setShowDeployModal(true)}
         onOpenSettings={() => setShowPermissionsModal(true)}
@@ -2852,7 +2862,7 @@ export default function Workspace() {
             loading={askLoading}
             streamingMessageId={askStreamingId}
             onApiKeyChange={() => hasApiKey(askProvider).then(setAskHasKey)}
-            onConnectVps={() => setShowSshModal(true)}
+            onConnectVps={() => openSshModalForPanel("ask")}
             onOpenGitRemote={() => { setGitRemoteSlot("ask"); setShowGitRemote(true); }}
             zoom={askZoom}
             onZoomChange={handleAskZoomChange}
@@ -2925,7 +2935,7 @@ export default function Workspace() {
                 repoName={askActiveRepo?.fullName}
                 panelLabel="Ask"
                 onSelectLocal={() => setAskMachineId("local:opencode:ask")}
-                onConnectVps={() => { setRuntimeManagerPanel("ask"); setShowSshModal(true); }}
+                onConnectVps={() => openSshModalForPanel("ask")}
                 onDisconnectVps={() => setAskMachineId(askActiveRepo ? "local:opencode:ask" : null)}
                 onOpenGitRemote={() => { setGitRemoteSlot("ask"); setShowGitRemote(true); }}
                 onOpenRuntimeManager={() => { setRuntimeManagerPanel("ask"); setShowRuntimeManager(true); }}
@@ -3002,7 +3012,7 @@ export default function Workspace() {
             loading={agentLoading}
             streamingMessageId={agentStreamingId}
             onApiKeyChange={() => hasApiKey(askProvider).then(setAskHasKey)}
-            onConnectVps={() => setShowSshModal(true)}
+            onConnectVps={() => openSshModalForPanel("agent")}
             onOpenGitRemote={() => { setGitRemoteSlot("agent"); setShowGitRemote(true); }}
             zoom={agentZoom}
             onZoomChange={handleAgentZoomChange}
@@ -3062,7 +3072,7 @@ export default function Workspace() {
                 repoName={activeRepo?.fullName}
                 panelLabel="Agent"
                 onSelectLocal={() => setAgentMachineId("local:opencode")}
-                onConnectVps={() => { setRuntimeManagerPanel("agent"); setShowSshModal(true); }}
+                onConnectVps={() => openSshModalForPanel("agent")}
                 onDisconnectVps={() => setAgentMachineId(activeRepo ? "local:opencode" : null)}
                 onOpenGitRemote={() => { setGitRemoteSlot("agent"); setShowGitRemote(true); }}
                 onOpenRuntimeManager={() => { setRuntimeManagerPanel("agent"); setShowRuntimeManager(true); }}

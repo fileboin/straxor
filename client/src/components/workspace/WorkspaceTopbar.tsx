@@ -43,6 +43,14 @@ const VPS_STATUS_LABELS: Record<string, string> = {
   error: "VPS ✕",
 };
 
+const VPS_STATUS_ICONS: Record<string, string> = {
+  disconnected: "⏻",
+  connecting: "⏻",
+  provisioning: "⏻",
+  ready: "✓",
+  error: "✕",
+};
+
 const VPS_STATUS_COLORS: Record<string, string> = {
   disconnected: "border-border bg-transparent text-text-secondary",
   connecting: "border-yellow-500/50 bg-yellow-500/10 text-yellow-500",
@@ -111,17 +119,18 @@ function WorkspaceTopbar({
           {theme === "dark" ? "☀" : "☾"}
         </button>
 
-        {/* Connect VPS button */}
         <button
           onClick={onConnectVps}
           disabled={vpsStatus === "connecting" || vpsStatus === "provisioning"}
-          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs font-medium transition-colors ${VPS_STATUS_COLORS[vpsStatus]} disabled:opacity-50 disabled:cursor-not-allowed`}
-          title={vpsStatus === "ready" ? "VPS povezan" : "Poveži VPS"}
+          className={`h-8 min-w-8 shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium whitespace-nowrap transition-colors ${VPS_STATUS_COLORS[vpsStatus]} disabled:opacity-50 disabled:cursor-not-allowed`}
+          title={vpsStatus === "ready" ? "VPS povezan" : "Otvori SSH / VPS povezivanje"}
+          aria-label={vpsStatus === "ready" ? "VPS povezan" : "Otvori SSH / VPS povezivanje"}
         >
+          <span className="shrink-0">{VPS_STATUS_ICONS[vpsStatus]}</span>
           {(vpsStatus === "connecting" || vpsStatus === "provisioning") && (
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" />
           )}
-          <span className="hidden lg:inline">{VPS_STATUS_LABELS[vpsStatus]}</span>
+          <span className="hidden xl:inline">{VPS_STATUS_LABELS[vpsStatus]}</span>
         </button>
 
         <button
