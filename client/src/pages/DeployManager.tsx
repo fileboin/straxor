@@ -503,7 +503,7 @@ export default function DeployManager() {
                 )}
               </div>
 
-              {null}
+              
 
               {/* Deployment history */}
 
