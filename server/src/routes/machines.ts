@@ -21,8 +21,57 @@ import {
 import type { ProvisionEvent, CoolifyInstallEvent } from "../runtime/opencode-adapter/index.js";
 import { encrypt, decrypt, isEncrypted } from "../lib/crypto.js";
 
+function parseSshTarget(value: string): { host: string; username?: string; port?: number } {
+  let raw = value.trim();
+  if (!raw) return { host: "" };
+
+  raw = raw.replace(/^ssh:\/\//i, "");
+  raw = raw.replace(/^ssh\s+/i, "").trim();
+
+  const portFlagMatch = raw.match(/(?:^|\s)-p\s+(\d+)(?:\s|$)/i);
+  const portFromFlag = portFlagMatch ? parseInt(portFlagMatch[1], 10) : undefined;
+  if (portFlagMatch) {
+    raw = raw.replace(portFlagMatch[0], " ").trim();
+  }
+
+  const tokens = raw.split(/\s+/).filter(Boolean);
+  let target = tokens[tokens.length - 1] || raw;
+  target = target.replace(/^['"]|['"]$/g, "");
+  target = target.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+
+  let username: string | undefined;
+  let hostPort = target;
+
+  const atIndex = target.lastIndexOf("@");
+  if (atIndex > 0) {
+    username = target.slice(0, atIndex).trim() || undefined;
+    hostPort = target.slice(atIndex + 1).trim();
+  }
+
+  let host = hostPort;
+  let port = portFromFlag;
+
+  const bracketMatch = hostPort.match(/^\[([^\]]+)\](?::(\d+))?$/);
+  if (bracketMatch) {
+    host = bracketMatch[1];
+    if (!port && bracketMatch[2]) port = parseInt(bracketMatch[2], 10);
+    return { host, username, port };
+  }
+
+  const colonCount = (hostPort.match(/:/g) || []).length;
+  if (colonCount === 1) {
+    const [maybeHost, maybePort] = hostPort.split(":");
+    if (/^\d+$/.test(maybePort || "")) {
+      host = maybeHost;
+      if (!port) port = parseInt(maybePort, 10);
+    }
+  }
+
+  return { host, username, port };
+}
+
 function normalizeHost(value: string): string {
-  return value.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+  return parseSshTarget(value).host;
 }
 
 function isBlockedLocalHost(host: string): boolean {
@@ -136,10 +185,15 @@ router.post("/", requireAuth, async (req, res) => {
     const passwordRaw = body.password ?? body.password ?? null;
     const privateKeyRaw = body.privateKey ?? body.private_key ?? null;
 
-    const normalizedHost = typeof hostRaw === "string" ? normalizeHost(hostRaw) : "";
-    const normalizedUsername = typeof usernameRaw === "string" ? usernameRaw.trim() : "";
+    const parsedTarget = typeof hostRaw === "string" ? parseSshTarget(hostRaw) : { host: "" };
+    const normalizedHost = parsedTarget.host;
+    const normalizedUsername = typeof usernameRaw === "string" && usernameRaw.trim()
+      ? usernameRaw.trim()
+      : (parsedTarget.username || "");
     const resolvedAuthType = (authTypeRaw === "key" ? "key" : "password");
-    const resolvedPort = Number.isFinite(Number(portRaw)) ? Number(portRaw) : 22;
+    const resolvedPort = Number.isFinite(Number(portRaw))
+      ? Number(portRaw)
+      : (parsedTarget.port && Number.isFinite(parsedTarget.port) ? parsedTarget.port : 22);
 
     if (!projectIdRaw || !name || !normalizedHost || !normalizedUsername) {
       res.status(400).json({ error: "Missing required fields" });

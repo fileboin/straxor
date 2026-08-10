@@ -27,8 +27,57 @@ const STATUS_LABELS: Record<ProvisionStatus, string> = {
   error: "Greška",
 };
 
+function parseSshTarget(value: string): { host: string; username?: string; port?: number } {
+  let raw = value.trim();
+  if (!raw) return { host: "" };
+
+  raw = raw.replace(/^ssh:\/\//i, "");
+  raw = raw.replace(/^ssh\s+/i, "").trim();
+
+  const portFlagMatch = raw.match(/(?:^|\s)-p\s+(\d+)(?:\s|$)/i);
+  const portFromFlag = portFlagMatch ? parseInt(portFlagMatch[1], 10) : undefined;
+  if (portFlagMatch) {
+    raw = raw.replace(portFlagMatch[0], " ").trim();
+  }
+
+  const tokens = raw.split(/\s+/).filter(Boolean);
+  let target = tokens[tokens.length - 1] || raw;
+  target = target.replace(/^['"]|['"]$/g, "");
+  target = target.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+
+  let username: string | undefined;
+  let hostPort = target;
+
+  const atIndex = target.lastIndexOf("@");
+  if (atIndex > 0) {
+    username = target.slice(0, atIndex).trim() || undefined;
+    hostPort = target.slice(atIndex + 1).trim();
+  }
+
+  let host = hostPort;
+  let port = portFromFlag;
+
+  const bracketMatch = hostPort.match(/^\[([^\]]+)\](?::(\d+))?$/);
+  if (bracketMatch) {
+    host = bracketMatch[1];
+    if (!port && bracketMatch[2]) port = parseInt(bracketMatch[2], 10);
+    return { host, username, port };
+  }
+
+  const colonCount = (hostPort.match(/:/g) || []).length;
+  if (colonCount === 1) {
+    const [maybeHost, maybePort] = hostPort.split(":");
+    if (/^\d+$/.test(maybePort || "")) {
+      host = maybeHost;
+      if (!port) port = parseInt(maybePort, 10);
+    }
+  }
+
+  return { host, username, port };
+}
+
 function normalizeHost(value: string): string {
-  return value.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+  return parseSshTarget(value).host;
 }
 
 function isLikelyPrivateHost(host: string): boolean {
@@ -72,7 +121,8 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
   const [error, setError] = useState("");
   const [prefilled, setPrefilled] = useState(false);
 
-  const normalizedHost = useMemo(() => normalizeHost(host), [host]);
+  const parsedTarget = useMemo(() => parseSshTarget(host), [host]);
+  const normalizedHost = parsedTarget.host;
   const hostLooksInvalid = isLikelyPrivateHost(host);
 
   useEffect(() => {
@@ -98,7 +148,10 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
   }, [prefilled]);
 
   const handleConnect = async () => {
-    if (!normalizedHost || !username.trim() || (!password && authType === "password") || (!privateKey && authType === "key")) {
+    const resolvedUsername = (parsedTarget.username || username).trim();
+    const resolvedPort = parsedTarget.port ?? parseInt(port, 10);
+
+    if (!normalizedHost || !resolvedUsername || (!password && authType === "password") || (!privateKey && authType === "key")) {
       setError("Unesi javnu VPS IP/DNS adresu, korisničko ime i ispravan SSH/Auth metod.");
       return;
     }
@@ -108,8 +161,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
       return;
     }
 
-    const parsedPort = parseInt(port, 10);
-    if (!Number.isFinite(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
+    if (!Number.isFinite(resolvedPort) || resolvedPort < 1 || resolvedPort > 65535) {
       setError("SSH port mora biti između 1 i 65535.");
       return;
     }
@@ -123,10 +175,10 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
         method: "POST",
         body: JSON.stringify({
           projectId,
-          name: machineName || `${username.trim()}@${normalizedHost}`,
+          name: machineName || `${resolvedUsername}@${normalizedHost}`,
           host: normalizedHost,
-          port: parsedPort,
-          username: username.trim(),
+          port: resolvedPort,
+          username: resolvedUsername,
           authType,
           password: authType === "password" ? password : undefined,
           privateKey: authType === "key" ? privateKey : undefined,
@@ -276,10 +328,10 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
             type="text"
             value={host}
             onChange={(e) => setHost(e.target.value)}
-            placeholder="203.0.113.10 ili vps.example.com"
+            placeholder="203.0.113.10, root@203.0.113.10 ili ssh root@203.0.113.10"
             className={`w-full px-2.5 py-1.5 text-[12px] rounded-lg border bg-surface-2 text-text placeholder-text-muted outline-none focus:border-accent transition-colors ${host && hostLooksInvalid ? "border-red-500/60" : "border-border"}`}
           />
-          <div className="mt-1 text-[10px] text-text-muted">Koristi javnu IP adresu VPS-a ili DNS hostname — ne lokalni `192.168.x.x`, `10.x.x.x` ili `localhost`.</div>
+          <div className="mt-1 text-[10px] text-text-muted">Možeš uneti samo host/IP, `root@host`, ili ceo `ssh root@host` format. Ako uneseš `:port` ili `-p 2222`, i to će biti prepoznato.</div>
         </div>
         <div className="w-20 shrink-0">
           <label className="block text-[11px] text-text-muted mb-1">Port</label>
@@ -302,7 +354,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
           placeholder="root"
           className="w-full px-2.5 py-1.5 text-[12px] rounded-lg border border-border bg-surface-2 text-text placeholder-text-muted outline-none focus:border-accent transition-colors"
         />
-        <div className="mt-1 text-[10px] text-text-muted">Podrazumevano je `root`. Promeni samo ako tvoj VPS koristi drugog SSH korisnika.</div>
+        <div className="mt-1 text-[10px] text-text-muted">Ako u host polje uneseš `root@ip` ili `ssh root@ip`, korisničko ime će se automatski preuzeti odatle.</div>
       </div>
 
       <div>
@@ -365,7 +417,7 @@ export default function SshInput({ projectId, onConnected, onCancel }: Props) {
       <button
         type="button"
         onClick={handleConnect}
-        disabled={!normalizedHost || !username.trim() || hostLooksInvalid}
+        disabled={!normalizedHost || !((parsedTarget.username || username).trim()) || hostLooksInvalid}
         className="w-full py-2 text-sm font-medium rounded-lg bg-accent text-white hover:opacity-85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         Validiraj, poveži i pokreni
