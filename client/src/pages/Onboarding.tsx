@@ -92,7 +92,7 @@ export default function OnboardingPage() {
 
         {/* Step content */}
         <div className="bg-surface border border-border rounded-xl p-6 mb-6 min-h-[280px]">
-          {current.id === "ai-key" && (
+                  {current.id === "ai-key" && (
             <StepAiKey onComplete={() => markComplete("ai-key")} />
           )}
           {current.id === "vps" && (
@@ -103,6 +103,9 @@ export default function OnboardingPage() {
           )}
           {current.id === "project" && (
             <StepProject onComplete={() => markComplete("project")} user={user} />
+          )}
+          {current.id === "api-token" && (
+            <StepApiToken onComplete={() => markComplete("api-token")} />
           )}
         </div>
 
@@ -326,6 +329,44 @@ function StepGit({ onComplete }: { onComplete: () => void }) {
         <div className="mt-3 text-center text-[11px] text-green-400 font-medium">
           ✓ Spremljeno — možeš nastaviti
         </div>
+      )}
+    </div>
+  );
+}
+
+/* --- Step 2.5: API Token after Coolify install --- */
+function StepApiToken({ onComplete }: { onComplete: () => void }) {
+  const [token, setToken] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    if (!token.trim()) return;
+    // Persist token locally for the onboarding session
+    localStorage.setItem("straxor.coolify_token", token.trim());
+    setSaved(true);
+    onComplete();
+  };
+
+  return (
+    <div>
+      <h2 className="text-sm font-semibold text-text mb-1">Coolify API Token</h2>
+      <p className="text-[11px] text-text-muted mb-4">Unesi API token za Coolify kako bi završili post-instacijsku tok...</p>
+      <input
+        type="password"
+        value={token}
+        onChange={(e) => setToken(e.target.value)}
+        placeholder="Token"
+        className="w-full px-3 py-2 text-xs bg-bg border border-border rounded-lg focus:outline-none focus:border-accent text-text placeholder:text-text-muted"
+      />
+      {!saved ? (
+        <button
+          onClick={handleSave}
+          className="mt-3 w-full py-2 text-xs font-medium rounded-lg border border-accent bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+        >
+          Spremi token
+        </button>
+      ) : (
+        <div className="mt-2 text-green-600 text-xs">Token spremljen</div>
       )}
     </div>
   );
