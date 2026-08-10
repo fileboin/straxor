@@ -503,7 +503,7 @@ export default function DeployManager() {
                 )}
               </div>
 
-              { /* Active deployment detail removed for build stability */ }
+              {null}
 
               {/* Deployment history */}
 
