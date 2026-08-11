@@ -2717,25 +2717,6 @@ export default function Workspace() {
           </div>
         </div>
       )}
-      {restoredFromMirror && (
-        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-40 px-3 py-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 text-yellow-300 text-[11px] shadow-lg shadow-black/20">
-          Resume restored from local mirror
-          <button
-            type="button"
-            onClick={() => setShowPwaDiagnostics(true)}
-            className="ml-2 underline hover:no-underline"
-          >
-            View diagnostics
-          </button>
-          <button
-            type="button"
-            onClick={() => setRestoredFromMirror(false)}
-            className="ml-2 text-yellow-200/80 hover:text-yellow-100"
-          >
-            ✕
-          </button>
-        </div>
-      )}
       <WorkspaceTopbar
         projectName={projectName}
         template="react"
@@ -2793,6 +2774,34 @@ export default function Workspace() {
           </button>
         )}
       </div>
+
+      {restoredFromMirror && (
+        <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5 border-b border-yellow-500/30 bg-yellow-500/10 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[13px] text-yellow-300 shrink-0">⚠</span>
+            <span className="text-[12px] text-yellow-200/90 truncate">
+              Resume restored from local mirror
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowPwaDiagnostics(true)}
+              className="px-3 py-1.5 rounded-lg border border-yellow-500/40 bg-yellow-500/10 text-yellow-200 text-[11px] font-medium hover:bg-yellow-500/20 transition-colors"
+            >
+              View diagnostics
+            </button>
+            <button
+              type="button"
+              onClick={() => setRestoredFromMirror(false)}
+              aria-label="Zatvori"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-yellow-500/40 text-yellow-200/80 hover:text-yellow-100 hover:bg-yellow-500/20 transition-colors shrink-0"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Panels */}
       <div
