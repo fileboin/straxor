@@ -426,6 +426,8 @@ export default function GitRemotePanel({ onClose, onRepoChanged, slot }: Props) 
         {actionMsg && (
           <div className="text-sm text-green-400 bg-green-400/10 px-3 py-1 rounded">{actionMsg}</div>
         )}
+        <button className="btn btn-ghost btn-sm ml-2" onClick={load} title="Refresh tokens">⟳</button>
+            
 
         <div className="flex gap-2 border-b border-gray-700 pb-2">
           {(["repos", "prs", "issues"] as Tab[]).map((t) => (

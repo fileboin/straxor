@@ -581,6 +581,14 @@ export default function PanelMenu({
               >
                 {t("panelMenu.gitOpen")} →
               </button>
+              <button
+                type="button"
+                onClick={load}
+                className="text-xs text-text-muted hover:text-text ml-2"
+                title="Refresh tokens"
+              >
+                ⟳
+              </button>
             </div>
 
             {activeSlot && (
