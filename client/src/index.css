@@ -351,6 +351,68 @@ body {
 }
 
 /* ═══════════════════════════════════════════════
+   MOBILE / RESPONSIVE HARDENING
+   Čiste dugmad, uvek vidljiv komposer iznad tastature,
+   bez preklapanja. Clamped na <= 767px (md breakpoint).
+   ═══════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  html,
+  body {
+    height: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  #root {
+    height: 100%;
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  /* Paneli: zabrani horizontalni overflow, garantuj komposer u kadru */
+  .panel-glass {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Komposer form — ostaje na dnu panela, nema previse visine */
+  form.flex.items-center.gap-2.rounded-\[20px\] {
+    min-height: 44px;
+  }
+  form.flex.items-center.gap-2.rounded-\[20px\] input {
+    min-width: 0;
+    font-size: 16px; /* sprečava iOS zoom na fokus */
+  }
+
+  /* Dugmad — dovoljna površina dodira i jasna separacija */
+  button {
+    touch-action: manipulation;
+  }
+  .rounded-full,
+  .rounded-xl,
+  .rounded-lg {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Topbar: prevelike sekcije skupljaju vertikalan prostor */
+  header,
+  [class*="border-b"] {
+    flex-shrink: 0;
+  }
+}
+
+/* Izbegni prelivanje tekstom unutar dugmadi/tabova na malim ekranima */
+@media (max-width: 640px) {
+  .whitespace-nowrap {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+}
+
+/* ═══════════════════════════════════════════════
    MARKETPLACE CORE (Block 70)
    ═══════════════════════════════════════════════ */
 
