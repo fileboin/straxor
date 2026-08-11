@@ -64,6 +64,13 @@
       "when": 1786456613032,
       "tag": "0008_global_vps_independent",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787000000000,
+      "tag": "0009_github_identity",
+      "breakpoints": true
     }
   ]
 }

@@ -23,6 +23,9 @@ export const users = pgTable("users", {
   resetTokenExpires: timestamp("reset_token_expires"),
   totpSecret: varchar("totp_secret", { length: 255 }),
   twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
+  githubId: varchar("github_id", { length: 255 }).unique(),
+  githubLogin: varchar("github_login", { length: 255 }),
+  githubAvatar: varchar("github_avatar", { length: 512 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

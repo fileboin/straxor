@@ -52,6 +52,8 @@ interface PublicUser {
   email: string;
   role: string;
   emailVerified: boolean;
+  githubLogin?: string | null;
+  githubAvatar?: string | null;
 }
 
 function toPublicUser(u: {
@@ -59,8 +61,17 @@ function toPublicUser(u: {
   email: string;
   role: string;
   emailVerified: boolean | null;
+  githubLogin?: string | null;
+  githubAvatar?: string | null;
 }): PublicUser {
-  return { id: u.id, email: u.email, role: u.role, emailVerified: !!u.emailVerified };
+  return {
+    id: u.id,
+    email: u.email,
+    role: u.role,
+    emailVerified: !!u.emailVerified,
+    githubLogin: u.githubLogin || null,
+    githubAvatar: u.githubAvatar || null,
+  };
 }
 
 async function publicUserWithFailsafe(user: {
@@ -166,10 +177,67 @@ async function resolveGithubEmail(accessToken: string): Promise<string> {
   return String(primary.email).toLowerCase();
 }
 
-async function findOrCreateGithubUser(email: string) {
+// GitHub profile identity used to durably bind a Straxor user to a GitHub
+// account. The GitHub `id` is stable for the lifetime of the account, whereas
+// the email can change — so lookups always prefer `githubId` first.
+interface GithubProfile {
+  id: string;
+  login: string;
+  avatarUrl?: string;
+  email?: string;
+}
+
+async function fetchGithubProfile(accessToken: string): Promise<GithubProfile> {
+  const profile: any = await githubApi("/user", accessToken);
+  return {
+    id: String(profile.id),
+    login: String(profile.login || ""),
+    avatarUrl: typeof profile.avatar_url === "string" ? profile.avatar_url : undefined,
+    email: typeof profile.email === "string" ? profile.email.toLowerCase() : undefined,
+  };
+}
+
+async function findOrCreateGithubUser(profile: GithubProfile, email: string) {
   const normalizedEmail = email.trim().toLowerCase();
+
+  // 1) Durable key: match on the GitHub account id. This survives email changes
+  //    and re-binds the user's projects, settings, tokens and chat history.
+  if (profile.id) {
+    const [byGithubId] = await db.select().from(users).where(eq(users.githubId, profile.id));
+    if (byGithubId) {
+      const updated = await publicUserWithFailsafe(byGithubId);
+      // Rebind login/avatar/email so the record stays in sync.
+      await db
+        .update(users)
+        .set({
+          githubLogin: profile.login || byGithubId.githubLogin,
+          githubAvatar: profile.avatarUrl || byGithubId.githubAvatar,
+          ...(byGithubId.email !== normalizedEmail
+            ? { email: normalizedEmail, emailVerified: true }
+            : {}),
+        })
+        .where(eq(users.id, byGithubId.id));
+      return updated;
+    }
+  }
+
+  // 2) Fallback: match on email (used by users who registered before GitHub
+  //    identity existed), then bind the GitHub id so future logins are durable.
   const [existing] = await db.select().from(users).where(eq(users.email, normalizedEmail));
-  if (existing) return publicUserWithFailsafe(existing);
+  if (existing) {
+    await db
+      .update(users)
+      .set({
+        githubId: profile.id || existing.githubId,
+        githubLogin: profile.login || existing.githubLogin,
+        githubAvatar: profile.avatarUrl || existing.githubAvatar,
+        emailVerified: true,
+      })
+      .where(eq(users.id, existing.id));
+    return publicUserWithFailsafe(existing);
+  }
+
+  // 3) New user: create with the GitHub identity attached.
   const role = await resolveRoleForEmail(normalizedEmail);
   const passwordHash = await bcrypt.hash(randomBytes(32).toString("hex"), 10);
   const [user] = await db
@@ -180,6 +248,9 @@ async function findOrCreateGithubUser(email: string) {
       role,
       emailVerified: true,
       verificationToken: null,
+      githubId: profile.id || null,
+      githubLogin: profile.login || null,
+      githubAvatar: profile.avatarUrl || null,
     })
     .returning({ id: users.id, email: users.email, role: users.role, emailVerified: users.emailVerified });
   return toPublicUser(user);
@@ -331,8 +402,9 @@ router.get("/github/callback", async (req, res) => {
 
     const returnTo = sanitizeReturnTo(state.returnTo || "/");
     const accessToken = await exchangeGithubCode(code, buildGithubCallbackUrl(req));
-    const email = await resolveGithubEmail(accessToken);
-    const publicUser = await findOrCreateGithubUser(email);
+    const profile = await fetchGithubProfile(accessToken);
+    const email = profile.email || (await resolveGithubEmail(accessToken));
+    const publicUser = await findOrCreateGithubUser(profile, email);
     const token = signToken(publicUser);
 
     const url = new URL(`${appUrl}${returnTo}`);
@@ -514,7 +586,14 @@ router.get("/me", async (req, res) => {
     const payload = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
 
     const [user] = await db
-      .select({ id: users.id, email: users.email, role: users.role, emailVerified: users.emailVerified })
+      .select({
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        emailVerified: users.emailVerified,
+        githubLogin: users.githubLogin,
+        githubAvatar: users.githubAvatar,
+      })
       .from(users)
       .where(eq(users.id, payload.userId));
 
@@ -522,7 +601,11 @@ router.get("/me", async (req, res) => {
       return res.status(401).json({ error: "Korisnik ne postoji" });
     }
 
-    res.json({ user: await publicUserWithFailsafe(user) });
+    const publicUser = await publicUserWithFailsafe(user);
+    // Sliding session: every successful `/me` issues a fresh token, so an
+    // active user is never logged out while the app keeps the session alive.
+    const freshToken = signToken(publicUser);
+    res.json({ user: publicUser, token: freshToken });
   } catch {
     res.status(401).json({ error: "Neispravan token" });
   }

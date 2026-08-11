@@ -6,6 +6,8 @@ export interface User {
   email: string;
   role: string;
   emailVerified: boolean;
+  githubLogin?: string | null;
+  githubAvatar?: string | null;
 }
 
 export function isAdmin(user: User | null): boolean {
@@ -33,8 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    api<{ user: User }>("/auth/me")
-      .then(({ user }) => setUser(user))
+    api<{ user: User; token?: string }>("/auth/me")
+      .then(({ user, token: refreshed }) => {
+        if (refreshed) localStorage.setItem("token", refreshed);
+        setUser(user);
+      })
       .catch(() => localStorage.removeItem("token"))
       .finally(() => setLoading(false));
   }, []);

@@ -72,9 +72,16 @@ export async function runMigrations(): Promise<void> {
   `;
   const isFresh = tableRows[0].n === 0;
 
-  if (!isFresh) {
-    // Existing DB: baseline all currently-known entries as applied so nothing
-    // re-runs; only genuinely new future migrations will be executed.
+  // Apply all journal entries whose tag has NOT yet been recorded as applied.
+  // On a truly fresh DB every entry runs; on an existing DB only genuinely new
+  // migrations run (their SQL is written idempotently so re-running is safe).
+  const toRun = entries.filter((e) => !applied.has(e.tag));
+
+  if (!isFresh && applied.size === 0) {
+    // Existing DB but no baseline yet: ALL known migrations were applied
+    // historically (some manually). Baseline them so old SQL never re-runs and
+    // fails with "already exists". Any migration that was added after this
+    // baseline will run on the next boot.
     let seeded = 0;
     for (const entry of entries) {
       if (applied.has(entry.tag)) continue;
@@ -82,17 +89,20 @@ export async function runMigrations(): Promise<void> {
       applied.add(entry.tag);
       seeded++;
     }
-    if (seeded > 0) {
-      console.log(`[migrate] Existing DB detected — baselined ${seeded} existing migration(s). Only new migrations will run.`);
-    }
+    console.log(`[migrate] Existing DB with no baseline — baselined ${seeded} migration(s). New ones run on next boot.`);
     await client.end();
     return;
   }
 
-  // Fresh DB: run everything in order.
-  console.log("[migrate] Fresh DB detected — applying all migrations...");
-  for (const entry of entries) {
-    if (applied.has(entry.tag)) continue;
+  if (toRun.length === 0) {
+    await client.end();
+    return;
+  }
+
+  console.log(
+    `[migrate] Applying ${toRun.length} pending migration(s) on a ${isFresh ? "fresh" : "existing"} DB...`
+  );
+  for (const entry of toRun) {
     const file = path.join(drizzleDir, `${entry.tag}.sql`);
     if (!fs.existsSync(file)) {
       console.warn(`[migrate] Migration file missing: ${entry.tag}.sql — skipping`);
@@ -112,5 +122,5 @@ export async function runMigrations(): Promise<void> {
     console.log(`[migrate] Applied ${entry.tag}`);
   }
   await client.end();
-  console.log("[migrate] All migrations applied.");
+  console.log("[migrate] All pending migrations applied.");
 }
