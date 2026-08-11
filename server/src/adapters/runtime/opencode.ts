@@ -233,7 +233,7 @@ export function createOpenCodeAdapter(): RuntimeAdapter {
       throw new Error("createSession requires userId — use bound adapter");
     },
 
-    async sendMessage(machineId, sessionId, text, mode, attachments) {
+    async sendMessage(machineId, sessionId, text, mode, attachments, system) {
       throw new Error("sendMessage requires userId — use bound adapter");
     },
 
@@ -332,7 +332,8 @@ export function createBoundAdapter(userId: string) {
       sessionId: string,
       text: string,
       mode: "sync" | "async" = "async",
-      attachments?: EngineAttachment[]
+      attachments?: EngineAttachment[],
+      system?: string
     ) {
       return withTransport(machineId, userId, async (port, ssh) => {
         const endpoint = mode === "async"
@@ -342,7 +343,9 @@ export function createBoundAdapter(userId: string) {
         if (attachments?.length) {
           console.log(`[agent:debug] machineId=${machineId} sessionId=${sessionId} parts=${parts.length} attachments=${attachments.length}`);
         }
-        const res = await httpCall(port, ssh, "POST", endpoint, { parts });
+        const body: Record<string, unknown> = { parts };
+        if (system) body.system = system;
+        const res = await httpCall(port, ssh, "POST", endpoint, body);
         if (res.status !== 200 && res.status !== 204) {
           throw new Error(`Failed to send message: ${res.data}`);
         }

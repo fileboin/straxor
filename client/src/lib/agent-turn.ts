@@ -52,7 +52,7 @@ function buildSystemContext(role: AgentRole, prompts: { id: string; name: string
 
 export async function runAgentTurn(msg: string, attachments: Attachment[] | undefined, ctx: AgentTurnCtx): Promise<void> {
   const system = buildSystemContext(ctx.role, ctx.savedPrompts, ctx.activePromptIds);
-  const fullMsg = system ? `${system}\n\n---\n\n${msg}` : msg;
+  const fullMsg = msg;
 
   if (!ctx.machineId) {
     ctx.setLoading(false);
@@ -112,7 +112,7 @@ export async function runAgentTurn(msg: string, attachments: Attachment[] | unde
     };
 
     try {
-      const started = await startAgentBackground(ctx.machineId, fullMsg, ctx.sessionId, attachments);
+      const started = await startAgentBackground(ctx.machineId, fullMsg, ctx.sessionId, attachments, system);
       ctx.setSessionId(started.sessionId);
       statusRef.timeline = [];
       await poll(started.jobId);
@@ -236,5 +236,5 @@ export async function runAgentTurn(msg: string, attachments: Attachment[] | unde
       ctx.setStreamingId(null);
       ctx.setLoading(false);
     },
-  }, attachments);
+  }, attachments, system);
 }

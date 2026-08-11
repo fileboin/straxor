@@ -1,7 +1,16 @@
 # Session Summary
 
 ## Objective
-Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot.
+Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
+
+## Zadnji zadatak — Uklanjanje sistemskog spama iz Panela 1 (Opcja A, urađeno)
+- **Uzrok**: Ask panel pokreće punoi agent turn kroz `runAgentTurn`, a sistemska uloga (`[SISTEMSKA ULOGA: Developer]` + prompts) bila je ugradjena DIREKTNO u tijelo vidljive korisničke poruke koju je model vidio i session pamti. Paralelno, server je u `agent.ts` prepend-ovao `[STRAXOR GITHUB CONTEXT]` (repo/branch/dir/slot) u isti vidljivi `fullText`. Zato se uloga i kontekst ispisuju u chatu i vraćaju pri restoru.
+- **Fix (Opcja A — uloga u pozadini kao pravi system prompt)**:
+  - `RuntimeAdapter.sendMessage` (`adapter.ts`) dobio opcioni 6. parametar `system?`.
+  - `opencode.ts` (unbound stub + bound adapter) prosleđuje `system` u tijelo opencode `POST /session/{id}/message` / `prompt_async` (opencode ≥1.17 podržava `system` polje) — uz zadržano `parts`.
+  - `routes/agent.ts` (`/send` i `/background`): prima `system` iz body-j-a; `[STRAXOR GITHUB CONTEXT]` se više NE lijepi u korisničku poruku (fullText čist), nego se spaja u `systemPrompt` koji ide kao system prompt. `runBackground` prima `systemPrompt`.
+  - Klijent: `streamAgentMessage`/`startAgentBackground` primaju opcioni `system` i šalju ga; `agent-turn.ts` sada šalje ČIST `msg` kao poruku (`fullMsg = msg`) i `system` (buildSystemContext) zasebno kao 6. argument — uloga ostaje aktivna u pozadini, chat je čist (samo user/assistant).
+- **Verifikovano**: server `tsc --noEmit` čist, client `npm run build` prolazi, vitest 55/55.
 
 ## Zadnji zadatak — GitHub repo servis (centralizacija, KORACI 1–5, urađeno)
 - **Arhitektura je već centralizovana**: repo pristup NE zavisi od AI providera. Svi pozivi idu preko `getGitRemoteAdapter(userId, platform)` (`adapters/git/remote/registry.ts:32`) → jedini `GitRemoteAdapter` po platformi. Nijedan AI-provider adapter (anthropic/http, direct-providers, model-router, ollama) ne zove repo servis — verifikovano grepfom u `server/src/adapters`.

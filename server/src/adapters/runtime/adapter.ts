@@ -39,7 +39,8 @@ export interface RuntimeAdapter {
     sessionId: string,
     text: string,
     mode?: "sync" | "async",
-    attachments?: EngineAttachment[]
+    attachments?: EngineAttachment[],
+    system?: string
   ): Promise<{ parts?: unknown[] }>;
   listSessions(machineId: string): Promise<unknown[]>;
   getTodos(machineId: string, sessionId: string): Promise<TodoItem[]>;

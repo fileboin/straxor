@@ -227,13 +227,14 @@ router.post("/bus/:eventId/status", async (req: Request, res: Response) => {
 
 router.post("/send", async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  const { machineId, sessionId, text, message, mode, attachments } = req.body as {
+  const { machineId, sessionId, text, message, mode, attachments, system } = req.body as {
     machineId: string;
     sessionId?: string;
     text?: string;
     message?: string;
     mode?: "sync" | "async";
     attachments?: AttachmentRef[];
+    system?: string;
   };
 
   // Support both `text` and `message` field names
@@ -259,11 +260,14 @@ router.post("/send", async (req: Request, res: Response) => {
   // must go through this same server-side path so context sharing stays
   // consistent. Explicit workspace context prevents OpenCode from answering as
   // if it were in an empty directory, while the registry serializes workspace
-  // preparation with any other active agent.
+  // preparation with any other active agent. This context is added to the
+  // session's SYSTEM prompt (not the visible user message), so the role and
+  // repo context stay active in the background without spamming the chat.
+  let systemPrompt = system || "";
   if (isLocalMachineId(machineId)) {
     try {
       const workspace = await withSharedWorkspace(userId, async (context) => context, slotFromMachineId(machineId));
-      fullText = [
+      const githubContext = [
         "[STRAXOR GITHUB CONTEXT]",
         `Active repository: ${workspace.repo}`,
         `Active branch: ${workspace.branch}`,
@@ -273,8 +277,8 @@ router.post("/send", async (req: Request, res: Response) => {
         "This context is shared across Straxor OpenCode agents and GitHub integration for the active panel.",
         "You are already running inside this workspace. Inspect its files before answering. Use this repository for all reads, edits, tests, and git operations; never use /tmp or another clone. Do not claim a repository is unavailable unless a tool call proves it.",
         "[/STRAXOR GITHUB CONTEXT]",
-        fullText,
       ].join("\n");
+      systemPrompt = systemPrompt ? `${githubContext}\n\n${systemPrompt}` : githubContext;
       console.log(`[agent:workspace] user=${userId} repo=${workspace.repo} branch=${workspace.branch}`);
     } catch {
       // No usable workspace (no active repo, or the repo token can't be
@@ -316,10 +320,10 @@ router.post("/send", async (req: Request, res: Response) => {
     const effectiveMode = mode || "async";
     let result;
     try {
-      result = await adapter.sendMessage(machineId, activeSessionId, fullText, effectiveMode, engineAttachments);
+      result = await adapter.sendMessage(machineId, activeSessionId, fullText, effectiveMode, engineAttachments, systemPrompt);
     } catch {
       // prompt_async may not be supported, fall back to sync
-      result = await adapter.sendMessage(machineId, activeSessionId, fullText, "sync", engineAttachments);
+      result = await adapter.sendMessage(machineId, activeSessionId, fullText, "sync", engineAttachments, systemPrompt);
     }
 
     // If we got parts back from sync, forward them as events
@@ -713,12 +717,13 @@ const backgroundJobs = new Map<string, BackgroundJob>();
 // the tab is backgrounded because the work happens entirely server-side.
 router.post("/background", async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  const { machineId, message, text, sessionId, attachments } = req.body as {
+  const { machineId, message, text, sessionId, attachments, system } = req.body as {
     machineId: string;
     sessionId?: string;
     message?: string;
     text?: string;
     attachments?: AttachmentRef[];
+    system?: string;
   };
 
   const msgText = message || text;
@@ -742,6 +747,28 @@ router.post("/background", async (req: Request, res: Response) => {
     const fullText =
       notes.length > 0 ? [msgText, ...notes].filter(Boolean).join("\n\n") : msgText;
 
+    // Same workspace-context-as-system-prompt behavior as the /send route.
+    let systemPrompt = system || "";
+    if (isLocalMachineId(machineId)) {
+      try {
+        const workspace = await withSharedWorkspace(userId, async (context) => context, slotFromMachineId(machineId));
+        const githubContext = [
+          "[STRAXOR GITHUB CONTEXT]",
+          `Active repository: ${workspace.repo}`,
+          `Active branch: ${workspace.branch}`,
+          `Workspace directory: ${workspace.dir}`,
+          `Panel slot: ${slotFromMachineId(machineId)}`,
+          `Workspace mode: ${workspace.readOnly ? "read-only" : "read-write"}`,
+          "This context is shared across Straxor OpenCode agents and GitHub integration for the active panel.",
+          "You are already running inside this workspace. Inspect its files before answering. Use this repository for all reads, edits, tests, and git operations; never use /tmp or another clone. Do not claim a repository is unavailable unless a tool call proves it.",
+          "[/STRAXOR GITHUB CONTEXT]",
+        ].join("\n");
+        systemPrompt = systemPrompt ? `${githubContext}\n\n${systemPrompt}` : githubContext;
+      } catch {
+        // No workspace — run as general chat.
+      }
+    }
+
     job = {
       id: `bg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       userId,
@@ -756,7 +783,7 @@ router.post("/background", async (req: Request, res: Response) => {
     res.json({ jobId: job.id, sessionId: activeSessionId, status: "running" });
 
     // Fire-and-forget: run the send + event stream detached from the request.
-    runBackground(job.id, adapter, activeSessionId, fullText, engineAttachments).catch(() => {});
+    runBackground(job.id, adapter, activeSessionId, fullText, engineAttachments, systemPrompt).catch(() => {});
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({ error: message });
@@ -768,7 +795,8 @@ async function runBackground(
   adapter: any,
   sessionId: string,
   fullText: string,
-  engineAttachments: unknown[]
+  engineAttachments: unknown[],
+  systemPrompt?: string
 ): Promise<void> {
   const job = backgroundJobs.get(jobId);
   if (!job) return;
@@ -778,9 +806,9 @@ async function runBackground(
     // Send async first, fall back to sync if unsupported.
     let result;
     try {
-      result = await adapter.sendMessage(machineId, sessionId, fullText, "async", engineAttachments);
+      result = await adapter.sendMessage(machineId, sessionId, fullText, "async", engineAttachments, systemPrompt);
     } catch {
-      result = await adapter.sendMessage(machineId, sessionId, fullText, "sync", engineAttachments);
+      result = await adapter.sendMessage(machineId, sessionId, fullText, "sync", engineAttachments, systemPrompt);
     }
     if (result?.parts) {
       for (const part of result.parts as any[]) {

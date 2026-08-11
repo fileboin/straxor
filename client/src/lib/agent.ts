@@ -29,7 +29,8 @@ export async function streamAgentMessage(
   message: string,
   sessionId: string | null,
   callbacks: AgentStreamCallbacks,
-  attachments?: Attachment[]
+  attachments?: Attachment[],
+  system?: string
 ): Promise<void> {
   try {
     const token = localStorage.getItem("token");
@@ -43,6 +44,7 @@ export async function streamAgentMessage(
         machineId,
         message,
         sessionId: sessionId || undefined,
+        ...(system !== undefined && system !== "" ? { system } : {}),
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
       }),
     });
@@ -224,7 +226,8 @@ export async function startAgentBackground(
   machineId: string,
   message: string,
   sessionId: string | null,
-  attachments?: Attachment[]
+  attachments?: Attachment[],
+  system?: string
 ): Promise<{ jobId: string; sessionId: string }> {
   const token = localStorage.getItem("token");
   const res = await fetch("/api/agent/background", {
@@ -237,6 +240,7 @@ export async function startAgentBackground(
       machineId,
       message,
       sessionId: sessionId || undefined,
+      ...(system !== undefined && system !== "" ? { system } : {}),
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
     }),
   });
