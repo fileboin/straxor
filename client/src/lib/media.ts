@@ -1,3 +1,5 @@
+import { getLang } from "./i18n.js";
+
 interface RecognitionEventLike {
   resultIndex?: number;
   results?: ArrayLike<{
@@ -32,12 +34,49 @@ export function hasSpeechRecognition(): boolean {
   return typeof w.SpeechRecognition !== "undefined" || typeof w.webkitSpeechRecognition !== "undefined";
 }
 
+// Web Speech API accepts BCP-47 tags. Map the app's 2-letter language codes to
+// concrete regional tags for more reliable recognition; the bare 2-letter code
+// itself is a valid fallback for every supported language.
+const SPEECH_LANG_TAGS: Record<string, string> = {
+  en: "en-US",
+  sr: "sr-RS",
+  sv: "sv-SE",
+  de: "de-DE",
+  fr: "fr-FR",
+  es: "es-ES",
+  it: "it-IT",
+  pt: "pt-PT",
+  nl: "nl-NL",
+  pl: "pl-PL",
+  ru: "ru-RU",
+  uk: "uk-UA",
+  zh: "zh-CN",
+  ja: "ja-JP",
+  ko: "ko-KR",
+  ar: "ar-SA",
+  hi: "hi-IN",
+  tr: "tr-TR",
+  el: "el-GR",
+  cs: "cs-CZ",
+  da: "da-DK",
+  fi: "fi-FI",
+  no: "nb-NO",
+  ro: "ro-RO",
+  hu: "hu-HU",
+  sk: "sk-SK",
+  bg: "bg-BG",
+};
+
 export function createSpeechRecognition(): SpeechRecognitionLike | null {
   const w = window as WindowWithSpeech;
   const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
   if (!Ctor) return null;
   const rec = new Ctor();
-  rec.lang = navigator.language || "en-US";
+  const appLang = getLang();
+  // Always follow the app's selected language (default: English). We never
+  // bind recognition to the device/browser language so SR, SV and any other
+  // language keep working regardless of the phone's locale.
+  rec.lang = SPEECH_LANG_TAGS[appLang] || appLang || "en-US";
   rec.interimResults = true;
   rec.maxAlternatives = 1;
   return rec;

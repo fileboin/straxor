@@ -271,10 +271,9 @@ export function detectLang(): Lang {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored && LANGS.some((l) => l.code === stored)) return stored as Lang;
-    const nav = (navigator.language || "en").toLowerCase().split("-")[0];
-    // English is the priority/default; match the browser only when it is a
-    // supported language, otherwise fall back to English.
-    if (LANGS.some((l) => l.code === nav)) return nav as Lang;
+    // English is always the default. We deliberately do NOT auto-detect the
+    // browser/device language — the user picks their language explicitly via
+    // the selector, so the app is never silently tied to local device settings.
     return "en";
   } catch {
     return "en";
