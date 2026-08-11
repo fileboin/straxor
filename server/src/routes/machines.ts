@@ -273,14 +273,18 @@ router.post("/", requireAuth, async (req, res) => {
       ? String(body.privateKey ?? body.private_key).trim()
       : null;
 
-    if (!projectIdRaw || !name || !normalizedHost || !normalizedUsername) {
+    if (!name || !normalizedHost || !normalizedUsername) {
       res.status(400).json({ error: "Missing required fields" });
       return;
     }
 
-    const projectId = await resolveProjectId(userId, String(projectIdRaw));
+    // VPS je globalna, nezavisna od projekta: projectId je opcion.
+    // Ako nije proslijeđen, mašina pripada korisniku za cijelu aplikaciju.
+    const projectId = projectIdRaw
+      ? await resolveProjectId(userId, String(projectIdRaw))
+      : null;
 
-    if (!projectId) {
+    if (projectIdRaw && !projectId) {
       res.status(400).json({ error: `Unknown project: ${String(projectIdRaw)}` });
       return;
     }

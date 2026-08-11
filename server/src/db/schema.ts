@@ -57,9 +57,7 @@ export const machines = pgTable("machines", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  projectId: uuid("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
   name: varchar("name", { length: 255 }).notNull(),
   host: varchar("host", { length: 255 }).notNull(),
   port: integer("port").notNull().default(22),

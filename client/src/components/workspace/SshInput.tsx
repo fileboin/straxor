@@ -3,7 +3,7 @@ import { api } from "../../lib/api.js";
 import { listMachines } from "../../lib/machines.js";
 
 interface Props {
-  projectId: string;
+  projectId?: string;
   onConnected: (machineId: string) => void;
   onCancel: () => void;
   onStatusChange?: (status: "disconnected" | "connecting" | "provisioning" | "ready" | "error") => void;
@@ -135,7 +135,7 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
         const machine = await api<{ id: string }>("/machines", {
           method: "POST",
           body: JSON.stringify({
-            projectId,
+            ...(projectId ? { projectId } : {}),
             name: machineName.trim() || `${cleanUsername}@${cleanHost}`,
             host: cleanHost,
             port: cleanPort,

@@ -97,7 +97,7 @@ function WorkspaceTopbar({
     <header className="flex items-center justify-between px-2 py-1.5 border-b border-border bg-surface h-11 shrink-0 sm:px-3 md:px-4">
       <div className="flex items-center gap-1.5 min-w-0 sm:gap-2">
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/dashboard")}
           className="flex items-center justify-center w-8 h-8 rounded-lg border border-border bg-transparent text-text-secondary hover:text-text hover:border-border-light transition-colors shrink-0"
         >
           ←

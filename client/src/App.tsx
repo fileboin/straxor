@@ -118,6 +118,14 @@ export default function App() {
               path="/"
               element={
                 <ProtectedRoute>
+                  <Workspace />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
               }

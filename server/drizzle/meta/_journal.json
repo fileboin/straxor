@@ -57,6 +57,13 @@
       "when": 1786377600000,
       "tag": "0008_agent_bus_events",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786456613032,
+      "tag": "0008_global_vps_independent",
+      "breakpoints": true
     }
   ]
 }
