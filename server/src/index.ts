@@ -235,9 +235,20 @@ if (fs.existsSync(clientDist)) {
   console.log("Client dist not found at", clientDist, "- API only mode");
 }
 
+// ── Run DB migrations before accepting requests ──
+import { runMigrations } from "./db/migrate.js";
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+runMigrations()
+  .then(() => {
+    console.log("[migrate] Startup migrations check complete.");
+  })
+  .catch((err) => {
+    console.error("[migrate] Migration check failed:", err);
+  });
 
 // ── Graceful shutdown: kill spawned local engine processes ──
 import { stopAllLocalEngines } from "./runtime/local/engine.js";
