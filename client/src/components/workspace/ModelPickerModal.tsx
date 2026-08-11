@@ -103,8 +103,12 @@ export default function ModelPickerModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-3xl mx-4 bg-surface border border-border rounded-2xl shadow-2xl shadow-black/50 overflow-hidden h-[75vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-3xl sm:mx-4 bg-surface border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/50 overflow-hidden h-[85dvh] sm:h-[75vh] flex flex-col animate-slide-up">
+        {/* Handle — mobile bottom-sheet indikator */}
+        <div className="flex justify-center pt-2 pb-0 shrink-0 sm:hidden">
+          <div className="w-10 h-1 rounded-full bg-text-muted/40" />
+        </div>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -113,8 +117,9 @@ export default function ModelPickerModal({
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 transition-colors shrink-0"
+            className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center border border-border bg-surface-2 text-text-muted hover:text-text hover:bg-surface-3 transition-colors shrink-0"
             title={t("common.close")}
+            aria-label={t("common.close")}
           >
             ✕
           </button>

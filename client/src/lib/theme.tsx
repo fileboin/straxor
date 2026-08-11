@@ -45,7 +45,9 @@ export const ACCENT_COLORS: { id: AccentColor; label: string; color: string }[] 
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    return (localStorage.getItem("straxor-theme") as Theme) || "dark";
+    const stored = localStorage.getItem("straxor-theme");
+    if (stored === "dark" || stored === "light") return stored;
+    return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   });
   const [accent, setAccentState] = useState<AccentColor>(() => {
     const stored = localStorage.getItem("straxor-accent");
@@ -68,6 +70,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       }
     };
   }, [theme]);
+
+  // Follow OS theme when the user has never manually chosen one.
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: light)");
+    const onChange = (e: MediaQueryListEvent) => {
+      const stored = localStorage.getItem("straxor-theme");
+      if (stored === "dark" || stored === "light") return; // user chose manually
+      setThemeState(e.matches ? "light" : "dark");
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-accent", accent);

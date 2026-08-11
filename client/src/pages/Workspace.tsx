@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth, isAdmin } from "../lib/auth.js";
 import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar.js";
 import { useTheme } from "../lib/theme.js";
 import ChatPanel from "../components/workspace/ChatPanel.js";
@@ -167,6 +168,7 @@ function normalizeProjectRef(value: string): string {
 
 export default function Workspace() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { id: projectIdFromUrl } = useParams<{ id: string }>();
   const routeProjectRef = projectIdFromUrl || "";
   const [projectId, setProjectId] = useState<string>(routeProjectRef);
@@ -2765,42 +2767,37 @@ export default function Workspace() {
           onOpenKnowledge={() => navigate(`/project/${projectId || routeProjectRef || "unknown"}/knowledge`)}
         />
 
-      {/* Mobile tab switcher — pill segmented control */}
-      <div className="flex items-center gap-1 px-2 py-2 bg-surface-2 rounded-[20px] mx-2 mb-1 shrink-0 md:hidden">
-        <button
-          onClick={() => {
-            setMobileTab("ask");
-            setPanelMode("split");
-          }}
-          className={`flex-1 py-2 text-[13px] font-semibold rounded-full transition-colors flex items-center justify-center gap-1.5 ${
-            mobileTab === "ask"
-              ? "bg-accent text-white"
-              : "text-text-muted hover:text-text hover:bg-surface-3"
-          }`}
-        >
-          <span className={`w-2 h-2 rounded-full ${mobileTab === "ask" ? "bg-white/80" : "bg-accent"} shrink-0`} />
-          {t("agent.panel1")}
+      {/* Global navigation — fixed, horizontalno skrolujući bar */}
+      <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 border-b border-border bg-surface-2/80 shrink-0 overflow-x-auto scrollbar-none">
+        <button onClick={() => navigate("/dashboard")} className="flex items-center gap-1.5 px-2.5 h-7 shrink-0 rounded-lg border border-border bg-transparent text-text-secondary text-[11px] font-medium hover:text-text hover:border-border-light transition-colors">
+          🏠 Dashboard
         </button>
-        <button
-          onClick={() => {
-            setMobileTab("agent");
-            setPanelMode("split");
-          }}
-          className={`flex-1 py-2 text-[13px] font-semibold rounded-full transition-colors flex items-center justify-center gap-1.5 ${
-            mobileTab === "agent"
-              ? "bg-accent text-white"
-              : "text-text-muted hover:text-text hover:bg-surface-3"
-          }`}
-        >
-          <span className={`w-2 h-2 rounded-full ${mobileTab === "agent" ? "bg-white/80" : "bg-accent"} shrink-0`} />
-          {t("agent.panel2")}
+        <button onClick={() => navigate("/connections")} className="flex items-center gap-1.5 px-2.5 h-7 shrink-0 rounded-lg border border-border bg-transparent text-text-secondary text-[11px] font-medium hover:text-text hover:border-border-light transition-colors">
+          🔌 Connect
         </button>
+        <button onClick={() => navigate("/marketplace")} className="flex items-center gap-1.5 px-2.5 h-7 shrink-0 rounded-lg border border-accent/30 bg-accent/5 text-accent text-[11px] font-medium hover:bg-accent/10 transition-colors">
+          🏪 Marketplace
+        </button>
+        <button onClick={() => setShowMultiAgent(true)} className="flex items-center gap-1.5 px-2.5 h-7 shrink-0 rounded-lg border border-border bg-transparent text-text-secondary text-[11px] font-medium hover:text-text hover:border-border-light transition-colors">
+          🤖 Multi-Agent
+        </button>
+        <button onClick={() => { setGitRemoteSlot("agent"); setShowGitRemote(true); }} className="flex items-center gap-1.5 px-2.5 h-7 shrink-0 rounded-lg border border-border bg-transparent text-text-secondary text-[11px] font-medium hover:text-text hover:border-border-light transition-colors">
+          🐙 GitHub
+        </button>
+        <button onClick={() => navigate("/help")} className="flex items-center gap-1.5 px-2.5 h-7 shrink-0 rounded-lg border border-border bg-transparent text-text-secondary text-[11px] font-medium hover:text-text hover:border-border-light transition-colors">
+          ❓ Help
+        </button>
+        {isAdmin(user) && (
+          <button onClick={() => navigate("/admin")} className="flex items-center gap-1.5 px-2.5 h-7 shrink-0 rounded-lg border border-border bg-transparent text-text-secondary text-[11px] font-medium hover:text-text hover:border-border-light transition-colors">
+            🛠 Admin
+          </button>
+        )}
       </div>
 
       {/* Panels */}
       <div
         ref={panelsRef}
-        className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3"
+        className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3 pb-[64px] md:pb-2"
       >
         {/* Layout toggle — visible on all screens; stacked stays automatic on mobile */}
         <div
@@ -3168,6 +3165,40 @@ modelOrch={agentModelOrch}
       </div>
 
       <BottomBar machineId={agentMachineId || null} />
+
+      {/* Mobile bottom navigation — single-panel switching */}
+      <div className="fixed bottom-0 inset-x-0 z-40 md:hidden border-t border-border bg-surface/95 backdrop-blur-lg">
+        <div className="grid grid-cols-2 gap-1 px-3 pt-1.5 pb-2 safe-bottom">
+          <button
+            onClick={() => {
+              setMobileTab("ask");
+              setPanelMode("split");
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl border text-[10px] font-semibold transition-colors ${
+              mobileTab === "ask"
+                ? "bg-accent/15 border-accent/40 text-accent"
+                : "border-transparent text-text-muted hover:text-text hover:bg-surface-3"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${mobileTab === "ask" ? "bg-accent" : "bg-text-muted"} shrink-0`} />
+            {t("agent.panel1")}
+          </button>
+          <button
+            onClick={() => {
+              setMobileTab("agent");
+              setPanelMode("split");
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl border text-[10px] font-semibold transition-colors ${
+              mobileTab === "agent"
+                ? "bg-accent/15 border-accent/40 text-accent"
+                : "border-transparent text-text-muted hover:text-text hover:bg-surface-3"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${mobileTab === "agent" ? "bg-accent" : "bg-text-muted"} shrink-0`} />
+            {t("agent.panel2")}
+          </button>
+        </div>
+      </div>
 
       {/* SSH Modal */}
       {showSshModal && (
