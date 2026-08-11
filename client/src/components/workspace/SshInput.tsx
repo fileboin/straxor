@@ -217,6 +217,32 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
     }
   };
 
+  async function handleDisconnect() {
+    if (!existingMachineId) { setError("Nema aktivne veze"); return; }
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/machines/${existingMachineId}/disconnect`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Disconnect failed" }));
+        throw new Error((err as any).error || "Disconnect failed");
+      }
+      // Success: clear local state and close panel
+      setExistingMachineId(null);
+      setStatus("idle");
+      setStatusMessage("");
+      onStatusChange?.("disconnected");
+      onCancel();
+    } catch (err: any) {
+      setError(err?.message ?? "Disconnect failed");
+    }
+  }
+
   // Prikaz toka (connecting / checking / ready / error)
   if (status !== "idle") {
     return (
@@ -382,16 +408,19 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
 
       {/* Dugmad */}
       <div className="flex gap-2">
-        <button type="button" onClick={handleTestSsh}
-          disabled={testLoading || !canSubmit}
-          className="flex-1 py-2 text-sm font-medium rounded-lg border border-border bg-surface-2 text-text-secondary hover:text-text transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-          {testLoading ? "Testiranje..." : "🔍 Test SSH"}
-        </button>
-        <button type="button" onClick={handleConnect}
-          disabled={!canSubmit}
-          className="flex-1 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:opacity-85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-          Poveži i pokreni
-        </button>
+        {existingMachineId ? (
+          <button type="button" onClick={handleDisconnect}
+            className="flex-1 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:opacity-85 transition-colors">
+            Prekini vezu
+          </button>
+        ) : (
+          <button type="button" onClick={handleConnect}
+            disabled={!canSubmit}
+            className="flex-1 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:opacity-85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            Poveži i pokreni
+          </button>
+        )}
+        
       </div>
     </div>
   );

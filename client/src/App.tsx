@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth, isAdmin } from "./lib/auth.js";
 import { ThemeProvider } from "./lib/theme.js";
-import { isOnboardingComplete } from "./lib/onboarding.js";
+// onboarding gating removed: onboarding is optional and not required to access agents
 import Layout from "./components/Layout.js";
 import Login from "./pages/Login.js";
 import Register from "./pages/Register.js";
@@ -25,7 +25,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (!isOnboardingComplete()) return <Navigate to="/onboarding" replace />;
+  // onboarding is not required to access the app core
   return <>{children}</>;
 }
 
@@ -41,8 +41,8 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (isOnboardingComplete()) return <Navigate to="/" replace />;
-  return <>{children}</>;
+  // onboarding is optional; redirect logged-in users to main workspace
+  return <Navigate to="/" replace />;
 }
 
 function GuestRoute({ children }: { children: React.ReactNode }) {

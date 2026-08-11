@@ -20,6 +20,7 @@ import {
 } from "../runtime/opencode-adapter/index.js";
 import type { ProvisionEvent, CoolifyInstallEvent } from "../runtime/opencode-adapter/index.js";
 import { encrypt, decrypt, isEncrypted } from "../lib/crypto.js";
+import { stopLocalEnginesForUser } from "../runtime/local/engine.js";
 
 function stripMarkdown(value: string): string {
   return value
@@ -470,6 +471,40 @@ router.post("/:id/provision", requireAuth, async (req, res) => {
     try {
       ssh?.close();
     } catch {}
+  }
+});
+
+// POST /api/machines/:id/disconnect
+router.post("/:id/disconnect", requireAuth, async (req, res) => {
+  const userId = req.user!.userId;
+  const id = req.params.id as string;
+  try {
+    const rows = await db
+      .select({ id: machines.id })
+      .from(machines)
+      .where(and(eq(machines.id, id), eq(machines.userId, userId)))
+      .limit(1);
+    if (rows.length === 0) {
+      res.status(404).json({ error: "Machine not found" });
+      return;
+    }
+
+    // Attempt to stop any local engines for this user (best-effort)
+    try {
+      await stopLocalEnginesForUser(userId);
+    } catch {
+      // ignore stop errors
+    }
+
+    await db
+      .update(machines)
+      .set({ status: "disconnected", opencodeRunning: false })
+      .where(eq(machines.id, id));
+
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
   }
 });
 
