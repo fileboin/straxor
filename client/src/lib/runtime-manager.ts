@@ -177,6 +177,80 @@ export async function checkRuntimeHealth(machineId: string, runtimeId: RuntimeId
   return api(`/runtimes/${runtimeId}/health?machineId=${machineId}`);
 }
 
+/**
+ * Result of a VPS connection verification.
+ * `vpsStatus` drives the topbar lamp. `"offline"` means the runtime is not
+ * reachable / not running; `"reconnecting"` means we are about to (or are)
+ * attempting an automatic reconnect.
+ */
+export interface VpsVerifyResult {
+  vpsStatus: "ready" | "offline" | "reconnecting" | "error";
+  health?: RuntimeHealth | null;
+}
+
+function isReachable(health: RuntimeHealth | null | undefined): boolean {
+  if (!health) return false;
+  return health.running === true;
+}
+
+/**
+ * Verify that a VPS-bound runtime is actually alive before reporting "ready".
+ *
+ * 1. Calls GET /runtimes/opencode/health.
+ * 2. If it returns running → ready.
+ * 3. If the check throws or reports not-running, it attempts an automatic
+ *    reconnect (POST /runtimes/opencode/reconnect) so the daemon is restored
+ *    without forcing the user to click connect again.
+ * 4. Returns "reconnecting" while the reconnect attempt is in flight and
+ *    "offline"/"error" if it could not be restored.
+ *
+ * `machineId` is the concrete VPS machine id (never a `local:` id).
+ */
+export async function verifyVpsConnection(
+  machineId: string,
+  opts?: { timeoutMs?: number }
+): Promise<VpsVerifyResult> {
+  const timeout = opts?.timeoutMs ?? 12_000;
+
+  let health: RuntimeHealth | null = null;
+  try {
+    health = await withTimeout(
+      checkRuntimeHealth(machineId, "opencode"),
+      timeout
+    );
+  } catch {
+    health = null;
+  }
+
+  if (isReachable(health)) {
+    return { vpsStatus: "ready", health };
+  }
+
+  // Not reachable → try an automatic reconnect before giving up.
+  try {
+    const reconnected = await withTimeout(
+      reconnectRuntime(machineId, "opencode"),
+      timeout
+    );
+    if (isReachable(reconnected)) {
+      return { vpsStatus: "ready", health: reconnected };
+    }
+    return { vpsStatus: "offline", health: reconnected };
+  } catch {
+    return { vpsStatus: "offline", health: null };
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
 export async function restartRuntime(machineId: string, runtimeId: RuntimeId): Promise<RuntimeHealth> {
   return api(`/runtimes/${runtimeId}/restart`, {
     method: "POST",

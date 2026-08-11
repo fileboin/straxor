@@ -24,6 +24,7 @@ import { listRepoConnections, type RepoConnection } from "../lib/repos.js";
 import { fetchProjects } from "../lib/projects.js";
 import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
 import { type AgentRole, getRoleById, fetchPrompts, type SavedPrompt } from "../lib/roles.js";
+import { verifyVpsConnection } from "../lib/runtime-manager.js";
 import { t, useLang } from "../lib/i18n.js";
 import { checkBeforeInstall, type ScanVerdict } from "../lib/security.js";
 import RoleSelector from "../components/workspace/RoleSelector.js";
@@ -321,7 +322,7 @@ export default function Workspace() {
   const [handshakeTestLoading, setHandshakeTestLoading] = useState(false);
   const [handshakeTestResult, setHandshakeTestResult] = useState<HandshakeSelfTestResult | null>(null);
   const [handshakeTestHistory, setHandshakeTestHistory] = useState<StoredHandshakeSelfTest[]>([]);
-  const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error">("disconnected");
+  const [vpsStatus, setVpsStatus] = useState<"disconnected" | "connecting" | "provisioning" | "ready" | "error" | "reconnecting" | "offline">("disconnected");
 
   // Permissions state
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
@@ -951,7 +952,28 @@ export default function Workspace() {
         setAgentSessionId(full.opencodeSessionId);
       }
       if (restoredAskVps || restoredAgentVps || (full.machineId && !full.machineId.startsWith("local:"))) {
-        setVpsStatus("ready");
+        // Prefer the concrete VPS machine id that was restored to a panel.
+        const restoredVpsId =
+          (restoredAgentVps ? full.agentConfig : "") ||
+          (restoredAskVps ? full.askConfig : "") ||
+          full.machineId || "";
+        let vpsMachineId = "";
+        try {
+          const cfg = JSON.parse(String(restoredVpsId));
+          vpsMachineId = String(cfg.machineId || "").replace(/^local:/, "");
+        } catch {
+          vpsMachineId = String(full.machineId || "").replace(/^local:/, "");
+        }
+        if (vpsMachineId) {
+          // Do NOT show a blind "ready" — verify the daemon is actually alive,
+          // and auto-reconnect if it silently died.
+          setVpsStatus("reconnecting");
+          void verifyVpsConnection(vpsMachineId).then((result) => {
+            setVpsStatus(result.vpsStatus === "ready" ? "ready" : "offline");
+          });
+        } else {
+          setVpsStatus("ready");
+        }
       }
 
       // Restore messages
@@ -3509,7 +3531,14 @@ modelOrch={agentModelOrch}
             setShowKanban(false);
             setDbSessionId(sessionId);
             setAgentMachineId(machineId);
-            setVpsStatus("ready");
+            if (machineId && !String(machineId).startsWith("local:")) {
+              setVpsStatus("reconnecting");
+              void verifyVpsConnection(String(machineId)).then((result) => {
+                setVpsStatus(result.vpsStatus === "ready" ? "ready" : "offline");
+              });
+            } else {
+              setVpsStatus("ready");
+            }
           }}
           runtimes={[
             { id: "opencode", name: "OpenCode" },
@@ -3552,7 +3581,23 @@ modelOrch={agentModelOrch}
               } catch {}
             }
             if ((session.machineId && !session.machineId.startsWith("local:")) || askMachineId || agentMachineId) {
-              setVpsStatus("ready");
+              // Verify the daemon is actually alive before showing "ready",
+              // and auto-reconnect if it silently died.
+              const vpsId = String(
+                (agentMachineId && !String(agentMachineId).startsWith("local:"))
+                  ? agentMachineId
+                  : (askMachineId && !String(askMachineId).startsWith("local:"))
+                    ? askMachineId
+                    : session.machineId || ""
+              );
+              if (vpsId) {
+                setVpsStatus("reconnecting");
+                void verifyVpsConnection(vpsId).then((result) => {
+                  setVpsStatus(result.vpsStatus === "ready" ? "ready" : "offline");
+                });
+              } else {
+                setVpsStatus("ready");
+              }
             }
             if (full?.messages) {
               setAgentMessages(restoreMessages(full.messages) as ChatMessage[]);

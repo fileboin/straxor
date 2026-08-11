@@ -79,12 +79,10 @@ export default function Dashboard() {
     setProjects((prev) => prev.filter((p) => p.id !== id));
   };
 
+  // Agenti su potpuno nezavisni od projekata — uvijek vodi direktno u Workspace
+  // (agenti, SSH mašine i paneli su globalni i rade bez ijednog projekta).
   const handleOpenAgents = () => {
-    if (projects[0]?.id) {
-      navigate(`/project/${projects[0].id}`);
-      return;
-    }
-    setShowCreate(true);
+    navigate("/");
   };
 
   return (

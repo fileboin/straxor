@@ -7,7 +7,7 @@ interface Props {
   projectName: string;
   template: string;
   status?: "idle" | "active";
-  vpsStatus?: "disconnected" | "connecting" | "provisioning" | "ready" | "error";
+  vpsStatus?: "disconnected" | "connecting" | "provisioning" | "ready" | "error" | "reconnecting" | "offline";
   onConnectVps?: () => void;
   onOpenEnv?: () => void;
   onOpenDeploy?: () => void;
@@ -41,6 +41,8 @@ const VPS_STATUS_LABELS: Record<string, string> = {
   provisioning: "Provisioning...",
   ready: "VPS ✓",
   error: "VPS ✕",
+  reconnecting: "Ponovno povezivanje...",
+  offline: "VPS ⚠",
 };
 
 const VPS_STATUS_ICONS: Record<string, string> = {
@@ -49,6 +51,8 @@ const VPS_STATUS_ICONS: Record<string, string> = {
   provisioning: "⏻",
   ready: "✓",
   error: "✕",
+  reconnecting: "↻",
+  offline: "⚠",
 };
 
 const VPS_STATUS_COLORS: Record<string, string> = {
@@ -57,6 +61,8 @@ const VPS_STATUS_COLORS: Record<string, string> = {
   provisioning: "border-accent/50 bg-accent-dim text-accent",
   ready: "border-green-500/50 bg-green-500/10 text-green-500",
   error: "border-red-500/50 bg-red-500/10 text-red-500",
+  reconnecting: "border-yellow-500/50 bg-yellow-500/10 text-yellow-500",
+  offline: "border-red-500/50 bg-red-500/10 text-red-500",
 };
 
 function WorkspaceTopbar({
