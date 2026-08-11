@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { db } from "../db/index.js";
-import { machines, infraConfigs, projects } from "../db/schema.js";
+import { machines, infraConfigs } from "../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import {
   connectSSH,
@@ -101,32 +101,6 @@ function isBlockedLocalHost(host: string): boolean {
   );
 }
 
-function normalizeProjectRef(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-async function resolveProjectId(userId: string, projectRef: string): Promise<string | null> {
-  const trimmed = String(projectRef || "").trim();
-  if (!trimmed) return null;
-
-  const rows = await db
-    .select({ id: projects.id, name: projects.name })
-    .from(projects)
-    .where(eq(projects.userId, userId));
-
-  const direct = rows.find((row) => row.id === trimmed);
-  if (direct) return direct.id;
-
-  const normalizedRef = normalizeProjectRef(trimmed);
-  const byName = rows.find((row) => normalizeProjectRef(row.name) === normalizedRef);
-  return byName?.id || null;
-}
 
 const router = Router();
 
@@ -261,8 +235,8 @@ router.post("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
     const body: any = req.body || {};
-    const projectIdRaw = body.projectId ?? body.project_id;
     // Direktan trim po polju — bez parsiranja SSH stringa
+    // projectId se namerno ignorise — VPS masine su globalne za korisnika, ne vezane za projekat
     const name = stripMarkdown(String(body.name ?? ""));
     const normalizedHost = stripMarkdown(String(body.host ?? ""));
     const normalizedUsername = stripMarkdown(String(body.username ?? ""));
@@ -276,17 +250,6 @@ router.post("/", requireAuth, async (req, res) => {
 
     if (!name || !normalizedHost || !normalizedUsername) {
       res.status(400).json({ error: "Missing required fields" });
-      return;
-    }
-
-    // VPS je globalna, nezavisna od projekta: projectId je opcion.
-    // Ako nije proslijeđen, mašina pripada korisniku za cijelu aplikaciju.
-    const projectId = projectIdRaw
-      ? await resolveProjectId(userId, String(projectIdRaw))
-      : null;
-
-    if (projectIdRaw && !projectId) {
-      res.status(400).json({ error: `Unknown project: ${String(projectIdRaw)}` });
       return;
     }
 
@@ -322,7 +285,7 @@ router.post("/", requireAuth, async (req, res) => {
       .insert(machines)
       .values({
         userId,
-        projectId,
+        projectId: null, // VPS masine su globalne — ne vezuju se za projekat
         name,
         host: normalizedHost,
         port: resolvedPort,

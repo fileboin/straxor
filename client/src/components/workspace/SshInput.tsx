@@ -73,15 +73,21 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
     listMachines()
       .then((machines) => {
         if (!mounted || prefilled) return;
-        const latest = [...machines]
-          .filter((m) => m.status !== "error")
-          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+        const sorted = [...machines]
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        // Preferujemo mašinu koja je već povezana/ready za Disconnect dugme
+        const connected = sorted.find((m) => m.status === "ready" || m.status === "provisioning" || m.status === "connecting");
+        const latest = connected || sorted.filter((m) => m.status !== "error")[0];
         if (!latest) return;
         setHost(latest.host || "");
         setPort(String(latest.port || 22));
         setUsername(latest.username || "root");
         setAuthType(latest.authType === "key" ? "key" : "password");
         setMachineName(latest.name || "");
+        // Ako je mašina već spojena, pokažemo Disconnect dugme odmah
+        if (connected) {
+          setExistingMachineId(connected.id);
+        }
         setPrefilled(true);
       })
       .catch(() => {});
@@ -135,7 +141,7 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
         const machine = await api<{ id: string }>("/machines", {
           method: "POST",
           body: JSON.stringify({
-            ...(projectId ? { projectId } : {}),
+            // projectId se namerno ne salje — VPS masine su globalne za korisnika
             name: machineName.trim() || `${cleanUsername}@${cleanHost}`,
             host: cleanHost,
             port: cleanPort,
