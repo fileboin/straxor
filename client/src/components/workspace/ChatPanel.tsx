@@ -820,109 +820,117 @@ function ChatPanel({
         />
       ) : (
         <>
-      {/* Header — title bar */}
-      <div className="flex items-center justify-between px-2 py-2 border-b border-border bg-surface-2 shrink-0 gap-2 sm:px-3">
-        <div className="flex items-center gap-1.5 min-w-0 sm:gap-2">
-          <div
-            className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0 ${
-              iconColor === "blue"
-                ? "bg-accent-blue-dim text-accent-blue"
-                : "bg-accent-dim text-accent"
-            }`}
-          >
-            {icon}
+      {/* Header — two clean rows: identity + primary actions, then engine/toggles */}
+      <div className="flex flex-col gap-1 px-2 py-1.5 border-b border-border bg-surface-2 shrink-0 sm:px-3">
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0 sm:gap-2">
+            <div
+              className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0 ${
+                iconColor === "blue"
+                  ? "bg-accent-blue-dim text-accent-blue"
+                  : "bg-accent-dim text-accent"
+              }`}
+            >
+              {icon}
+            </div>
+            <span className="font-semibold text-[13px] truncate">{title}</span>
+            <span
+              className={`hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
+                (badgeColor || iconColor) === "blue"
+                  ? "bg-accent-blue-dim text-accent-blue"
+                  : "bg-accent-dim text-accent"
+              }`}
+            >
+              {badge}
+            </span>
           </div>
-          <span className="font-semibold text-[13px]">{title}</span>
-          <span
-            className={`hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
-              (badgeColor || iconColor) === "blue"
-                ? "bg-accent-blue-dim text-accent-blue"
-                : "bg-accent-dim text-accent"
-            }`}
-          >
-            {badge}
-          </span>
-          {headerLeft}
-          {headerStatus}
+          <div className="flex items-center gap-1 shrink-0 sm:gap-1.5">
+            {orbState && orbLabel && (
+              <div className="flex items-center gap-2 mr-1" title={orbLabel}>
+                <ThinkingOrb state={orbState} size={64} theme="auto" aria-label={orbLabel} />
+                <span className="hidden sm:inline text-xs text-text-muted capitalize">{orbState}</span>
+              </div>
+            )}
+            {onToggleExpand && (
+              <div className="flex items-center gap-0.5">
+                <button
+                  onClick={onToggleExpand}
+                  className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
+                  title={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")}
+                >
+                  {isExpanded ? "⊟" : "⊞"}
+                </button>
+                <InfoTip text={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")} placement="bottom" />
+              </div>
+            )}
+            {panelMenuNode}
+            <button
+              onClick={() => setShowModelPicker(true)}
+              className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
+              title={t("models.pickerTitle")}
+              aria-label="Model picker"
+            >
+              ✦
+            </button>
+            <InfoTip text={t("toolbar.modelInfo")} placement="bottom" />
+          </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0 sm:gap-2">
-          {orbState && orbLabel && (
-            <div className="flex items-center gap-2 mr-1" title={orbLabel}>
-              <ThinkingOrb state={orbState} size={64} theme="auto" aria-label={orbLabel} />
-              <span className="hidden sm:inline text-xs text-text-muted capitalize">{orbState}</span>
-            </div>
-          )}
-          {runtimeControl}
-          {onBackgroundChange && (
-            <div className="hidden md:flex items-center gap-0.5">
-              <button
-                type="button"
-                onClick={() => onBackgroundChange(!background)}
-                className={`flex items-center gap-1 px-1.5 h-7 rounded-md border text-[10px] font-medium transition-colors ${
-                  background
-                    ? "border-accent/50 bg-accent/10 text-accent"
-                    : "border-border bg-transparent text-text-muted hover:text-text-secondary hover:border-border-light"
-                }`}
-                title={backgroundHint || (background ? t("chat.background.on") : t("chat.background.off"))}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${background ? "bg-accent animate-pulse" : "bg-text-muted"}`} />
-                <span className="hidden lg:inline">Bg</span>
-                <span className="lg:hidden">Bg</span>
-              </button>
-              <InfoTip text={backgroundHint || t("chat.background.hint")} placement="bottom" />
-            </div>
-          )}
-          {onModelOrchChange && (
-            <div className="hidden md:flex items-center gap-0.5">
-              <button
-                type="button"
-                onClick={() => !modelOrchDisabled && onModelOrchChange(!modelOrch)}
-                disabled={modelOrchDisabled}
-                className={`flex items-center gap-1 px-1.5 h-7 rounded-md border text-[10px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                  modelOrch
-                    ? "border-accent/50 bg-accent/10 text-accent"
-                    : "border-border bg-transparent text-text-muted hover:text-text-secondary hover:border-border-light"
-                }`}
-                title={modelOrchHint || (modelOrch ? "Model orkestracija uključena" : "Model orkestracija isključena")}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${modelOrch ? "bg-accent" : "bg-text-muted"}`} />
-                <span className="hidden lg:inline">M-Orch</span>
-                <span className="lg:hidden">M</span>
-              </button>
-              <InfoTip text={modelOrchHint || "Model orkestracija — task se automatski rutira na najbolji model prema težini"} placement="bottom" />
-            </div>
-          )}
-          {onToggleExpand && (
-            <div className="flex items-center gap-0.5">
-              <button
-                onClick={onToggleExpand}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
-                title={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")}
-              >
-                {isExpanded ? "⊟" : "⊞"}
-              </button>
-              <InfoTip text={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")} placement="bottom" />
-            </div>
-          )}
-          {panelMenuNode}
-          <button
-            onClick={() => setShowModelPicker(true)}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
-            title={t("models.pickerTitle")}
-            aria-label="Model picker"
-          >
-            ✦
-          </button>
-          <InfoTip text={t("toolbar.modelInfo")} placement="bottom" />
-          <ProviderModelDropdown
-            providerId={providerId}
-            modelId={modelId}
-            thinking={thinking}
-            onProviderChange={onProviderChange}
-            onModelChange={onModelChange}
-            onThinkingChange={onThinkingChange}
-            onApiKeyChange={onApiKeyChange}
-          />
+        <div className="flex items-center justify-between gap-2 min-w-0 flex-wrap">
+          <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+            {headerLeft}
+            {headerStatus}
+          </div>
+          <div className="flex items-center gap-1 shrink-0 flex-wrap sm:gap-2">
+            {runtimeControl}
+            {onBackgroundChange && (
+              <div className="hidden md:flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => onBackgroundChange(!background)}
+                  className={`flex items-center gap-1 px-1.5 h-7 rounded-md border text-[10px] font-medium transition-colors ${
+                    background
+                      ? "border-accent/50 bg-accent/10 text-accent"
+                      : "border-border bg-transparent text-text-muted hover:text-text-secondary hover:border-border-light"
+                  }`}
+                  title={backgroundHint || (background ? t("chat.background.on") : t("chat.background.off"))}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${background ? "bg-accent animate-pulse" : "bg-text-muted"}`} />
+                  <span className="hidden lg:inline">Bg</span>
+                  <span className="lg:hidden">Bg</span>
+                </button>
+                <InfoTip text={backgroundHint || t("chat.background.hint")} placement="bottom" />
+              </div>
+            )}
+            {onModelOrchChange && (
+              <div className="hidden md:flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => !modelOrchDisabled && onModelOrchChange(!modelOrch)}
+                  disabled={modelOrchDisabled}
+                  className={`flex items-center gap-1 px-1.5 h-7 rounded-md border text-[10px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                    modelOrch
+                      ? "border-accent/50 bg-accent/10 text-accent"
+                      : "border-border bg-transparent text-text-muted hover:text-text-secondary hover:border-border-light"
+                  }`}
+                  title={modelOrchHint || (modelOrch ? "Model orkestracija uključena" : "Model orkestracija isključena")}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${modelOrch ? "bg-accent" : "bg-text-muted"}`} />
+                  <span className="hidden lg:inline">M-Orch</span>
+                  <span className="lg:hidden">M</span>
+                </button>
+                <InfoTip text={modelOrchHint || "Model orkestracija — task se automatski rutira na najbolji model prema težini"} placement="bottom" />
+              </div>
+            )}
+            <ProviderModelDropdown
+              providerId={providerId}
+              modelId={modelId}
+              thinking={thinking}
+              onProviderChange={onProviderChange}
+              onModelChange={onModelChange}
+              onThinkingChange={onThinkingChange}
+              onApiKeyChange={onApiKeyChange}
+            />
+          </div>
         </div>
       </div>
 

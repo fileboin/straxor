@@ -413,6 +413,40 @@ body {
 }
 
 /* ═══════════════════════════════════════════════
+   DESKTOP PANEL HARDENING
+   Čist split 50/50, jasne nezavisne cjeline, bez
+   preklapanja i teksta van okvira. Clamped >= 768px.
+   ═══════════════════════════════════════════════ */
+@media (min-width: 768px) {
+  /* Svaki panel je nezavisna, oštro ograđena cjelina */
+  .panel-glass {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  }
+  [data-theme="light"] .panel-glass {
+    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.12);
+  }
+
+  /* Sprječi da sadržaj iscuri iz okvira panela */
+  .panel-glass {
+    contain: layout paint;
+  }
+}
+
+/* Globalna zaštita — nijedan element ne smije iscuriti iz okvira */
+.panel-glass > * {
+  min-width: 0;
+}
+.panel-glass button,
+.panel-glass span,
+.panel-glass div {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.panel-glass button {
+  white-space: normal;
+}
+
+/* ═══════════════════════════════════════════════
    MARKETPLACE CORE (Block 70)
    ═══════════════════════════════════════════════ */
 
