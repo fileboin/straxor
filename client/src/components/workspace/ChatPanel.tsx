@@ -514,16 +514,26 @@ function ChatPanel({
         return;
       }
       recognitionRef.current = rec;
+      // Keep any text the user already typed before tapping the mic, and track
+      // the committed (final) transcript separately. With interimResults on, the
+      // results array grows every event — re-appending everything each time
+      // duplicates/stirs text (worst for sr/sv/other langs). We only append
+      // final results once and show the current interim as a live preview.
+      const typedPrefix = input.trim();
+      let finalText = "";
       rec.onresult = (e) => {
-        let text = "";
+        let interim = "";
         const results = e.results;
-        if (results) {
-          for (let i = 0; i < results.length; i++) {
-            const r = results[i];
-            if (r && r[0]?.transcript) text += r[0].transcript;
-          }
+        if (!results) return;
+        for (let i = 0; i < results.length; i++) {
+          const r = results[i];
+          const t = r && r[0]?.transcript ? r[0].transcript : "";
+          if (t && r.isFinal) finalText += (finalText ? " " : "") + t;
+          else if (t) interim += t;
         }
-        if (text) setInput((prev) => (prev ? `${prev} ${text}` : text));
+        const joined = [typedPrefix, finalText].filter(Boolean).join(" ").trim();
+        const preview = joined + (interim ? (joined ? " " : "") + interim : "");
+        setInput(preview);
       };
       rec.onerror = (ev) => {
         if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
