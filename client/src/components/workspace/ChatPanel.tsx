@@ -538,8 +538,15 @@ function ChatPanel({
         setInput(preview);
       };
       rec.onerror = (ev) => {
-        if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
-          setMicError(t("upload.mic.error"));
+        // Always surface a visible reaction: "not-allowed"/permission issues,
+        // "audio-capture" (no mic hardware), or any other silent failure. A mic
+        // click must never appear to do nothing.
+        setMicState("idle");
+        recognitionRef.current = null;
+        setMicError(t("upload.mic.error"));
+        const err = ev.error;
+        if (err === "not-allowed" || err === "service-not-allowed" || err === "audio-capture") {
+          if (err === "audio-capture") setMicError(t("toolbar.mic.unsupported"));
         }
       };
       rec.onend = () => {
@@ -552,6 +559,7 @@ function ChatPanel({
       } catch {
         recognitionRef.current = null;
         setMicState("idle");
+        setMicError(t("upload.mic.error"));
         startMicFallback();
       }
     } else {
