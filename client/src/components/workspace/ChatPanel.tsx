@@ -86,6 +86,7 @@ interface Props {
   onSend: (message: string, attachments?: Attachment[]) => void;
   onConnectVps?: () => void;
   onOpenGitRemote?: () => void;
+  onOpenCommandPalette?: () => void;
   loading?: boolean;
   streamingMessageId?: string | null;
   onApiKeyChange?: () => void;
@@ -267,6 +268,7 @@ function ChatPanel({
   onSend,
   onConnectVps,
   onOpenGitRemote,
+  onOpenCommandPalette,
   loading,
   streamingMessageId,
   onApiKeyChange,
@@ -762,6 +764,7 @@ function ChatPanel({
       onOpenModelPicker={() => setShowModelPicker(true)}
       onOpenPromptLibrary={() => onOpenPromptLibrary?.()}
       onOpenGitRemote={() => onOpenGitRemote?.()}
+      onOpenCommandPalette={onOpenCommandPalette}
       storageKey={panelMenuKey}
       panelAccent={panelAccent}
       onPanelAccentChange={onPanelAccentChange}
@@ -969,7 +972,7 @@ function ChatPanel({
                 {msg.orchestrated.map((res) => (
                   <div
                     key={res.modelId}
-                    className="rounded-xl border border-border bg-surface/60 p-2.5"
+                    className="rounded-xl border border-border bg-surface-2 p-2.5"
                   >
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className="text-[10px] font-semibold text-text-muted truncate">
@@ -1047,7 +1050,7 @@ function ChatPanel({
 
       {/* ThinkingOrb status bar — functional indicator while the panel works */}
       {orbState && orbLabel && (
-        <div className="px-3 py-1.5 border-t border-border bg-surface/60 flex items-center gap-2 shrink-0">
+        <div className="px-3 py-1.5 border-t border-border bg-surface-2 flex items-center gap-2 shrink-0">
           <ThinkingOrb state={orbState} size={20} theme="auto" aria-label={orbLabel} />
           <span className="text-[11px] text-text-muted">{orbLabel}</span>
         </div>

@@ -112,8 +112,8 @@
 
 /* Light tema — jasni, beli paneli sa tamno-sivim tekstom */
 [data-theme="light"] .panel-glass {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(15, 23, 42, 0.1);
+  background: var(--surface);
+  border-color: rgba(15, 23, 42, 0.12);
   box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1);
 }
 [data-theme="light"] input,
@@ -242,10 +242,8 @@
 /* ── OLED "metal dark" površine — suptilna metalna tekstura za panela/inpute,
    da se elementi odvajaju od prave crne, a da ne budu ravni. ── */
 [data-accent="black"] .panel-glass {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.012) 100%),
-    #050507;
-  border-color: rgba(255, 255, 255, 0.09);
+  background: #0a0a0d;
+  border-color: rgba(255, 255, 255, 0.12);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 12px 32px rgba(0, 0, 0, 0.75);
@@ -305,15 +303,14 @@
 }
 
 /* ═══════════════════════════════════════════
-   FAZA 4 — Glassmorphism panel
-   Semi-transparentna pozadina + backdrop blur
-   + blagi gradient glow rubova u boji accenta.
+   FAZA 4 — Panel surface
+   Čvrsta, neprozirna pozadina + blagi gradient glow rubova
+   u boji accenta. Bez prozirnosti i backdrop blura — tekst i
+   ikonice se uvek jasno vide bez preklapanja (bilo koja tema).
    ═══════════════════════════════════════════ */
 .panel-glass {
-  background: var(--panel-bg, rgba(10, 14, 26, 0.55));
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--panel-bg, var(--surface));
+  border: 1px solid var(--border);
   position: relative;
   overflow: hidden;
 }
@@ -336,8 +333,8 @@
 
 /* Light tema — glass panel */
 [data-theme="light"] .panel-glass {
-  background: var(--panel-bg-light, rgba(255, 255, 255, 0.6));
-  border-color: rgba(0, 0, 0, 0.06);
+  background: var(--panel-bg-light, var(--surface));
+  border-color: rgba(0, 0, 0, 0.08);
 }
 [data-theme="light"] .panel-glass::before {
   opacity: 0.06;

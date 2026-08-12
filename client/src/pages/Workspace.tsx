@@ -2710,7 +2710,7 @@ export default function Workspace() {
   return (
     <div className="h-full flex flex-col relative">
       {!stateReady && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-bg/80">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-bg">
           <div className="flex flex-col items-center gap-3">
             <div className="w-8 h-8 border-2 border-border-light border-t-accent rounded-full animate-spin" />
             <span className="text-[13px] text-text-muted">Učitavam radni prostor…</span>
@@ -2749,7 +2749,7 @@ export default function Workspace() {
         />
 
       {/* Global navigation — fixed, horizontalno skrolujući bar */}
-      <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 border-b border-border bg-surface-2/80 shrink-0 overflow-x-auto scrollbar-none">
+      <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 border-b border-border bg-surface-2 shrink-0 overflow-x-auto scrollbar-none">
         <button onClick={() => navigate("/dashboard")} className="flex items-center gap-1.5 px-2.5 h-7 shrink-0 rounded-lg border border-border bg-transparent text-text-secondary text-[11px] font-medium hover:text-text hover:border-border-light transition-colors">
           🏠 Dashboard
         </button>
@@ -2936,6 +2936,7 @@ export default function Workspace() {
             isExpanded={panelMode === "ask-full"}
             onToggleExpand={toggleAskExpand}
             onOpenPromptLibrary={() => setShowPromptLibrary(true)}
+            onOpenCommandPalette={() => setShowCommandPalette(true)}
             headerStatus={(() => {
               const pending = agentBusEvents.find((e) => e.to === "ask" && e.status === "review_pending");
               const warning = agentBusEvents.find((e) => e.to === "ask" && e.status === "warning_received");
@@ -3086,6 +3087,7 @@ export default function Workspace() {
             isExpanded={panelMode === "agent-full"}
             onToggleExpand={toggleAgentExpand}
             onOpenPromptLibrary={() => setShowPromptLibrary(true)}
+            onOpenCommandPalette={() => setShowCommandPalette(true)}
             headerStatus={(() => {
               const pending = agentBusEvents.find((e) => e.to === "agent" && e.status === "review_pending");
               const warning = agentBusEvents.find((e) => e.to === "agent" && e.status === "warning_received");
@@ -3176,7 +3178,7 @@ modelOrch={agentModelOrch}
       <BottomBar machineId={agentMachineId || null} />
 
       {/* Mobile bottom navigation — single-panel switching */}
-      <div className="fixed bottom-0 inset-x-0 z-40 md:hidden border-t border-border bg-surface/95 backdrop-blur-lg">
+      <div className="fixed bottom-0 inset-x-0 z-40 md:hidden border-t border-border bg-surface">
         <div className="grid grid-cols-2 gap-1 px-3 pt-1.5 pb-2 safe-bottom">
           <button
             onClick={() => {
@@ -3704,18 +3706,6 @@ modelOrch={agentModelOrch}
         open={showCommandPalette}
         onClose={() => setShowCommandPalette(false)}
       />
-
-      {/* Command Palette trigger hint */}
-      {!showCommandPalette && (
-        <button
-          onClick={() => setShowCommandPalette(true)}
-          className="fixed bottom-4 right-4 z-40 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-surface/80 backdrop-blur-sm text-[10px] text-text-muted hover:text-text-secondary hover:border-border-light transition-colors shadow-lg shadow-black/20 hidden md:flex"
-          title="Command Palette (Ctrl+K)"
-        >
-          <kbd className="text-[9px] bg-surface-2 border border-border px-1 py-0.5 rounded font-mono">⌘K</kbd>
-          <span>Komande</span>
-        </button>
-      )}
     </div>
   );
 }

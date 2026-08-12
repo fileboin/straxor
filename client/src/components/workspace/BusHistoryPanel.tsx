@@ -60,8 +60,8 @@ export default function BusHistoryPanel({ open, events, onClose }: Props) {
             <div className="text-center py-10 text-text-muted text-sm">Nema bus događaja za prikaz.</div>
           ) : (
             grouped.map((group) => (
-              <div key={group.chainId} className="rounded-2xl border border-border bg-surface-2/40 overflow-hidden">
-                <div className="px-4 py-3 border-b border-border bg-surface/60 flex items-center justify-between">
+              <div key={group.chainId} className="rounded-2xl border border-border bg-surface-2 overflow-hidden">
+                <div className="px-4 py-3 border-b border-border bg-surface flex items-center justify-between">
                   <div>
                     <div className="text-[12px] font-semibold text-text">Chain {group.chainId}</div>
                     <div className="text-[10px] text-text-muted">{group.events.length} događaja</div>

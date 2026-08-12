@@ -23,6 +23,7 @@ interface Props {
   onOpenModelPicker: () => void;
   onOpenPromptLibrary: () => void;
   onOpenGitRemote: () => void;
+  onOpenCommandPalette?: () => void;
   storageKey: string;
   panelAccent?: string;
   onPanelAccentChange?: (color: string) => void;
@@ -43,6 +44,7 @@ export default function PanelMenu({
   onOpenModelPicker,
   onOpenPromptLibrary,
   onOpenGitRemote,
+  onOpenCommandPalette,
   storageKey,
   panelAccent,
   onPanelAccentChange,
@@ -281,6 +283,23 @@ export default function PanelMenu({
               </button>
             </div>
           </div>
+
+          <div className="border-t border-border" />
+
+          {/* Komande (Command Palette) */}
+          {onOpenCommandPalette && (
+            <div className="px-1.5">
+              <button
+                type="button"
+                onClick={() => { setOpen(false); onOpenCommandPalette(); }}
+                className="w-full flex items-center gap-2 px-2 py-2 rounded-lg border border-border bg-surface-2 text-[12px] text-text hover:border-border-light hover:text-text transition-colors"
+              >
+                <span className="text-[13px] w-5 text-center shrink-0">⌘</span>
+                <span className="flex-1 min-w-0 text-left">{t("panelMenu.commands")}</span>
+                <span className="text-[10px] text-text-muted shrink-0">Ctrl+K</span>
+              </button>
+            </div>
+          )}
 
           <div className="border-t border-border" />
 
