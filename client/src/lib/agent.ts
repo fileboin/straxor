@@ -34,12 +34,39 @@ export async function streamAgentMessage(
 ): Promise<void> {
   try {
     const token = localStorage.getItem("token");
+    const IDLE_MS = 60_000;
+    const TOTAL_MS = 900_000;
+    const controller = new AbortController();
+    let watchdog = window.setTimeout(() => controller.abort(), IDLE_MS);
+    const totalTimer = window.setTimeout(() => controller.abort(), TOTAL_MS);
+    const poke = () => {
+      window.clearTimeout(watchdog);
+      watchdog = window.setTimeout(() => controller.abort(), IDLE_MS);
+    };
+    poke();
+    let finished = false;
+    const finishError = (message: string) => {
+      if (finished) return;
+      finished = true;
+      window.clearTimeout(watchdog);
+      window.clearTimeout(totalTimer);
+      callbacks.onError(message);
+    };
+    const finishDone = () => {
+      if (finished) return;
+      finished = true;
+      window.clearTimeout(watchdog);
+      window.clearTimeout(totalTimer);
+      callbacks.onDone();
+    };
+
     const response = await fetch("/api/agent/send", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
       },
+      signal: controller.signal,
       body: JSON.stringify({
         machineId,
         message,
@@ -51,13 +78,13 @@ export async function streamAgentMessage(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: "Request failed" }));
-      callbacks.onError(errorData.error || `HTTP ${response.status}`);
+      finishError(errorData.error || `HTTP ${response.status}`);
       return;
     }
 
     const reader = response.body?.getReader();
     if (!reader) {
-      callbacks.onError("No response stream");
+      finishError("No response stream");
       return;
     }
 
@@ -66,6 +93,7 @@ export async function streamAgentMessage(
 
     while (true) {
       const { done, value } = await reader.read();
+      poke();
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
@@ -78,7 +106,7 @@ export async function streamAgentMessage(
 
         const data = trimmed.slice(6);
         if (data === "[DONE]") {
-          callbacks.onDone();
+          finishDone();
           return;
         }
 
@@ -99,20 +127,21 @@ export async function streamAgentMessage(
               callbacks.onToolResult(event.id, event.result || "", event.status);
               break;
             case "done":
-              callbacks.onDone();
+              finishDone();
               return;
             case "error":
-              callbacks.onError(event.message);
+              finishError(event.message);
               return;
           }
         } catch {}
       }
     }
 
-    callbacks.onDone();
+    finishDone();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Network error";
-    callbacks.onError(message);
+    const isAbort = error instanceof DOMException && error.name === "AbortError";
+    callbacks.onError(isAbort ? "Odgovor je prekoračio vremensko ograničenje. Pokušajte ponovo ili ukratite upit." : message);
   }
 }
 

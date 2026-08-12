@@ -1932,7 +1932,20 @@ export default function Workspace() {
       const poll = async (jobId: string, sessionId: string) => {
         let attempts = 0;
         const timer = window.setInterval(async () => {
-          if (attempts++ > 2400) { window.clearInterval(timer); setAgentStreamingId(null); setAgentLoading(false); return; }
+          // ~3 minutes (120 x 1.5s) hard cap; a longer silent job is a hang.
+          if (attempts++ > 120) {
+            window.clearInterval(timer);
+            setAgentMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantMsg.id
+                  ? { ...m, content: m.content + `\n\n[Greška: Zadatak je prekoračio vremensko ograničenje.]` }
+                  : m
+              )
+            );
+            setAgentStreamingId(null);
+            setAgentLoading(false);
+            return;
+          }
           try {
             const st = await fetchBackgroundStatus(jobId);
             if (st.timeline.length !== statusRef.timeline.length) {

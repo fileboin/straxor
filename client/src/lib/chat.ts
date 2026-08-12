@@ -62,12 +62,42 @@ export async function streamChat(
 
   try {
     const token = localStorage.getItem("token");
+    // Watchdog: if no data arrives within IDLE_MS the connection is considered
+    // hung and is aborted so the UI can surface an error instead of spinning.
+    // TOTAL_MS is a hard cap against an endless provider loop.
+    const IDLE_MS = 45_000;
+    const TOTAL_MS = 600_000;
+    const controller = new AbortController();
+    let watchdog = window.setTimeout(() => controller.abort(), IDLE_MS);
+    const totalTimer = window.setTimeout(() => controller.abort(), TOTAL_MS);
+    const poke = () => {
+      window.clearTimeout(watchdog);
+      watchdog = window.setTimeout(() => controller.abort(), IDLE_MS);
+    };
+    poke();
+    let finished = false;
+    const finishError = (message: string) => {
+      if (finished) return;
+      finished = true;
+      window.clearTimeout(watchdog);
+      window.clearTimeout(totalTimer);
+      callbacks.onError(message);
+    };
+    const finishDone = () => {
+      if (finished) return;
+      finished = true;
+      window.clearTimeout(watchdog);
+      window.clearTimeout(totalTimer);
+      callbacks.onDone();
+    };
+
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
       },
+      signal: controller.signal,
       body: JSON.stringify({
         providerId,
         modelId,
@@ -80,13 +110,13 @@ export async function streamChat(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: "Request failed" }));
-      callbacks.onError(errorData.error || `HTTP ${response.status}`);
+      finishError(errorData.error || `HTTP ${response.status}`);
       return;
     }
 
     const reader = response.body?.getReader();
     if (!reader) {
-      callbacks.onError("No response stream");
+      finishError("No response stream");
       return;
     }
 
@@ -95,6 +125,7 @@ export async function streamChat(
 
     while (true) {
       const { done, value } = await reader.read();
+      poke();
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
@@ -107,14 +138,14 @@ export async function streamChat(
 
         const data = trimmed.slice(6);
         if (data === "[DONE]") {
-          callbacks.onDone();
+          finishDone();
           return;
         }
 
         try {
           const parsed = JSON.parse(data);
           if (parsed.error) {
-            callbacks.onError(parsed.error);
+            finishError(parsed.error);
             return;
           }
           if (parsed.token) {
@@ -124,9 +155,10 @@ export async function streamChat(
       }
     }
 
-    callbacks.onDone();
+    finishDone();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Network error";
-    callbacks.onError(message);
+    const isAbort = error instanceof DOMException && error.name === "AbortError";
+    callbacks.onError(isAbort ? "Odgovor je prekoračio vremensko ograničenje. Pokušajte ponovo ili ukratite upit." : message);
   }
 }

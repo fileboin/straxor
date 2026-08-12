@@ -293,13 +293,17 @@ export function createHttpAIProviderAdapter(): AIProviderAdapter {
         `[ai-provider] provider=${providerId} model=${modelId} messages=${messages.length} imageBlocks=${imageCount}`
       );
 
+      const controller = new AbortController();
+      const totalTimeout = setTimeout(() => controller.abort(), 600_000); // 10 min hard cap
       const response = await fetch(baseUrl, {
         method: "POST",
         headers,
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
+        clearTimeout(totalTimeout);
         let errorMessage = `${providerId} error (${response.status})`;
         try {
           const errorText = await response.text();
@@ -338,9 +342,17 @@ export function createHttpAIProviderAdapter(): AIProviderAdapter {
 
       const decoder = new TextDecoder();
       let buffer = "";
+      let idleTimer: ReturnType<typeof setTimeout> | null = null;
+      const poke = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        // Abort if the upstream goes silent for 90s (no tokens, no keepalive).
+        idleTimer = setTimeout(() => controller.abort(), 90_000);
+      };
+      poke();
 
       while (true) {
-        const { done, value } = await reader.read();
+        const { done, value } = await reader.read().catch(() => ({ done: true, value: undefined }));
+        poke();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
@@ -387,6 +399,9 @@ export function createHttpAIProviderAdapter(): AIProviderAdapter {
           }
         }
       }
+
+      if (idleTimer) clearTimeout(idleTimer);
+      clearTimeout(totalTimeout);
     },
   };
 }
