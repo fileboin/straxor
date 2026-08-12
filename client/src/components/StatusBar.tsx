@@ -54,22 +54,24 @@ export default function StatusBar() {
   }, []);
 
   return (
-    <div className="flex items-center gap-0 border-b border-border bg-surface overflow-x-auto shrink-0">
-      {health.map((item, i) => (
-        <div
-          key={item.id}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] whitespace-nowrap ${
-            i < health.length - 1 ? "border-r border-border" : ""
-          }`}
-        >
-          <StatusDot status={item.status} />
-          <span className="text-text-muted">{item.label}</span>
-          {item.detail && (
-            <span className="text-text-muted opacity-60">{item.detail}</span>
-          )}
-        </div>
-      ))}
-      <div className="relative ml-auto shrink-0 px-2">
+    <div className="flex items-stretch border-b border-border bg-surface shrink-0">
+      <div className="flex items-center gap-0 overflow-x-auto min-w-0">
+        {health.map((item, i) => (
+          <div
+            key={item.id}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] whitespace-nowrap ${
+              i < health.length - 1 ? "border-r border-border" : ""
+            }`}
+          >
+            <StatusDot status={item.status} />
+            <span className="text-text-muted">{item.label}</span>
+            {item.detail && (
+              <span className="text-text-muted opacity-60">{item.detail}</span>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="relative ml-auto shrink-0 px-2 flex items-center border-l border-border">
         <button
           onClick={() => setLangOpen((o) => !o)}
           className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-text-muted hover:text-text rounded-md hover:bg-surface-2 transition-colors"
