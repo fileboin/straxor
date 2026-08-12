@@ -120,7 +120,7 @@ export default function HomeMenu({ onOpenHowItWorks, onOpenSettings, onOpenExpor
               <span className="ml-auto text-[10px] text-text-muted">{showEditors ? "▾" : "▸"}</span>
             </button>
             {showEditors && (
-              <div className="bg-surface-2/50 border-t border-border/50">
+              <div className="bg-surface-2 border-t border-border/50">
                 {EDITORS.map((ed) => (
                   <button
                     key={ed.id}

@@ -17,7 +17,7 @@ export default function ThinkingOrbStatus({ state, label }: ThinkingOrbStatusPro
   const text = label || orbLabelFor(state);
   return (
     <div
-      className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border bg-surface/70 max-w-[85%] self-start"
+      className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border bg-surface-2 max-w-[85%] self-start"
       role="status"
       aria-live="polite"
     >

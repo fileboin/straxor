@@ -858,10 +858,15 @@ function ChatPanel({
               <div className="flex items-center gap-0.5">
                 <button
                   onClick={onToggleExpand}
-                  className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-[13px] font-semibold border transition-colors shrink-0 ${
+                    isExpanded
+                      ? "border-accent/50 bg-accent/15 text-accent"
+                      : "border-border bg-surface-3 text-text-secondary hover:text-text hover:border-border-light"
+                  }`}
                   title={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")}
+                  aria-label={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")}
                 >
-                  {isExpanded ? "⊟" : "⊞"}
+                  {isExpanded ? "⤢" : "⛶"}
                 </button>
                 <InfoTip text={isExpanded ? t("panel.expand.exit") : t("panel.expand.enter")} placement="bottom" />
               </div>
