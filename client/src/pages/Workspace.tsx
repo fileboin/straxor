@@ -29,6 +29,7 @@ import { verifyVpsConnection } from "../lib/runtime-manager.js";
 import { t, useLang } from "../lib/i18n.js";
 import { checkBeforeInstall, type ScanVerdict } from "../lib/security.js";
 import RoleSelector from "../components/workspace/RoleSelector.js";
+import ChatAgentToggle from "../components/workspace/ChatAgentToggle.js";
 import PromptLibrary from "../components/workspace/PromptLibrary.js";
 import SecurityScanResult from "../components/workspace/SecurityScanResult.js";
 import ExportPanel from "../components/workspace/ExportPanel.js";
@@ -2953,14 +2954,12 @@ export default function Workspace() {
             headerLeft={
               <div className="flex items-center gap-2">
                 <RoleSelector role={askRole} onChange={setAskRole} />
-                <button
-                  type="button"
-                  onClick={() => setAskPanelMode((prev) => (prev === "agent" ? "chat" : "agent"))}
-                  className={`px-2 h-7 rounded-md border text-[10px] font-medium transition-colors ${askPanelMode === "agent" ? "border-accent/50 bg-accent/10 text-accent" : "border-border bg-transparent text-text-muted hover:text-text hover:border-border-light"}`}
-                  title={askPanelMode === "agent" ? t("chat.ask.agentMode") : t("chat.ask.chatMode")}
-                >
-                  {askPanelMode === "agent" ? "OpenCode" : "Chat"}
-                </button>
+                <ChatAgentToggle
+                  mode={askPanelMode}
+                  onChange={setAskPanelMode}
+                  side="left"
+                  noEngine={!askMachineId || (!!askMachineId?.startsWith("local:") && !isLocalHost)}
+                />
                 <button
                   type="button"
                   onClick={() => setShowBusHistory(true)}
@@ -3104,14 +3103,12 @@ export default function Workspace() {
             headerLeft={
               <div className="flex items-center gap-2">
                 <RoleSelector role={agentRole} onChange={setAgentRole} />
-                <button
-                  type="button"
-                  onClick={() => setAgentPanelMode((prev) => (prev === "agent" ? "chat" : "agent"))}
-                  className={`px-2 h-7 rounded-md border text-[10px] font-medium transition-colors ${agentPanelMode === "agent" ? "border-accent/50 bg-accent/10 text-accent" : "border-border bg-transparent text-text-muted hover:text-text hover:border-border-light"}`}
-                  title={agentPanelMode === "agent" ? t("chat.agent.agentMode") : t("chat.agent.chatMode")}
-                >
-                  {agentPanelMode === "agent" ? "OpenCode" : "Chat"}
-                </button>
+                <ChatAgentToggle
+                  mode={agentPanelMode}
+                  onChange={setAgentPanelMode}
+                  side="right"
+                  noEngine={!agentMachineId || (!!agentMachineId?.startsWith("local:") && !isLocalHost)}
+                />
                 <button
                   type="button"
                   onClick={() => setShowBusHistory(true)}
