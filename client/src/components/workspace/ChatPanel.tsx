@@ -6,6 +6,7 @@ import ModelPickerModal from "./ModelPickerModal.js";
 import InputToolbar from "./InputToolbar.js";
 import InfoTip from "./InfoTip.js";
 import WelcomeHero from "./WelcomeHero.js";
+import { FormattedContent } from "./FormattedContent.js";
 import PanelMenu from "./PanelMenu.js";
 import ThinkingOrbStatus from "./ThinkingOrbStatus.js";
 import InlineApiKeyForm from "./InlineApiKeyForm.js";
@@ -90,6 +91,7 @@ interface Props {
   loading?: boolean;
   streamingMessageId?: string | null;
   onApiKeyChange?: () => void;
+  onStop?: () => void;
   headerContent?: React.ReactNode;
   headerLeft?: React.ReactNode;
   headerStatus?: React.ReactNode;
@@ -272,6 +274,7 @@ function ChatPanel({
   loading,
   streamingMessageId,
   onApiKeyChange,
+  onStop,
   headerContent,
   headerLeft,
   headerStatus,
@@ -311,8 +314,7 @@ function ChatPanel({
   orbState = null,
   orbLabel,
   onFocusChange,
-}: Props) {
-  const [input, setInput] = useState(draftInput || "");
+}: Props) {  const [input, setInput] = useState(draftInput || "");
   useLang();
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
@@ -976,8 +978,10 @@ function ChatPanel({
                 {msg.label}
               </div>
             )}
-            <div className="whitespace-pre-wrap break-words">
-              {msg.content}
+            <div>
+              {msg.content ? (
+                <FormattedContent content={msg.content} />
+              ) : null}
               {streamingMessageId === msg.id && !msg.toolCalls?.length && (
                 <span className="inline-block w-2 h-4 ml-0.5 bg-accent animate-pulse" />
               )}
@@ -1107,15 +1111,27 @@ function ChatPanel({
             disabled={loading && !isSteerable}
             className="flex-1 bg-transparent text-text text-[13px] placeholder-text-muted outline-none border-none disabled:opacity-50"
           />
-          <button
-            type="submit"
-            disabled={(loading && !isSteerable) || (!input.trim() && pendingAttachments.length === 0)}
-            className={`w-[30px] h-[30px] rounded-full border-none text-white text-sm flex items-center justify-center transition-opacity shrink-0 disabled:opacity-30 ${
-              isSteerable ? "bg-accent" : iconColor === "blue" ? "bg-accent-blue" : "bg-accent"
-            } hover:opacity-85`}
-          >
-            {isSteerable ? "\u2191" : "\u2191"}
-          </button>
+          {loading && onStop ? (
+            <button
+              type="button"
+              onClick={onStop}
+              title={t("chat.stop")}
+              aria-label={t("chat.stop")}
+              className="w-[30px] h-[30px] rounded-full border-none bg-red-500 text-white text-sm font-bold flex items-center justify-center transition-opacity shrink-0 hover:opacity-85"
+            >
+              ■
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={(loading && !isSteerable) || (!input.trim() && pendingAttachments.length === 0)}
+              className={`w-[30px] h-[30px] rounded-full border-none text-white text-sm flex items-center justify-center transition-opacity shrink-0 disabled:opacity-30 ${
+                isSteerable ? "bg-accent" : iconColor === "blue" ? "bg-accent-blue" : "bg-accent"
+              } hover:opacity-85`}
+            >
+              {isSteerable ? "\u2191" : "\u2191"}
+            </button>
+          )}
         </form>
 
         {/* Hidden file pickers */}

@@ -51,7 +51,8 @@ export async function streamChat(
   messages: ChatMessage[],
   thinking: string,
   callbacks: StreamCallbacks,
-  attachments?: Attachment[]
+  attachments?: Attachment[],
+  externalSignal?: AbortSignal
 ): Promise<void> {
   // First check if we have an API key for this provider
   const key = await getApiKey(providerId);
@@ -68,6 +69,16 @@ export async function streamChat(
     const IDLE_MS = 45_000;
     const TOTAL_MS = 600_000;
     const controller = new AbortController();
+    // Surface the user's Stop/Abort as a request abort too.
+    let userAbort = false;
+    const onExtAbort = () => {
+      userAbort = true;
+      controller.abort();
+    };
+    if (externalSignal) {
+      if (externalSignal.aborted) onExtAbort();
+      else externalSignal.addEventListener("abort", onExtAbort, { once: true });
+    }
     let watchdog = window.setTimeout(() => controller.abort(), IDLE_MS);
     const totalTimer = window.setTimeout(() => controller.abort(), TOTAL_MS);
     const poke = () => {
@@ -76,18 +87,21 @@ export async function streamChat(
     };
     poke();
     let finished = false;
+    const cleanup = () => {
+      window.clearTimeout(watchdog);
+      window.clearTimeout(totalTimer);
+      externalSignal?.removeEventListener("abort", onExtAbort);
+    };
     const finishError = (message: string) => {
       if (finished) return;
       finished = true;
-      window.clearTimeout(watchdog);
-      window.clearTimeout(totalTimer);
+      cleanup();
       callbacks.onError(message);
     };
     const finishDone = () => {
       if (finished) return;
       finished = true;
-      window.clearTimeout(watchdog);
-      window.clearTimeout(totalTimer);
+      cleanup();
       callbacks.onDone();
     };
 
@@ -159,6 +173,11 @@ export async function streamChat(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Network error";
     const isAbort = error instanceof DOMException && error.name === "AbortError";
+    // A user-initiated Stop is a graceful cancel, not an error.
+    if (isAbort && userAbort) {
+      finishDone();
+      return;
+    }
     callbacks.onError(isAbort ? "Odgovor je prekoračio vremensko ograničenje. Pokušajte ponovo ili ukratite upit." : message);
   }
 }

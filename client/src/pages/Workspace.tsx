@@ -362,6 +362,14 @@ export default function Workspace() {
     try { return localStorage.getItem("straxor.machine.ask"); } catch { return null; }
   });
   const askDirectFallbackRef = useRef(false);
+  const askAbortRef = useRef<AbortController | null>(null);
+  const agentAbortRef = useRef<AbortController | null>(null);
+  const askStop = useCallback(() => {
+    askAbortRef.current?.abort();
+  }, []);
+  const agentStop = useCallback(() => {
+    agentAbortRef.current?.abort();
+  }, []);
 
   // Active repo connection — when set and no VPS machine is configured, the
   // agent runs on the LOCAL engine inside the cloned repo (no VPS needed).
@@ -1474,6 +1482,7 @@ export default function Workspace() {
     setAskStreamingId(assistantMsg.id);
     setAskLoading(true);
     setAskPrefill("");
+    askAbortRef.current = new AbortController();
 
     // Ask is a full independent agent on its own local engine/slot. When a
     // machine is configured (e.g. active repo for the ask slot → local engine),
@@ -1545,6 +1554,7 @@ export default function Workspace() {
           setAskStreamingId(null);
           setAskLoading(false);
         },
+        signal: askAbortRef.current?.signal,
       }).catch((error) => {
         const message = error instanceof Error ? error.message : "Network error";
         setAskMessages((prev) =>
@@ -1689,6 +1699,7 @@ export default function Workspace() {
       onDone: () => {
         setAskStreamingId(null);
         setAskLoading(false);
+        askAbortRef.current = null;
       },
       onError: (error) => {
         setAskMessages((prev) =>
@@ -1700,8 +1711,9 @@ export default function Workspace() {
         );
         setAskStreamingId(null);
         setAskLoading(false);
+        askAbortRef.current = null;
       },
-    }, attachments);
+    }, attachments, askAbortRef.current?.signal);
   }, [askProvider, askModel, askThinking, askRole, askMessages, askModelOrch, askOrchestratedModels, availableModels, askMachineId, askSessionId, askBackground, agentProvider, agentModel, agentThinking, agentRole, permissions, activePromptIds, savedPrompts, projectId, dbSessionId, proceedToolAllow]);
 
   const handleAgentSend = useCallback(async (msg: string, attachments?: Attachment[]) => {
@@ -1726,6 +1738,7 @@ export default function Workspace() {
     setAgentStreamingId(assistantMsg.id);
     setAgentLoading(true);
     setAgentPrefill("");
+    agentAbortRef.current = new AbortController();
 
     // On a remote host (Render / phone) there is no local opencode runtime, so
     // the Agent panel must run as plain AI chat (exactly like the Ask panel).
@@ -2104,6 +2117,7 @@ export default function Workspace() {
       onDone: () => {
         setAgentStreamingId(null);
         setAgentLoading(false);
+        agentAbortRef.current = null;
         // Refresh todos after agent finishes
         setTimeout(() => refreshTodos(), 300);
 
@@ -2156,8 +2170,9 @@ export default function Workspace() {
         );
         setAgentStreamingId(null);
         setAgentLoading(false);
+        agentAbortRef.current = null;
       },
-    }, attachments);
+    }, attachments, agentAbortRef.current?.signal);
   }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch, agentOrchestratedModels, availableModels, agentBackground, agentPanelMode, transferByBus]);
 
   useEffect(() => {
@@ -2984,6 +2999,7 @@ export default function Workspace() {
               </div>
             }
             modelOrch={askModelOrch}
+            onStop={askStop}
             onModelOrchChange={setAskModelOrch}
             modelOrchHint="Model orkestracija — task se automatski rutira na najbolji model prema težini"
             isSteerable={askPanelMode === "chat" && isAgentSteerable}
@@ -3145,7 +3161,8 @@ export default function Workspace() {
                 onOpenRuntimeManager={() => { setRuntimeManagerPanel("agent"); setShowRuntimeManager(true); }}
               />
             }
-modelOrch={agentModelOrch}
+            modelOrch={agentModelOrch}
+            onStop={agentStop}
              onModelOrchChange={setAgentModelOrch}
              modelOrchHint="Model orkestracija — task se automatski rutira na najbolji model prema težini (kad agent radi kao običan chat)"
              panelAccent={agentPanelAccent || undefined}

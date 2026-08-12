@@ -37,6 +37,7 @@ export interface AgentTurnCtx {
   checkBeforeInstall: (name: string, version: string, ecosystem: string, machineId?: string) => Promise<unknown>;
   onRefreshTodos?: () => void;
   onErrorFallback?: (error: string) => void;
+  signal?: AbortSignal;
 }
 
 function buildSystemContext(role: AgentRole, prompts: { id: string; name: string; content: string }[], activeIds: Set<string>): string {
@@ -236,5 +237,5 @@ export async function runAgentTurn(msg: string, attachments: Attachment[] | unde
       ctx.setStreamingId(null);
       ctx.setLoading(false);
     },
-  }, attachments, system);
+  }, attachments, system, ctx.signal);
 }

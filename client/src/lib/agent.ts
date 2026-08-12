@@ -30,13 +30,23 @@ export async function streamAgentMessage(
   sessionId: string | null,
   callbacks: AgentStreamCallbacks,
   attachments?: Attachment[],
-  system?: string
+  system?: string,
+  externalSignal?: AbortSignal
 ): Promise<void> {
   try {
     const token = localStorage.getItem("token");
     const IDLE_MS = 60_000;
     const TOTAL_MS = 900_000;
     const controller = new AbortController();
+    let userAbort = false;
+    const onExtAbort = () => {
+      userAbort = true;
+      controller.abort();
+    };
+    if (externalSignal) {
+      if (externalSignal.aborted) onExtAbort();
+      else externalSignal.addEventListener("abort", onExtAbort, { once: true });
+    }
     let watchdog = window.setTimeout(() => controller.abort(), IDLE_MS);
     const totalTimer = window.setTimeout(() => controller.abort(), TOTAL_MS);
     const poke = () => {
@@ -45,18 +55,21 @@ export async function streamAgentMessage(
     };
     poke();
     let finished = false;
+    const cleanup = () => {
+      window.clearTimeout(watchdog);
+      window.clearTimeout(totalTimer);
+      externalSignal?.removeEventListener("abort", onExtAbort);
+    };
     const finishError = (message: string) => {
       if (finished) return;
       finished = true;
-      window.clearTimeout(watchdog);
-      window.clearTimeout(totalTimer);
+      cleanup();
       callbacks.onError(message);
     };
     const finishDone = () => {
       if (finished) return;
       finished = true;
-      window.clearTimeout(watchdog);
-      window.clearTimeout(totalTimer);
+      cleanup();
       callbacks.onDone();
     };
 
@@ -141,6 +154,10 @@ export async function streamAgentMessage(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Network error";
     const isAbort = error instanceof DOMException && error.name === "AbortError";
+    if (isAbort && userAbort) {
+      finishDone();
+      return;
+    }
     callbacks.onError(isAbort ? "Odgovor je prekoračio vremensko ograničenje. Pokušajte ponovo ili ukratite upit." : message);
   }
 }
