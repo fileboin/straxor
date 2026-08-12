@@ -2272,12 +2272,11 @@ export default function Workspace() {
     setAgentMachineId(machineId);
     setAskSessionId(null);
     setAgentSessionId(null);
-    // No blind "ready": handshake the VPS daemon. If it's not actually alive,
-    // verifyVpsConnection auto-reconnects and reports the true status.
-    setVpsStatus("reconnecting");
-    void verifyVpsConnection(machineId).then((result) => {
-      setVpsStatus(result.vpsStatus === "ready" ? "ready" : "offline");
-    });
+    // Restore stable "ready" on connect (regression 0810539 downgraded this to
+    // a false "offline" when a transient health-check timed out, even though
+    // the VPS engine was alive). The daemon is still lazily health-checked on
+    // restore; a busy health probe must never block the connected state.
+    setVpsStatus("ready");
     setShowSshModal(false);
   }, []);
 
