@@ -2272,7 +2272,12 @@ export default function Workspace() {
     setAgentMachineId(machineId);
     setAskSessionId(null);
     setAgentSessionId(null);
-    setVpsStatus("ready");
+    // No blind "ready": handshake the VPS daemon. If it's not actually alive,
+    // verifyVpsConnection auto-reconnects and reports the true status.
+    setVpsStatus("reconnecting");
+    void verifyVpsConnection(machineId).then((result) => {
+      setVpsStatus(result.vpsStatus === "ready" ? "ready" : "offline");
+    });
     setShowSshModal(false);
   }, []);
 
