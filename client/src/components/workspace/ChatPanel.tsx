@@ -884,9 +884,9 @@ function ChatPanel({
             {panelMenuNode}
             <button
               onClick={() => setShowModelPicker(true)}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-2 border border-transparent hover:border-border transition-colors"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-[13px] font-semibold border transition-colors shrink-0 border-border bg-surface-3 text-text-secondary hover:text-text hover:border-border-light"
               title={t("models.pickerTitle")}
-              aria-label="Model picker"
+              aria-label={t("models.pickerTitle")}
             >
               ✦
             </button>
