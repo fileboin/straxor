@@ -504,10 +504,16 @@ function ChatPanel({
   };
 
   const handleMicToggle = () => {
-    if (micState !== "idle") {
-      stopMic();
-      return;
+    // Always clear any stale/prior session first so a click can never be a
+    // silent no-op (e.g. micState stuck on "recording"/"processing" without a
+    // matching onend). Then start fresh.
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch { /* noop */ }
+      recognitionRef.current = null;
     }
+    recorderStopRef.current?.();
+    recorderStopRef.current = null;
+    if (micState !== "idle") setMicState("idle");
     setMicError("");
     if (hasSpeechRecognition()) {
       const rec = createSpeechRecognition();
@@ -523,16 +529,34 @@ function ChatPanel({
       // final results once and show the current interim as a live preview.
       const typedPrefix = input.trim();
       let finalText = "";
+      // Highest result index already committed into finalText. Prevents
+      // re-appending the same final result on later events (the source of
+      // duplicated words), while still allowing a partial result that later
+      // turns final (index > finalizedMax) to be committed exactly once.
+      let finalizedMax = -1;
       rec.onresult = (e) => {
-        let interim = "";
         const results = e.results;
-        if (!results) return;
-        for (let i = 0; i < results.length; i++) {
+        if (!results || results.length === 0) return;
+        // Only process results from the first one that changed this event.
+        // Re-scanning from 0 every time duplicates final words and accumulates
+        // stale interim fragments (text stirring) — worst for sr/sv + other langs.
+        const start = typeof e.resultIndex === "number" ? e.resultIndex : 0;
+        let interim = "";
+        let addedFinal = "";
+        for (let i = start; i < results.length; i++) {
           const r = results[i];
           const t = r && r[0]?.transcript ? r[0].transcript : "";
-          if (t && r.isFinal) finalText += (finalText ? " " : "") + t;
-          else if (t) interim += t;
+          if (!t) continue;
+          if (r.isFinal) {
+            if (i > finalizedMax) {
+              addedFinal += (addedFinal ? " " : "") + t;
+              finalizedMax = i;
+            }
+          } else {
+            interim = t; // keep only the latest live preview fragment
+          }
         }
+        if (addedFinal) finalText += (finalText ? " " : "") + addedFinal;
         const joined = [typedPrefix, finalText].filter(Boolean).join(" ").trim();
         const preview = joined + (interim ? (joined ? " " : "") + interim : "");
         setInput(preview);
