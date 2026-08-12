@@ -1,4 +1,3 @@
-import { api } from "./api.js";
 import type { Attachment } from "./attachments.js";
 
 export interface RouteResult {
@@ -27,11 +26,36 @@ export interface OrchestrateResult {
 
 // Call the server difficulty router — returns the best model the user has an
 // API key for, based on task complexity. Used when Model orkestracija is ON.
-export async function routeChat(message: string, thinking?: string): Promise<RouteResult> {
-  return api<RouteResult>("/chat/route", {
-    method: "POST",
-    body: { message, thinking },
-  });
+// Honors the panel's Stop signal (so routing can't spin forever) and enforces
+// a hard timeout so a slow/missing router never leaves the panel stuck.
+export async function routeChat(message: string, thinking?: string, externalSignal?: AbortSignal): Promise<RouteResult> {
+  const token = localStorage.getItem("token");
+  const controller = new AbortController();
+  let userAbort = false;
+  const onExt = () => { userAbort = true; controller.abort(); };
+  if (externalSignal) {
+    if (externalSignal.aborted) onExt();
+    else externalSignal.addEventListener("abort", onExt, { once: true });
+  }
+  const timer = window.setTimeout(() => controller.abort(), 20_000);
+  try {
+    const res = await fetch("/api/chat/route", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      signal: controller.signal,
+      body: JSON.stringify({ message, thinking }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data as RouteResult;
+  } finally {
+    window.clearTimeout(timer);
+    externalSignal?.removeEventListener("abort", onExt);
+    if (userAbort) throw new DOMException("Aborted", "AbortError");
+  }
 }
 
 // Parallel multi-model execution. Fans out to all selected models simultaneously,

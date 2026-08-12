@@ -1489,6 +1489,7 @@ export default function Workspace() {
     setAskLoading(true);
     setAskPrefill("");
     askAbortRef.current = new AbortController();
+    const askCtl = askAbortRef.current;
 
     // Ask is a full independent agent on its own local engine/slot. When a
     // machine is configured (e.g. active repo for the ask slot → local engine),
@@ -1679,12 +1680,17 @@ export default function Workspace() {
 
     if (askModelOrch && (!attachments || attachments.length === 0)) {
       try {
-        const route = await routeChat(msg, askThinking);
+        const route = await routeChat(msg, askThinking, askCtl?.signal);
+        if (askCtl?.signal.aborted) {
+          setAskStreamingId(null);
+          setAskLoading(false);
+          return;
+        }
         if (route.routed && route.providerId && route.modelId) {
           provider = route.providerId;
           model = route.modelId;
         }
-      } catch {}
+      } catch {} 
     }
 
     // Reflect the actual routed model in the message label.
@@ -1706,6 +1712,16 @@ export default function Workspace() {
         setAskStreamingId(null);
         setAskLoading(false);
         askAbortRef.current = null;
+        const aId = assistantMsg.id;
+        setAskMessages((prev) => {
+          const found = prev.find((m) => m.id === aId);
+          if (found && !found.content && !found.toolCalls?.length && !found.orchestrated?.length) {
+            return prev.map((m) =>
+              m.id === aId ? { ...m, content: "_Model je završio bez vidljivog odgovora._" } : m
+            );
+          }
+          return prev;
+        });
       },
       onError: (error) => {
         setAskMessages((prev) =>
@@ -1745,6 +1761,7 @@ export default function Workspace() {
     setAgentLoading(true);
     setAgentPrefill("");
     agentAbortRef.current = new AbortController();
+    const agentCtl = agentAbortRef.current;
 
     // On a remote host (Render / phone) there is no local opencode runtime, so
     // the Agent panel must run as plain AI chat (exactly like the Ask panel).
@@ -1824,7 +1841,12 @@ export default function Workspace() {
       let model = agentModel;
       if (agentModelOrch && (!attachments || attachments.length === 0)) {
         try {
-          const route = await routeChat(msg, agentThinking);
+          const route = await routeChat(msg, agentThinking, agentCtl?.signal);
+          if (agentCtl?.signal.aborted) {
+            setAgentStreamingId(null);
+            setAgentLoading(false);
+            return;
+          }
           if (route.routed && route.providerId && route.modelId) {
             provider = route.providerId;
             model = route.modelId;
@@ -1864,6 +1886,16 @@ export default function Workspace() {
         onDone: () => {
           setAgentStreamingId(null);
           setAgentLoading(false);
+          const aId = assistantMsg.id;
+          setAgentMessages((prev) => {
+            const found = prev.find((m) => m.id === aId);
+            if (found && !found.content && !found.toolCalls?.length && !found.orchestrated?.length) {
+              return prev.map((m) =>
+                m.id === aId ? { ...m, content: "_Model je završio bez vidljivog odgovora._" } : m
+              );
+            }
+            return prev;
+          });
         },
         onError: (error) => {
           setAgentMessages((prev) =>
