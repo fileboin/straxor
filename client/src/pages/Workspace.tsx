@@ -2231,17 +2231,26 @@ export default function Workspace() {
     openSshModalForPanel(askFocused || mobileTab === "ask" ? "ask" : "agent");
   }, [askFocused, mobileTab, openSshModalForPanel]);
 
+  // ONE shared VPS engine is the central brain for BOTH panels. Connecting a
+  // VPS binds the same machineId to both panels (no per-panel VPS split, no
+  // local redirect once a VPS engine is live). Each panel's Chat|OpenCode
+  // toggle then decides whether that panel runs as a full agent or plain chat.
   const handleVpsConnected = useCallback((machineId: string) => {
-    if (runtimeManagerPanel === "ask") {
-      setAskMachineId(machineId);
-      setAskSessionId(null);
-    } else {
-      setAgentMachineId(machineId);
-      setAgentSessionId(null);
-    }
+    setAskMachineId(machineId);
+    setAgentMachineId(machineId);
+    setAskSessionId(null);
+    setAgentSessionId(null);
     setVpsStatus("ready");
     setShowSshModal(false);
-  }, [runtimeManagerPanel]);
+  }, []);
+
+  const handleVpsDisconnected = useCallback(() => {
+    setAskMachineId((prev) => (prev && !prev.startsWith("local:") ? null : prev));
+    setAgentMachineId((prev) => (prev && !prev.startsWith("local:") ? null : prev));
+    setAskSessionId(null);
+    setAgentSessionId(null);
+    setVpsStatus("disconnected");
+  }, []);
 
   const toggleAskExpand = useCallback(() => {
     setPanelMode((prev) => (prev === "ask-full" ? "split" : "ask-full"));
@@ -3026,7 +3035,7 @@ export default function Workspace() {
                 panelLabel="Ask"
                 onSelectLocal={() => setAskMachineId("local:opencode:ask")}
                 onConnectVps={() => openSshModalForPanel("ask")}
-                onDisconnectVps={() => setAskMachineId(askActiveRepo ? "local:opencode:ask" : null)}
+                onDisconnectVps={() => handleVpsDisconnected()}
                 onOpenGitRemote={() => { setGitRemoteSlot("ask"); setShowGitRemote(true); }}
                 onOpenRuntimeManager={() => { setRuntimeManagerPanel("ask"); setShowRuntimeManager(true); }}
               />
@@ -3162,7 +3171,7 @@ export default function Workspace() {
                 panelLabel="Agent"
                 onSelectLocal={() => setAgentMachineId("local:opencode")}
                 onConnectVps={() => openSshModalForPanel("agent")}
-                onDisconnectVps={() => setAgentMachineId(activeRepo ? "local:opencode" : null)}
+                onDisconnectVps={() => handleVpsDisconnected()}
                 onOpenGitRemote={() => { setGitRemoteSlot("agent"); setShowGitRemote(true); }}
                 onOpenRuntimeManager={() => { setRuntimeManagerPanel("agent"); setShowRuntimeManager(true); }}
               />
