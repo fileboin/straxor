@@ -68,7 +68,7 @@ export default function PanelMenu({
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const pct = Math.round(zoom * 100);
   const vPct = Math.round(verticalZoom * 100);
-  const { accent, setAccent, setTheme } = useTheme();
+  const { theme, accent, setAccent, setTheme } = useTheme();
 
   const place = useCallback(() => {
     const r = btnRef.current?.getBoundingClientRect();
@@ -415,6 +415,33 @@ export default function PanelMenu({
               <div className="text-[11px] uppercase tracking-wider text-text-muted">
                 {t("panelMenu.theme")}
               </div>
+            </div>
+            {/* Light / Dark toggle */}
+            <div className="grid grid-cols-2 gap-1 mb-2">
+              <button
+                type="button"
+                onClick={() => setTheme("light")}
+                className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-[12px] font-medium transition-colors ${
+                  theme === "light"
+                    ? "border-accent/50 bg-accent/15 text-accent"
+                    : "border-border bg-surface-2 text-text-muted hover:text-text hover:border-border-light"
+                }`}
+              >
+                <span className="text-[13px]">☀</span>
+                <span>{t("theme.light")}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme("dark")}
+                className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-[12px] font-medium transition-colors ${
+                  theme === "dark"
+                    ? "border-accent/50 bg-accent/15 text-accent"
+                    : "border-border bg-surface-2 text-text-muted hover:text-text hover:border-border-light"
+                }`}
+              >
+                <span className="text-[13px]">☾</span>
+                <span>{t("theme.dark")}</span>
+              </button>
             </div>
             <div className="flex flex-wrap gap-2">
               {ACCENT_COLORS.map((c) => {

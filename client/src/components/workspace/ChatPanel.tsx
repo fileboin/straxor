@@ -948,9 +948,9 @@ function ChatPanel({
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`group relative max-w-[90%] sm:max-w-[85%] px-3 py-2.5 rounded-2xl text-[13px] leading-relaxed ${
+            className={`group relative max-w-[92%] sm:max-w-[85%] px-3 py-2.5 rounded-2xl text-[13px] leading-relaxed shadow-sm ${
               msg.role === "user"
-                ? "self-end bg-accent text-white rounded-br-sm"
+                ? "self-end bg-accent text-white border border-accent/50 rounded-br-sm"
                 : `self-start bg-surface-2 border border-border rounded-bl-sm ${
                     iconColor === "blue" ? "border-accent-blue-border/30" : ""
                   }`
@@ -961,7 +961,7 @@ function ChatPanel({
                 {msg.label}
               </div>
             )}
-            <div className="whitespace-pre-wrap">
+            <div className="whitespace-pre-wrap break-words">
               {msg.content}
               {streamingMessageId === msg.id && !msg.toolCalls?.length && (
                 <span className="inline-block w-2 h-4 ml-0.5 bg-accent animate-pulse" />
@@ -988,7 +988,7 @@ function ChatPanel({
                         <span className="text-[10px] text-green-500 ml-auto shrink-0">✓</span>
                       )}
                     </div>
-                    <div className="text-[12px] whitespace-pre-wrap break-words text-text/90">
+                    <div className="text-[12px] whitespace-pre-wrap break-words text-text">
                       {res.error || res.content}
                     </div>
                   </div>
