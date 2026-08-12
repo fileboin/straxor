@@ -228,8 +228,8 @@ export default function PanelMenu({
         createPortal(
           <div
             ref={menuRef}
-            className="z-[100] w-[340px] max-w-[calc(100vw-16px)] max-h-[calc(100dvh-16px)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface shadow-2xl shadow-black/50 p-2.5 space-y-3.5"
-            style={{ position: "fixed", top: menuPos?.top, left: menuPos?.left, visibility: menuPos ? "visible" : "hidden" }}
+            className="z-[1000] w-[340px] max-w-[calc(100vw-16px)] max-h-[calc(100dvh-16px)] overflow-y-auto overscroll-contain rounded-xl border border-border shadow-2xl shadow-black/50 p-2.5 space-y-3.5"
+            style={{ position: "fixed", top: menuPos?.top, left: menuPos?.left, visibility: menuPos ? "visible" : "hidden", background: "var(--surface)", color: "var(--text)" }}
           >
           <div className="flex items-center justify-between px-1.5">
             <div className="text-[11px] uppercase tracking-wider text-text-muted font-medium">

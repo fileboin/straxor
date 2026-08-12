@@ -366,9 +366,15 @@ export default function Workspace() {
   const agentAbortRef = useRef<AbortController | null>(null);
   const askStop = useCallback(() => {
     askAbortRef.current?.abort();
+    askAbortRef.current = null;
+    setAskStreamingId(null);
+    setAskLoading(false);
   }, []);
   const agentStop = useCallback(() => {
     agentAbortRef.current?.abort();
+    agentAbortRef.current = null;
+    setAgentStreamingId(null);
+    setAgentLoading(false);
   }, []);
 
   // Active repo connection — when set and no VPS machine is configured, the

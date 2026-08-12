@@ -88,10 +88,24 @@ export async function runAgentTurn(msg: string, attachments: Attachment[] | unde
       );
     };
 
+    const cancelled = { done: false };
+    const onSigAbort = () => {
+      cancelled.done = true;
+      ctx.setStreamingId(null);
+      ctx.setLoading(false);
+    };
+    ctx.signal?.addEventListener("abort", onSigAbort, { once: true });
+
     const poll = async (jobId: string) => {
       let attempts = 0;
       const timer = window.setInterval(async () => {
-        if (attempts++ > 2400) { window.clearInterval(timer); ctx.setStreamingId(null); ctx.setLoading(false); return; }
+        if (cancelled.done || attempts++ > 2400) {
+          window.clearInterval(timer);
+          ctx.signal?.removeEventListener("abort", onSigAbort);
+          ctx.setStreamingId(null);
+          ctx.setLoading(false);
+          return;
+        }
         try {
           const st = await fetchBackgroundStatus(jobId);
           if (st.timeline.length !== statusRef.timeline.length) {
@@ -100,6 +114,7 @@ export async function runAgentTurn(msg: string, attachments: Attachment[] | unde
           }
           if (st.finished) {
             window.clearInterval(timer);
+            ctx.signal?.removeEventListener("abort", onSigAbort);
             if (st.status === "error" && st.error) {
               ctx.setMessages((prev) =>
                 prev.map((m) => (m.id === ctx.assistantMsgId ? { ...m, content: `[Greška: ${st.error}]` } : m))
@@ -118,6 +133,7 @@ export async function runAgentTurn(msg: string, attachments: Attachment[] | unde
       statusRef.timeline = [];
       await poll(started.jobId);
     } catch (err) {
+      ctx.signal?.removeEventListener("abort", onSigAbort);
       const message = err instanceof Error ? err.message : "Network error";
       ctx.setMessages((prev) =>
         prev.map((m) => (m.id === ctx.assistantMsgId ? { ...m, content: `[Greška: ${message}]` } : m))
@@ -215,16 +231,21 @@ export async function runAgentTurn(msg: string, attachments: Attachment[] | unde
       ctx.setStreamingId(null);
       ctx.setLoading(false);
       if (ctx.onRefreshTodos) setTimeout(ctx.onRefreshTodos, 300);
-      if (ctx.dbSessionId) {
-        const msgId = ctx.assistantMsgId;
-        ctx.setMessages((prev) => {
-          const found = prev.find((m) => m.id === msgId);
-          if (found && found.content) {
-            ctx.saveMessage(ctx.dbSessionId!, "assistant", found.content, found.label, found.toolCalls).catch(() => {});
-          }
-          return prev;
-        });
-      }
+      const msgId = ctx.assistantMsgId;
+      ctx.setMessages((prev) => {
+        const found = prev.find((m) => m.id === msgId);
+        if (found && !found.content && !found.toolCalls?.length) {
+          return prev.map((m) =>
+            m.id === msgId
+              ? { ...m, content: "_Agent je završio zadatak bez vidljivog teksta ili alata._" }
+              : m
+          );
+        }
+        if (found && found.content) {
+          ctx.saveMessage(ctx.dbSessionId!, "assistant", found.content, found.label, found.toolCalls).catch(() => {});
+        }
+        return prev;
+      });
     },
     onError: (error) => {
       if (ctx.onErrorFallback) {
