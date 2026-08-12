@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../lib/auth.js";
+import { LANGS, getLang, setLang, type Lang } from "../../lib/i18n.js";
 
 interface Props {
   onOpenHowItWorks?: () => void;
@@ -44,6 +45,8 @@ const EDITORS = [
 export default function HomeMenu({ onOpenHowItWorks, onOpenSettings, onOpenExport, onOpenNotifications, onOpenWorktrees, onOpenBrowserVerify, onOpenRollback, onOpenContext, onOpenGateway, onOpenProviders, onOpenMultiAgent, onOpenHomeCenter, onOpenDesignAssets, onOpenUsage, onOpenRuntimeManager, onOpenQuickStart }: Props) {
   const [open, setOpen] = useState(false);
   const [showEditors, setShowEditors] = useState(false);
+  const [showLangs, setShowLangs] = useState(false);
+  const [lang, setLangState] = useState<Lang>(getLang());
   const { user, logout } = useAuth();
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -52,11 +55,19 @@ export default function HomeMenu({ onOpenHowItWorks, onOpenSettings, onOpenExpor
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setOpen(false);
         setShowEditors(false);
+        setShowLangs(false);
       }
     }
     if (open) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
+
+  const setActiveLang = (code: Lang) => {
+    setLang(code);
+    setLangState(code);
+    setShowLangs(false);
+    setOpen(false);
+  };
 
   const handleLogout = () => {
     setOpen(false);
@@ -72,7 +83,7 @@ export default function HomeMenu({ onOpenHowItWorks, onOpenSettings, onOpenExpor
   return (
     <div className="relative" ref={menuRef}>
       <button
-        onClick={() => { setOpen(!open); setShowEditors(false); }}
+        onClick={() => { setOpen(!open); setShowEditors(false); setShowLangs(false); }}
         className="flex items-center justify-center w-8 h-8 rounded-lg border border-border bg-transparent text-text-secondary hover:text-text hover:border-border-light transition-colors"
         title="Izbornik"
       >
@@ -80,7 +91,7 @@ export default function HomeMenu({ onOpenHowItWorks, onOpenSettings, onOpenExpor
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-56 bg-surface border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden">
+        <div className="absolute right-0 top-full mt-1 w-56 max-h-[80vh] overflow-y-auto bg-surface border border-border rounded-xl shadow-xl z-50 py-1">
           {/* User info */}
           {user && (
             <div className="px-3 py-2 border-b border-border">
@@ -88,6 +99,40 @@ export default function HomeMenu({ onOpenHowItWorks, onOpenSettings, onOpenExpor
               <div className="text-xs font-medium text-text truncate">{user.email}</div>
             </div>
           )}
+
+          {/* Language selector — always available, one tap */}
+          <div className="px-3 py-2 border-b border-border">
+            <div className="text-[10px] uppercase tracking-wider text-text-muted mb-1.5">
+              Jezik / Language
+            </div>
+            <button
+              onClick={() => setShowLangs((v) => !v)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border bg-surface-2 text-[12px] text-text hover:border-border-light transition-colors"
+              title="Promijeni jezik"
+            >
+              <span className="text-[12px]">🌐</span>
+              <span className="flex-1 text-left truncate">
+                {LANGS.find((l) => l.code === lang)?.label ?? "English"}
+              </span>
+              <span className="text-[10px] text-text-muted">{showLangs ? "▾" : "▸"}</span>
+            </button>
+            {showLangs && (
+              <div className="mt-1.5 grid grid-cols-1 gap-0.5 max-h-48 overflow-y-auto overscroll-contain">
+                {LANGS.map((l) => (
+                  <button
+                    key={l.code}
+                    onClick={() => setActiveLang(l.code)}
+                    className={`w-full flex items-center justify-between px-2 py-1 rounded-md text-[12px] text-left hover:bg-surface-2 transition-colors ${
+                      l.code === lang ? "text-accent font-medium" : "text-text"
+                    }`}
+                  >
+                    <span className="truncate">{l.label}</span>
+                    {l.code === lang && <span className="text-[10px]">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* How it works */}
           <button
