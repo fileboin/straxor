@@ -159,18 +159,7 @@ export default function EnginePicker({
           </span>
         </button>
 
-        {mode === "vps" && onDisconnectVps && (
-          <button
-            onClick={() => { setOpen(false); onDisconnectVps(); }}
-            className="w-full flex items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-surface-2 border-t border-border"
-          >
-            <span className="text-base leading-none mt-0.5">⨯</span>
-            <span className="min-w-0">
-              <span className="block text-[11px] font-medium" style={{ color: "var(--text)" }}>Odvoji VPS runtime</span>
-              <span className="block text-[9px]" style={{ color: "var(--text-muted)" }}>Vrati ovaj panel na repo/local chat izbor</span>
-            </span>
-          </button>
-        )}
+
 
         <div className="border-t border-border">
           <button

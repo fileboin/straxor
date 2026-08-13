@@ -1506,77 +1506,96 @@ export default function Workspace() {
     // machine is configured (e.g. active repo for the ask slot → local engine),
     // run the full agent turn (SSE, tools, permissions) instead of plain chat.
     const localAskEngineOnRemote = !!askMachineId?.startsWith("local:") && !isLocalHost;
-    if (askPanelMode === "agent" && askMachineId && !localAskEngineOnRemote && !askDirectFallbackRef.current) {
-      await runAgentTurn(msg, attachments, {
-        role: askRole,
-        provider: askProvider,
-        model: askModel,
-        thinking: askThinking,
-        background: askBackground,
-        machineId: askMachineId,
-        sessionId: askSessionId,
-        setSessionId: setAskSessionId,
-        messages: askMessages,
-        setMessages: setAskMessages,
-        assistantMsgId: assistantMsg.id,
-        setStreamingId: (id: string | null) => { if (id === null && !isMine()) return; setAskStreamingId(id); },
-        setLoading: (v: boolean) => { if (!v && !isMine()) return; setAskLoading(v); },
-        setPrefill: setAskPrefill,
-        permissions,
-        activePromptIds,
-        savedPrompts,
-        projectId,
-        dbSessionId,
-        createDbSession: async () => {
-          try {
-            const PROJECT_ID = projectId || "straxor-landing";
-            const sess = await createSession(
-              PROJECT_ID,
-              askMachineId,
-              msg.slice(0, 100),
-              { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, machineId: agentMachineId, sessionId: agentSessionId },
-              { provider: askProvider, model: askModel, thinking: askThinking, role: askRole, machineId: askMachineId, sessionId: askSessionId }
-            );
-            setDbSessionId(sess.id);
-            fetchSessions(PROJECT_ID).then(setDbSessions);
-            return sess.id;
-          } catch {
-            return null;
-          }
-        },
-        saveMessage,
-        updateSession,
-        onToolAllow: proceedToolAllow,
-        setPendingTool,
-        setSecurityPackageName,
-        setPendingInstallAllow,
-        setSecurityVerdict,
-        checkBeforeInstall,
-        onRefreshTodos: () => {},
-        onErrorFallback: (error) => {
-          if (askMachineId?.startsWith("local:") && !askDirectFallbackRef.current) {
-            askDirectFallbackRef.current = true;
-            if (isMine()) {
-              setAskLoading(false);
-              setAskStreamingId(null);
-            }
-            setAskMessages((prev) => prev.filter((m) => m.id !== assistantMsg.id));
-            handleAskSend(msg, attachments);
-            return;
-          }
-          if (!isMine()) return;
-          setAskMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMsg.id
-                ? { ...m, content: m.content + `\n\n[Greška: ${error}]` }
-                : m
-            )
-          );
-          setAskStreamingId(null);
-          setAskLoading(false);
-        },
-        signal: askCtl.signal,
-      }).catch((error) => {
+    // Force agent mode for Ask panel: always prefer running the OpenCode agent
+    // when a machine is configured for Ask. This prevents falling back to plain
+    // text-only LLM chat and avoids passive streaming loops.
+    if (askMachineId && !localAskEngineOnRemote && !askDirectFallbackRef.current) {
+      // Timeout for agent response (ms)
+      const AGENT_RESPONSE_TIMEOUT = 15000;
+      // Wrap runAgentTurn with a timeout that aborts the request on expiry.
+      const runWithTimeout = async () => {
+        let timeoutId: number | null = null;
+        try {
+          const race = await Promise.race([
+            runAgentTurn(msg, attachments, {
+              role: askRole,
+              provider: askProvider,
+              model: askModel,
+              thinking: askThinking,
+              background: askBackground,
+              machineId: askMachineId,
+              sessionId: askSessionId,
+              setSessionId: setAskSessionId,
+              messages: askMessages,
+              setMessages: setAskMessages,
+              assistantMsgId: assistantMsg.id,
+              setStreamingId: (id: string | null) => { if (id === null && !isMine()) return; setAskStreamingId(id); },
+              setLoading: (v: boolean) => { if (!v && !isMine()) return; setAskLoading(v); },
+              setPrefill: setAskPrefill,
+              permissions,
+              activePromptIds,
+              savedPrompts,
+              projectId,
+              dbSessionId,
+              createDbSession: async () => {
+                try {
+                  const PROJECT_ID = projectId || "straxor-landing";
+                  const sess = await createSession(
+                    PROJECT_ID,
+                    askMachineId,
+                    msg.slice(0, 100),
+                    { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, machineId: agentMachineId, sessionId: agentSessionId },
+                    { provider: askProvider, model: askModel, thinking: askThinking, role: askRole, machineId: askMachineId, sessionId: askSessionId }
+                  );
+                  setDbSessionId(sess.id);
+                  fetchSessions(PROJECT_ID).then(setDbSessions);
+                  return sess.id;
+                } catch {
+                  return null;
+                }
+              },
+              saveMessage,
+              updateSession,
+              onToolAllow: proceedToolAllow,
+              setPendingTool,
+              setSecurityPackageName,
+              setPendingInstallAllow,
+              setSecurityVerdict,
+              checkBeforeInstall,
+              onRefreshTodos: () => {},
+              // On error: do NOT automatically re-run handleAskSend (would loop).
+              onErrorFallback: (error) => {
+                if (!isMine()) return;
+                setAskMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsg.id
+                      ? { ...m, content: m.content + `\n\n[Greška: ${error}]` }
+                      : m
+                  )
+                );
+                setAskStreamingId(null);
+                setAskLoading(false);
+              },
+              signal: askCtl.signal,
+            }),
+            new Promise((_, reject) => {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              timeoutId = window.setTimeout(() => {
+                try { askCtl.abort(); } catch (e) { /* noop */ }
+                reject(new Error("OpenCode timeout"));
+              }, AGENT_RESPONSE_TIMEOUT);
+            }),
+          ]);
+          return race;
+        } finally {
+          if (timeoutId) clearTimeout(timeoutId);
+        }
+      };
+
+      try {
+        console.log("[ask-debug] sending to OpenCode agent", { msg: msg.slice(0, 200), machineId: askMachineId });
+        await runWithTimeout();
+      } catch (error) {
         if (!isMine()) return;
         const message = error instanceof Error ? error.message : "Network error";
         setAskMessages((prev) =>
@@ -1588,7 +1607,8 @@ export default function Workspace() {
         );
         setAskStreamingId(null);
         setAskLoading(false);
-      });
+      }
+
       return;
     }
 
@@ -3035,6 +3055,7 @@ export default function Workspace() {
             verticalZoom={askVerticalZoom}
             onVerticalZoomChange={handleAskVerticalZoomChange}
             panelMenuKey="ask"
+            panelMenuEnabled={false}
             role={askRole}
             onRoleChange={setAskRole}
             copyLabel={`→ ${t("chat.send.help")}`}
@@ -3082,6 +3103,7 @@ export default function Workspace() {
                 onDisconnectVps={() => handleVpsDisconnected()}
                 onOpenGitRemote={() => { setGitRemoteSlot("ask"); setShowGitRemote(true); }}
                 onOpenRuntimeManager={() => { setRuntimeManagerPanel("ask"); setShowRuntimeManager(true); }}
+                panelMenuEnabled={false}
               />
             }
             onFocusChange={setAskFocused}

@@ -134,6 +134,8 @@ interface Props {
   orbLabel?: string;
   /** Reports panel container focus so the Ask beam can light on focus. */
   onFocusChange?: (focused: boolean) => void;
+  /** Whether the panel menu is enabled */
+  panelMenuEnabled?: boolean;
 }
 
 const ACCEPTED_EXT_RE = /\.(jpe?g|png|webp|gif|avif|mp3|wav|ogg|webm|m4a|pdf|txt|md|csv|json)$/i;
@@ -314,6 +316,7 @@ function ChatPanel({
   orbState = null,
   orbLabel,
   onFocusChange,
+  panelMenuEnabled = true,
 }: Props) {  const [input, setInput] = useState(draftInput || "");
   useLang();
   const [showModelPicker, setShowModelPicker] = useState(false);
@@ -797,7 +800,7 @@ function ChatPanel({
     />
   );
 
-  const panelMenuNode = onZoomChange ? (
+  const panelMenuNode = onZoomChange && panelMenuEnabled ? (
     <PanelMenu
       role={role || "developer"}
       onRoleChange={(r) => onRoleChange?.(r)}
