@@ -452,6 +452,85 @@ body {
 }
 
 /* ═══════════════════════════════════════════════
+   RESPONSIVE HARDENING — fluidni modali i panela
+   Fiksne vh visine prelome se na telefonima/tabletima
+   (browser chrome mijenja viewport). Na <768px sve
+   modale pretvaramo u fluidne: height auto + max-height
+   vezan za 100dvh, a unutrašnji sadržaj se sam skroluje.
+   Z-index i touch-action za čiste dropdown/modal otvore.
+   ═══════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  /* Fiksne visine modala → fluidne, nikad preko ekrana */
+  .h-\[70vh\],
+  .h-\[75vh\],
+  .h-\[80vh\],
+  .h-\[85vh\],
+  .h-\[88vh\],
+  .h-\[90vh\],
+  .h-\[94vh\],
+  .max-h-\[50vh\],
+  .max-h-\[60vh\],
+  .max-h-\[70vh\],
+  .max-h-\[75vh\],
+  .max-h-\[80vh\],
+  .max-h-\[85vh\],
+  .max-h-\[90vh\] {
+    height: auto;
+    max-height: 92dvh;
+  }
+
+  /* Modal overlay + scroll kontejner: gladak overflow-y, bez zaustavljanja */
+  .fixed.inset-0 {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .fixed.inset-0 > div {
+    max-height: 92dvh;
+  }
+  .fixed.inset-0 > div > .overflow-y-auto,
+  .fixed.inset-0 > div > div > .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Dropdown/menu unutar bilo kog panela — uvijek iznad i skrolabilan */
+  .z-\[50\],
+  .z-\[70\],
+  .z-\[100\] {
+    max-width: calc(100vw - 16px);
+    max-height: 80dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Modal kontejneri (bez fixed) — prirodna visina, skrol unutra */
+  .modal-container,
+  [class*="rounded-2xl"][class*="overflow-hidden"] {
+    max-height: 92dvh;
+  }
+
+  /* Touch & click — dropdown dugmad bez neprijatnih highlighta */
+  button,
+  [role="button"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+  }
+}
+
+/* Tablet — vh modali ograničeni na 90dvh da ne klize ispod */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .h-\[90vh\],
+  .h-\[94vh\],
+  .h-\[85vh\],
+  .h-\[80vh\],
+  .h-\[75vh\],
+  .h-\[70vh\] {
+    height: auto;
+    max-height: 90dvh;
+  }
+}
+
+/* ═══════════════════════════════════════════════
    DESKTOP PANEL HARDENING
    Čist split 50/50, jasne nezavisne cjeline, bez
    preklapanja i teksta van okvira. Clamped >= 768px.
