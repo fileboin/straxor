@@ -3061,23 +3061,8 @@ export default function Workspace() {
                 </div>
               );
             })()}
-            headerLeft={
-              <div className="flex items-center gap-2">
-                <RoleSelector role={askRole} onChange={setAskRole} />
-                <button
-                  type="button"
-                  onClick={() => setShowBusHistory(true)}
-                  className="px-2 h-7 rounded-md border border-border bg-transparent text-[10px] font-medium text-text-muted hover:text-text hover:border-border-light transition-colors"
-                  title="Bus history"
-                >
-                  Bus
-                </button>
-              </div>
-            }
-            modelOrch={askModelOrch}
+            headerLeft={undefined}
             onStop={askStop}
-            onModelOrchChange={setAskModelOrch}
-            modelOrchHint="Model orkestracija — task se automatski rutira na najbolji model prema težini"
             isSteerable={askPanelMode === "chat" && isAgentSteerable}
             onSteerSend={handleSteerSend}
             steerStatusText={askPanelMode === "chat" ? (agentTodos.length > 0 ? t("chat.steer.steps", { n: agentTodos.filter(t => t.status !== "completed").length }) : t("chat.dual.independent")) : undefined}
@@ -3086,8 +3071,6 @@ export default function Workspace() {
             orchestratedModels={askOrchestratedModels}
             onOrchestratedModelsChange={setAskOrchestratedModels}
             availableModels={availableModels}
-            background={askBackground}
-            onBackgroundChange={setAskBackground}
             runtimeControl={
               <EnginePicker
                 machineId={askMachineId}
