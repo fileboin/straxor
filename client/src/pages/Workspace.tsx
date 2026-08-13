@@ -364,7 +364,16 @@ export default function Workspace() {
   const askDirectFallbackRef = useRef(false);
   const askAbortRef = useRef<AbortController | null>(null);
   const agentAbortRef = useRef<AbortController | null>(null);
+  // Monotonic generation counters: every new send (and every Stop) bumps the
+  // generation, so an in-flight callback from an older/stopped request can
+  // never mutate the loading/streaming state of a newer request. Unlike
+  // comparing controller refs (where `ref === null` is ambiguous once a
+  // streamChat path nulls it), the generation guard is unambiguous and
+  // race-proof.
+  const askGenRef = useRef(0);
+  const agentGenRef = useRef(0);
   const askStop = useCallback(() => {
+    askGenRef.current++;
     askAbortRef.current?.abort();
     // Do NOT null the ref here — the next handleAskSend will replace it.
     // Keeping the ref lets in-flight callbacks detect that a newer request
@@ -373,6 +382,7 @@ export default function Workspace() {
     setAskLoading(false);
   }, []);
   const agentStop = useCallback(() => {
+    agentGenRef.current++;
     agentAbortRef.current?.abort();
     // Same guard pattern — do NOT null the ref.
     setAgentStreamingId(null);
@@ -1493,11 +1503,11 @@ export default function Workspace() {
     askAbortRef.current = new AbortController();
     const askCtl = askAbortRef.current;
     // Guard: only THIS request's callbacks may reset loading/streaming state.
-    // Prevents a stale async callback (from a stopped previous request) from
-    // clobbering a newer request that started before the cleanup ran.
-    // - isMine() is true when we are still the active controller, or when no
-    //   new controller has been installed yet (ref is null after normal finish).
-    const isMine = () => askAbortRef.current === askCtl || askAbortRef.current === null;
+    // Uses a monotonic generation counter so a stale async callback from a
+    // stopped/older request can never clobber a newer request, regardless of
+    // whether any other path nulls the abort ref.
+    const myGen = ++askGenRef.current;
+    const isMine = () => askGenRef.current === myGen;
 
     // Ask is a full independent agent on its own local engine/slot. When a
     // machine is configured (e.g. active repo for the ask slot → local engine),
@@ -1778,9 +1788,10 @@ export default function Workspace() {
     setAgentPrefill("");
     agentAbortRef.current = new AbortController();
     const agentCtl = agentAbortRef.current;
-    // Same guard pattern as handleAskSend — prevents stale callbacks from a
-    // stopped request from resetting the loading state of a newer request.
-    const isMineAgent = () => agentAbortRef.current === agentCtl || agentAbortRef.current === null;
+    // Same generation guard pattern as handleAskSend — prevents stale callbacks
+    // from a stopped request from resetting the loading state of a newer request.
+    const myGenAgent = ++agentGenRef.current;
+    const isMineAgent = () => agentGenRef.current === myGenAgent;
 
     // On a remote host (Render / phone) there is no local opencode runtime, so
     // the Agent panel must run as plain AI chat (exactly like the Ask panel).
