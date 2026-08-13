@@ -255,13 +255,7 @@ export default function Workspace() {
   const [askMessages, setAskMessages] = useState<ChatMessage[]>(INITIAL_ASK_MESSAGES);
   const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([]);
   const [mobileTab, setMobileTab] = useState<"ask" | "agent">("ask");
-  const [askPanelMode, setAskPanelMode] = useState<"agent" | "chat">(() => {
-    try {
-      return localStorage.getItem("straxor.ask.mode") === "chat" ? "chat" : "agent";
-    } catch {
-      return "agent";
-    }
-  });
+  const [askPanelMode] = useState<"agent" | "chat">("agent");
   const [agentPanelMode, setAgentPanelMode] = useState<"agent" | "chat">(() => {
     try {
       return localStorage.getItem("straxor.agent.mode") === "chat" ? "chat" : "agent";
@@ -694,7 +688,6 @@ export default function Workspace() {
         if (typeof s.askPanelAccent === "string") setAskPanelAccent(s.askPanelAccent);
         if (typeof s.agentPanelAccent === "string") setAgentPanelAccent(s.agentPanelAccent);
         if (s.mobileTab === "ask" || s.mobileTab === "agent") setMobileTab(s.mobileTab);
-        if (s.askPanelMode === "agent" || s.askPanelMode === "chat") setAskPanelMode(s.askPanelMode);
         if (s.agentPanelMode === "agent" || s.agentPanelMode === "chat") setAgentPanelMode(s.agentPanelMode);
         if (typeof s.dbSessionId === "string") setDbSessionId(s.dbSessionId);
         if (typeof s.askSessionId === "string") setAskSessionId(s.askSessionId);
@@ -3071,12 +3064,6 @@ export default function Workspace() {
             headerLeft={
               <div className="flex items-center gap-2">
                 <RoleSelector role={askRole} onChange={setAskRole} />
-                <ChatAgentToggle
-                  mode={askPanelMode}
-                  onChange={setAskPanelMode}
-                  side="left"
-                  noEngine={!askMachineId || (!!askMachineId?.startsWith("local:") && !isLocalHost)}
-                />
                 <button
                   type="button"
                   onClick={() => setShowBusHistory(true)}
