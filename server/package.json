@@ -23,6 +23,7 @@
     "isomorphic-git": "^1.40.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.2.0",
+    "opencode-ai": "1.18.11",
     "postgres": "^3.4.4",
     "ssh2": "^1.17.0"
   },
