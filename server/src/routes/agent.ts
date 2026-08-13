@@ -340,6 +340,12 @@ router.post("/send", async (req: Request, res: Response) => {
     let finished = false;
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
+    let idleHandle: ReturnType<typeof setTimeout> | undefined;
+    // If the OpenCode process produces nothing for this long, the server cuts
+    // the turn (aborts the process + ends the stream) instead of leaving the
+    // client polling a stuck job. Generous enough for a cold engine spawn or a
+    // long tool run, but guarantees a stuck process is killed.
+    const IDLE_TIMEOUT_MS = 120_000;
 
     // Guarded SSE write — never throws, silently no-ops once the response is gone.
     const send = (payload: unknown) => {
@@ -348,6 +354,19 @@ router.post("/send", async (req: Request, res: Response) => {
         res.write(`data: ${JSON.stringify(payload)}\n\n`);
       } catch {}
     };
+
+    // Reset the idle watchdog on any real activity so only a genuinely stuck
+    // process is cut, never a busy one.
+    const kickIdle = () => {
+      if (finished) return;
+      if (idleHandle) clearTimeout(idleHandle);
+      idleHandle = setTimeout(() => {
+        send({ type: "error", content: "OpenCode je prestao da odgovara — prekidam turn" });
+        finish({ abort: true });
+      }, IDLE_TIMEOUT_MS);
+    };
+    // Start the watchdog once the turn has been submitted.
+    kickIdle();
 
     // Only react to events for OUR session. The shared /event stream emits
     // events for every session on the machine, so an unrelated session going
@@ -373,6 +392,7 @@ router.post("/send", async (req: Request, res: Response) => {
 
       if (timeoutHandle) clearTimeout(timeoutHandle);
       if (heartbeat) clearInterval(heartbeat);
+      if (idleHandle) clearTimeout(idleHandle);
 
       // Abort the remote opencode process so it stops consuming resources —
       // only on interrupted flows (timeout, error, disconnect), never on clean idle.
@@ -402,6 +422,7 @@ router.post("/send", async (req: Request, res: Response) => {
 
     stream.on("data", (chunk: Buffer) => {
       if (finished) return;
+      kickIdle();
       buffer += chunk.toString();
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";

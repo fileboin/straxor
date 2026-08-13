@@ -1502,16 +1502,22 @@ export default function Workspace() {
     const myGen = ++askGenRef.current;
     const isMine = () => askGenRef.current === myGen;
 
-    // Ask is a full independent agent on its own local engine/slot. When a
-    // machine is configured (e.g. active repo for the ask slot → local engine),
-    // run the full agent turn (SSE, tools, permissions) instead of plain chat.
-    const localAskEngineOnRemote = !!askMachineId?.startsWith("local:") && !isLocalHost;
-    // Force agent mode for Ask panel: always prefer running the OpenCode agent
-    // when a machine is configured for Ask. This prevents falling back to plain
-    // text-only LLM chat and avoids passive streaming loops.
-    if (askMachineId && !localAskEngineOnRemote && !askDirectFallbackRef.current) {
-      // Timeout for agent response (ms)
-      const AGENT_RESPONSE_TIMEOUT = 15000;
+    // Ask is a full independent agent on its own local engine/slot. Force
+    // agent mode for Panel 1: every message MUST trigger the OpenCode agent
+    // that executes commands (tools, git, read/write). We NEVER fall back to
+    // passive text-only LLM chat — that is what produced empty gpt-4.1-nano
+    // bubbles and a hung "Generišem odgovor…" on Render. Ensure a machine id
+    // always exists (local engine) so the agent turn always runs, even when no
+    // GitHub repo is bound to the slot (the engine uses a bare sandbox).
+    const askAgentMachineId = askMachineId ?? "local:opencode:ask";
+    // On a remote host the local OpenCode engine is still spawnable (opencode-ai
+    // ships as a server dependency), so a local: machine must NOT downgrade to
+    // plain chat — run the agent turn over the local runtime instead.
+    if (askAgentMachineId && !askDirectFallbackRef.current) {
+      // Timeout for agent response (ms) — hard cut so the UI is never left
+      // blocked. Raised to 45s to allow real tool/git execution while still
+      // guaranteeing the process is killed and the panel is released.
+      const AGENT_RESPONSE_TIMEOUT = 45000;
       // Wrap runAgentTurn with a timeout that aborts the request on expiry.
       const runWithTimeout = async () => {
         let timeoutId: number | null = null;
@@ -1523,7 +1529,7 @@ export default function Workspace() {
               model: askModel,
               thinking: askThinking,
               background: askBackground,
-              machineId: askMachineId,
+              machineId: askAgentMachineId,
               sessionId: askSessionId,
               setSessionId: setAskSessionId,
               messages: askMessages,
@@ -1542,10 +1548,10 @@ export default function Workspace() {
                   const PROJECT_ID = projectId || "straxor-landing";
                   const sess = await createSession(
                     PROJECT_ID,
-                    askMachineId,
+                    askAgentMachineId,
                     msg.slice(0, 100),
                     { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, machineId: agentMachineId, sessionId: agentSessionId },
-                    { provider: askProvider, model: askModel, thinking: askThinking, role: askRole, machineId: askMachineId, sessionId: askSessionId }
+                    { provider: askProvider, model: askModel, thinking: askThinking, role: askRole, machineId: askAgentMachineId, sessionId: askSessionId }
                   );
                   setDbSessionId(sess.id);
                   fetchSessions(PROJECT_ID).then(setDbSessions);
