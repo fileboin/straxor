@@ -38,7 +38,14 @@ export default function InputToolbar({ onAction, micState = "idle", disabledActi
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      // Only close when clicking OUTSIDE both the toggle button (ref) AND the
+      // portal menu (menuRef). Since the portal is at document.body it is NOT
+      // inside ref.current, so without this guard React 18 flushes the
+      // setOpen(false) synchronously on mousedown — unmounting the portal
+      // before the click event fires — and menu-item onClick never runs.
+      const inToggle = ref.current && ref.current.contains(e.target as Node);
+      const inMenu   = menuRef.current && menuRef.current.contains(e.target as Node);
+      if (!inToggle && !inMenu) {
         setOpen(false);
       }
     };
