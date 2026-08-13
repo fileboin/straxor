@@ -366,13 +366,15 @@ export default function Workspace() {
   const agentAbortRef = useRef<AbortController | null>(null);
   const askStop = useCallback(() => {
     askAbortRef.current?.abort();
-    askAbortRef.current = null;
+    // Do NOT null the ref here — the next handleAskSend will replace it.
+    // Keeping the ref lets in-flight callbacks detect that a newer request
+    // has since started (askAbortRef.current !== their captured askCtl).
     setAskStreamingId(null);
     setAskLoading(false);
   }, []);
   const agentStop = useCallback(() => {
     agentAbortRef.current?.abort();
-    agentAbortRef.current = null;
+    // Same guard pattern — do NOT null the ref.
     setAgentStreamingId(null);
     setAgentLoading(false);
   }, []);
@@ -1490,6 +1492,12 @@ export default function Workspace() {
     setAskPrefill("");
     askAbortRef.current = new AbortController();
     const askCtl = askAbortRef.current;
+    // Guard: only THIS request's callbacks may reset loading/streaming state.
+    // Prevents a stale async callback (from a stopped previous request) from
+    // clobbering a newer request that started before the cleanup ran.
+    // - isMine() is true when we are still the active controller, or when no
+    //   new controller has been installed yet (ref is null after normal finish).
+    const isMine = () => askAbortRef.current === askCtl || askAbortRef.current === null;
 
     // Ask is a full independent agent on its own local engine/slot. When a
     // machine is configured (e.g. active repo for the ask slot → local engine),
@@ -1508,8 +1516,8 @@ export default function Workspace() {
         messages: askMessages,
         setMessages: setAskMessages,
         assistantMsgId: assistantMsg.id,
-        setStreamingId: setAskStreamingId,
-        setLoading: setAskLoading,
+        setStreamingId: (id: string | null) => { if (id === null && !isMine()) return; setAskStreamingId(id); },
+        setLoading: (v: boolean) => { if (!v && !isMine()) return; setAskLoading(v); },
         setPrefill: setAskPrefill,
         permissions,
         activePromptIds,
@@ -1545,12 +1553,15 @@ export default function Workspace() {
         onErrorFallback: (error) => {
           if (askMachineId?.startsWith("local:") && !askDirectFallbackRef.current) {
             askDirectFallbackRef.current = true;
-            setAskLoading(false);
-            setAskStreamingId(null);
+            if (isMine()) {
+              setAskLoading(false);
+              setAskStreamingId(null);
+            }
             setAskMessages((prev) => prev.filter((m) => m.id !== assistantMsg.id));
             handleAskSend(msg, attachments);
             return;
           }
+          if (!isMine()) return;
           setAskMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsg.id
@@ -1561,8 +1572,9 @@ export default function Workspace() {
           setAskStreamingId(null);
           setAskLoading(false);
         },
-        signal: askAbortRef.current?.signal,
+        signal: askCtl.signal,
       }).catch((error) => {
+        if (!isMine()) return;
         const message = error instanceof Error ? error.message : "Network error";
         setAskMessages((prev) =>
           prev.map((m) =>
@@ -1682,8 +1694,10 @@ export default function Workspace() {
       try {
         const route = await routeChat(msg, askThinking, askCtl?.signal);
         if (askCtl?.signal.aborted) {
-          setAskStreamingId(null);
-          setAskLoading(false);
+          if (isMine()) {
+            setAskStreamingId(null);
+            setAskLoading(false);
+          }
           return;
         }
         if (route.routed && route.providerId && route.modelId) {
@@ -1709,6 +1723,7 @@ export default function Workspace() {
         );
       },
       onDone: () => {
+        if (!isMine()) return;
         setAskStreamingId(null);
         setAskLoading(false);
         askAbortRef.current = null;
@@ -1724,6 +1739,7 @@ export default function Workspace() {
         });
       },
       onError: (error) => {
+        if (!isMine()) return;
         setAskMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsg.id
@@ -1735,8 +1751,8 @@ export default function Workspace() {
         setAskLoading(false);
         askAbortRef.current = null;
       },
-    }, attachments, askAbortRef.current?.signal);
-  }, [askProvider, askModel, askThinking, askRole, askMessages, askModelOrch, askOrchestratedModels, availableModels, askMachineId, askSessionId, askBackground, agentProvider, agentModel, agentThinking, agentRole, permissions, activePromptIds, savedPrompts, projectId, dbSessionId, proceedToolAllow]);
+    }, attachments, askCtl.signal);
+  }, [askProvider, askModel, askThinking, askRole, askMessages, askModelOrch, askOrchestratedModels, availableModels, askMachineId, askSessionId, askBackground, agentProvider, agentModel, agentThinking, agentRole, permissions, activePromptIds, savedPrompts, projectId, dbSessionId, proceedToolAllow, askPanelMode]);
 
   const handleAgentSend = useCallback(async (msg: string, attachments?: Attachment[]) => {
     const roleConfig = getRoleById(agentRole);
@@ -1762,6 +1778,9 @@ export default function Workspace() {
     setAgentPrefill("");
     agentAbortRef.current = new AbortController();
     const agentCtl = agentAbortRef.current;
+    // Same guard pattern as handleAskSend — prevents stale callbacks from a
+    // stopped request from resetting the loading state of a newer request.
+    const isMineAgent = () => agentAbortRef.current === agentCtl || agentAbortRef.current === null;
 
     // On a remote host (Render / phone) there is no local opencode runtime, so
     // the Agent panel must run as plain AI chat (exactly like the Ask panel).
@@ -1843,8 +1862,10 @@ export default function Workspace() {
         try {
           const route = await routeChat(msg, agentThinking, agentCtl?.signal);
           if (agentCtl?.signal.aborted) {
-            setAgentStreamingId(null);
-            setAgentLoading(false);
+            if (isMineAgent()) {
+              setAgentStreamingId(null);
+              setAgentLoading(false);
+            }
             return;
           }
           if (route.routed && route.providerId && route.modelId) {
@@ -1884,6 +1905,7 @@ export default function Workspace() {
           );
         },
         onDone: () => {
+          if (!isMineAgent()) return;
           setAgentStreamingId(null);
           setAgentLoading(false);
           const aId = assistantMsg.id;
@@ -1898,6 +1920,7 @@ export default function Workspace() {
           });
         },
         onError: (error) => {
+          if (!isMineAgent()) return;
           setAgentMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsg.id
@@ -1908,7 +1931,7 @@ export default function Workspace() {
           setAgentStreamingId(null);
           setAgentLoading(false);
         },
-      }, attachments);
+      }, attachments, agentCtl.signal);
       return;
     }
 
@@ -2025,12 +2048,14 @@ export default function Workspace() {
         statusRef.timeline = [];
         await poll(started.jobId, started.sessionId);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Network error";
-        setAgentMessages((prev) =>
-          prev.map((m) => (m.id === assistantMsg.id ? { ...m, content: `[Greška: ${message}]` } : m))
-        );
-        setAgentStreamingId(null);
-        setAgentLoading(false);
+        if (isMineAgent()) {
+          const message = err instanceof Error ? err.message : "Network error";
+          setAgentMessages((prev) =>
+            prev.map((m) => (m.id === assistantMsg.id ? { ...m, content: `[Greška: ${message}]` } : m))
+          );
+          setAgentStreamingId(null);
+          setAgentLoading(false);
+        }
       }
       return;
     }
@@ -2153,6 +2178,7 @@ export default function Workspace() {
         );
       },
       onDone: () => {
+        if (!isMineAgent()) return;
         setAgentStreamingId(null);
         setAgentLoading(false);
         agentAbortRef.current = null;
@@ -2195,10 +2221,11 @@ export default function Workspace() {
         // silently switch this panel to plain AI chat instead of leaving it silent.
         if (agentMachineId?.startsWith("local:") && !agentDirectFallbackRef.current) {
           agentDirectFallbackRef.current = true;
-          setAgentLoading(false);
+          if (isMineAgent()) setAgentLoading(false);
           handleAgentSend(msg, attachments);
           return;
         }
+        if (!isMineAgent()) return;
         setAgentMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsg.id
@@ -2210,7 +2237,7 @@ export default function Workspace() {
         setAgentLoading(false);
         agentAbortRef.current = null;
       },
-    }, attachments, agentAbortRef.current?.signal);
+    }, attachments, agentCtl.signal);
   }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch, agentOrchestratedModels, availableModels, agentBackground, agentPanelMode, transferByBus]);
 
   useEffect(() => {
