@@ -35,8 +35,12 @@ export async function streamAgentMessage(
 ): Promise<void> {
   try {
     const token = localStorage.getItem("token");
-    const IDLE_MS = 60_000;
-    const TOTAL_MS = 900_000;
+    // Idle watchdog: fires only when the agent produces NO real output
+    // (text / tool event) for IDLE_MS. Server SSE heartbeats (: ping) must NOT
+    // keep it alive, otherwise a stuck opencode process with no session.idle
+    // would spin "Generišem odgovor…" forever. The total cap is a last resort.
+    const IDLE_MS = 15_000;
+    const TOTAL_MS = 120_000;
     const controller = new AbortController();
     let userAbort = false;
     const onExtAbort = () => {
@@ -47,11 +51,20 @@ export async function streamAgentMessage(
       if (externalSignal.aborted) onExtAbort();
       else externalSignal.addEventListener("abort", onExtAbort, { once: true });
     }
-    let watchdog = window.setTimeout(() => controller.abort(), IDLE_MS);
-    const totalTimer = window.setTimeout(() => controller.abort(), TOTAL_MS);
+    let watchdog = window.setTimeout(() => {
+      console.error("[agent:stall] no text/tool output for 15s — aborting turn");
+      controller.abort();
+    }, IDLE_MS);
+    const totalTimer = window.setTimeout(() => {
+      console.error("[agent:stall] total 120s exceeded — aborting turn");
+      controller.abort();
+    }, TOTAL_MS);
     const poke = () => {
       window.clearTimeout(watchdog);
-      watchdog = window.setTimeout(() => controller.abort(), IDLE_MS);
+      watchdog = window.setTimeout(() => {
+        console.error("[agent:stall] no text/tool output for 15s — aborting turn");
+        controller.abort();
+      }, IDLE_MS);
     };
     poke();
     let finished = false;
@@ -106,7 +119,6 @@ export async function streamAgentMessage(
 
     while (true) {
       const { done, value } = await reader.read();
-      poke();
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
@@ -128,15 +140,19 @@ export async function streamAgentMessage(
 
           switch (event.type) {
             case "session":
+              poke();
               callbacks.onSession(event.sessionId);
               break;
             case "text":
+              poke();
               callbacks.onText(event.content, event.messageID);
               break;
             case "tool_call":
+              poke();
               callbacks.onToolCall(event.id, event.name, event.args);
               break;
             case "tool_result":
+              poke();
               callbacks.onToolResult(event.id, event.result || "", event.status);
               break;
             case "done":

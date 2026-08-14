@@ -3061,7 +3061,6 @@ export default function Workspace() {
             verticalZoom={askVerticalZoom}
             onVerticalZoomChange={handleAskVerticalZoomChange}
             panelMenuKey="ask"
-            panelMenuEnabled={false}
             role={askRole}
             onRoleChange={setAskRole}
             copyLabel={`→ ${t("chat.send.help")}`}
@@ -3109,7 +3108,6 @@ export default function Workspace() {
                 onDisconnectVps={() => handleVpsDisconnected()}
                 onOpenGitRemote={() => { setGitRemoteSlot("ask"); setShowGitRemote(true); }}
                 onOpenRuntimeManager={() => { setRuntimeManagerPanel("ask"); setShowRuntimeManager(true); }}
-                panelMenuEnabled={false}
               />
             }
             onFocusChange={setAskFocused}
