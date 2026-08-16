@@ -258,6 +258,7 @@ startCleanupScheduler();
 
 // ── Graceful shutdown: kill spawned local engine processes + stop janitor ──
 import { stopAllLocalEngines } from "./runtime/local/engine.js";
+import { stopAllPreviews } from "./runtime/local/preview.js";
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
   process.on(signal, () => {
     try {
@@ -265,6 +266,9 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
     } catch {}
     try {
       stopAllLocalEngines();
+    } catch {}
+    try {
+      void stopAllPreviews();
     } catch {}
     process.exit(0);
   });
