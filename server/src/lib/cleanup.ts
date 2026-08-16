@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import { getConfig } from "./config.js";
 import { isProcessOrphan, killProcess, listProcesses } from "./process-registry.js";
+import { cancelTerminalProcess } from "./terminal.js";
 import { failStaleTasks } from "./tasks.js";
 import { collectTaskWorkspaceDirs, getWorkspaceRoot } from "../runtime/local/workspace.js";
 
@@ -30,7 +31,10 @@ export async function runCleanupOnce(): Promise<CleanupReport> {
 
   for (const proc of listProcesses()) {
     if (isProcessOrphan(proc, now, cfg.maxProcessTimeMs)) {
-      if (killProcess(proc.id)) report.orphanProcessesKilled++;
+      // Terminal-managed processes need the manager's cancel path so their
+      // stream is closed and status is recorded as cancelled, not failed.
+      const killed = cancelTerminalProcess(proc.id, "SIGKILL") || killProcess(proc.id, "SIGKILL");
+      if (killed) report.orphanProcessesKilled++;
     }
   }
 

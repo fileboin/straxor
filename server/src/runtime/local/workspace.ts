@@ -9,8 +9,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
 import path from "path";
-import { getConfig } from "../../lib/config.js";
-import { finishProcess, registerProcess } from "../../lib/process-registry.js";
+import { getTerminalOutput, startTerminalProcess, waitForTerminalExit } from "../../lib/terminal.js";
 
 const execFileP = promisify(execFile);
 
@@ -352,50 +351,24 @@ export function runWorkspaceCommand(
   options: WorkspaceCommandOptions = {},
 ): Promise<WorkspaceCommandResult> {
   const dir = getRepoWorkspaceDir(userId, owner, name);
-  const cfg = getConfig();
   const started = Date.now();
-  const rec = registerProcess({
-    taskId: options.taskId ?? null,
-    userId,
-    command,
-    args,
-    cwd: dir,
-  });
-
-  return new Promise((resolve) => {
-    let settled = false;
-    const settle = (result: WorkspaceCommandResult) => {
-      if (settled) return;
-      settled = true;
-      resolve(result);
-    };
-    const child = execFile(
+  return (async () => {
+    const { processId } = startTerminalProcess({
+      userId,
+      cwd: dir,
       command,
       args,
-      {
-        cwd: dir,
-        timeout: options.timeoutMs ?? cfg.maxProcessTimeMs,
-        maxBuffer: cfg.maxProcessOutputBytes,
-        windowsHide: true,
-        env: { ...process.env, ...(options.env ?? {}) },
-      },
-      (err, stdout, stderr) => {
-        const code = (err as NodeJS.ErrnoException & { code?: number | string } | null)?.code;
-        const exitCode = err ? (typeof code === "number" ? code : null) : 0;
-        const out = Buffer.isBuffer(stdout) ? stdout.toString() : String(stdout ?? "");
-        const errOut = Buffer.isBuffer(stderr) ? stderr.toString() : String(stderr ?? "");
-        finishProcess(rec.id, {
-          status: err && exitCode === null ? "failed" : exitCode === 0 ? "finished" : "failed",
-          exitCode,
-          error: err && exitCode === null ? String(err) : null,
-        });
-        settle({ exitCode, stdout: out, stderr: errOut, durationMs: Date.now() - started });
-      },
-    );
-    child.on("error", (e) => {
-      // execFile callback is not invoked on spawn failure (e.g. missing binary).
-      finishProcess(rec.id, { status: "failed", exitCode: null, error: String(e) });
-      settle({ exitCode: null, stdout: "", stderr: String(e), durationMs: Date.now() - started });
+      taskId: options.taskId ?? null,
+      timeoutMs: options.timeoutMs,
+      env: options.env,
     });
-  });
+    const exit = await waitForTerminalExit(processId);
+    const out = getTerminalOutput(processId);
+    return {
+      exitCode: exit.exitCode ?? null,
+      stdout: out.stdout,
+      stderr: out.stderr,
+      durationMs: Date.now() - started,
+    };
+  })();
 }
