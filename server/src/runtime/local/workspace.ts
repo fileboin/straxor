@@ -9,6 +9,8 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
 import path from "path";
+import { getConfig } from "../../lib/config.js";
+import { finishProcess, registerProcess } from "../../lib/process-registry.js";
 
 const execFileP = promisify(execFile);
 
@@ -129,6 +131,18 @@ async function gitExec(cwd: string, args: string[]): Promise<string> {
   return (stdout + stderr).trim();
 }
 
+// Porcelain output is column-aligned (e.g. " M path"), so trimming would strip
+// the leading status column and corrupt path parsing. Return it verbatim.
+async function gitExecRaw(cwd: string, args: string[]): Promise<string> {
+  const { stdout } = await execFileP("git", args, {
+    cwd,
+    timeout: 120000,
+    maxBuffer: 32 * 1024 * 1024,
+    windowsHide: true,
+  });
+  return stdout;
+}
+
 function auth() {
   return () => Promise.resolve({ username: "x-access-token", password: "" });
 }
@@ -242,4 +256,146 @@ export async function ensureWorkspace(repo: WorkspaceRepo): Promise<WorkspaceInf
   } catch {}
 
   return { dir, branch, lastCommit, cloned: !wasRepo, gitBinary: await hasGitBinary() };
+}
+
+export interface WorkspaceFileStatus {
+  path: string;
+  status: "modified" | "added" | "deleted" | "untracked" | "renamed";
+}
+
+/**
+ * Map the two-char porcelain status code to the GitAdapter vocabulary.
+ * Renames use the "X -> Y" form on the path column; everything else keeps
+ * only the real file path.
+ */
+function parsePorcelainLine(line: string): WorkspaceFileStatus | null {
+  if (!line || line.length < 3) return null;
+  const code = line.slice(0, 2).trim();
+  const rest = line.slice(3);
+  if (!code && !rest) return null;
+
+  if (rest.includes(" -> ")) {
+    const target = rest.split(" -> ").pop()?.trim() || rest;
+    return { path: target, status: "renamed" };
+  }
+  if (code === "??") return { path: rest.trim(), status: "untracked" };
+  if (code.startsWith("A")) return { path: rest.trim(), status: "added" };
+  if (code.startsWith("D")) return { path: rest.trim(), status: "deleted" };
+  if (code.startsWith("M")) return { path: rest.trim(), status: "modified" };
+  if (code.startsWith("R")) return { path: rest.trim(), status: "renamed" };
+  return { path: rest.trim(), status: "modified" };
+}
+
+/** List changed/untracked files in the local sandbox (porcelain). */
+export async function statusWorkspace(
+  userId: string,
+  owner: string,
+  name: string,
+): Promise<WorkspaceFileStatus[]> {
+  const dir = getRepoWorkspaceDir(userId, owner, name);
+  const raw = await gitExecRaw(dir, ["status", "--porcelain"]).catch(() => "");
+  return raw
+    .split("\n")
+    .map(parsePorcelainLine)
+    .filter((s): s is WorkspaceFileStatus => s !== null);
+}
+
+export interface WorkspaceDiff {
+  stat: string;
+  diff: string;
+}
+
+/**
+ * Generate the unified diff (unstaged + staged) for the local sandbox so the
+ * approval step can show exactly what the agent changed before commit/push.
+ */
+export async function diffWorkspace(
+  userId: string,
+  owner: string,
+  name: string,
+): Promise<WorkspaceDiff> {
+  const dir = getRepoWorkspaceDir(userId, owner, name);
+  const unstagedDiff = await gitExec(dir, ["diff"]).catch(() => "");
+  const stagedDiff = await gitExec(dir, ["diff", "--cached"]).catch(() => "");
+  const unstagedStat = await gitExec(dir, ["diff", "--stat"]).catch(() => "");
+  const stagedStat = await gitExec(dir, ["diff", "--cached", "--stat"]).catch(() => "");
+  return {
+    stat: [stagedStat, unstagedStat].filter(Boolean).join("\n"),
+    diff: [stagedDiff, unstagedDiff].filter(Boolean).join("\n"),
+  };
+}
+
+export interface WorkspaceCommandResult {
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+}
+
+export interface WorkspaceCommandOptions {
+  timeoutMs?: number;
+  env?: Record<string, string>;
+  taskId?: string | null;
+}
+
+/**
+ * Run a command (npm install / build / test / ...) inside the local sandbox,
+ * capture stdout/stderr and mirror the run into the in-memory ProcessRegistry
+ * (Iteration 0) so it can be observed and cancelled from the API.
+ */
+export function runWorkspaceCommand(
+  userId: string,
+  owner: string,
+  name: string,
+  command: string,
+  args: string[] = [],
+  options: WorkspaceCommandOptions = {},
+): Promise<WorkspaceCommandResult> {
+  const dir = getRepoWorkspaceDir(userId, owner, name);
+  const cfg = getConfig();
+  const started = Date.now();
+  const rec = registerProcess({
+    taskId: options.taskId ?? null,
+    userId,
+    command,
+    args,
+    cwd: dir,
+  });
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (result: WorkspaceCommandResult) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+    const child = execFile(
+      command,
+      args,
+      {
+        cwd: dir,
+        timeout: options.timeoutMs ?? cfg.maxProcessTimeMs,
+        maxBuffer: cfg.maxProcessOutputBytes,
+        windowsHide: true,
+        env: { ...process.env, ...(options.env ?? {}) },
+      },
+      (err, stdout, stderr) => {
+        const code = (err as NodeJS.ErrnoException & { code?: number | string } | null)?.code;
+        const exitCode = err ? (typeof code === "number" ? code : null) : 0;
+        const out = Buffer.isBuffer(stdout) ? stdout.toString() : String(stdout ?? "");
+        const errOut = Buffer.isBuffer(stderr) ? stderr.toString() : String(stderr ?? "");
+        finishProcess(rec.id, {
+          status: err && exitCode === null ? "failed" : exitCode === 0 ? "finished" : "failed",
+          exitCode,
+          error: err && exitCode === null ? String(err) : null,
+        });
+        settle({ exitCode, stdout: out, stderr: errOut, durationMs: Date.now() - started });
+      },
+    );
+    child.on("error", (e) => {
+      // execFile callback is not invoked on spawn failure (e.g. missing binary).
+      finishProcess(rec.id, { status: "failed", exitCode: null, error: String(e) });
+      settle({ exitCode: null, stdout: "", stderr: String(e), durationMs: Date.now() - started });
+    });
+  });
 }

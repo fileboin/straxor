@@ -9,7 +9,7 @@ import {
   getGitRemoteToken,
 } from "../adapters/git/remote/registry.js";
 import type { GitPlatformId } from "../adapters/git/remote/adapter.js";
-import { ensureWorkspace, getRepoWorkspaceDir, hasGitBinary, pushWorkspace, commitWorkspace } from "../runtime/local/workspace.js";
+import { ensureWorkspace, getRepoWorkspaceDir, hasGitBinary, pushWorkspace, commitWorkspace, statusWorkspace, diffWorkspace } from "../runtime/local/workspace.js";
 import { stopLocalEnginesForUser } from "../runtime/local/engine.js";
 import { normalizeSlot, type RepoSlot } from "../runtime/local/shared-workspace.js";
 
@@ -266,6 +266,54 @@ router.get("/workspace", async (req, res) => {
       pushCapable: conn.connectionType !== "url" || !!(await getGitRemoteToken(userId, conn.platform as GitPlatformId)),
       gitBinary: await hasGitBinary(),
     });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+// GET /api/repos/status — changed files in the active repo's local sandbox.
+router.get("/status", async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const active = await db
+      .select()
+      .from(repoConnections)
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+      .limit(1);
+
+    if (active.length === 0) {
+      res.status(404).json({ error: "No active repo — connect one first" });
+      return;
+    }
+
+    const conn = active[0];
+    const files = await statusWorkspace(userId, conn.owner, conn.name);
+    res.json({ success: true, repo: conn.fullName, branch: conn.defaultBranch, files });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+// GET /api/repos/diff — unified diff + stat for the active repo's sandbox.
+router.get("/diff", async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const active = await db
+      .select()
+      .from(repoConnections)
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+      .limit(1);
+
+    if (active.length === 0) {
+      res.status(404).json({ error: "No active repo — connect one first" });
+      return;
+    }
+
+    const conn = active[0];
+    const result = await diffWorkspace(userId, conn.owner, conn.name);
+    res.json({ success: true, repo: conn.fullName, branch: conn.defaultBranch, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({ error: message });
