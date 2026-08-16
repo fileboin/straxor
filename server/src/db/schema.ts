@@ -10,6 +10,63 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
+// ── Foundation: Persistent Task State (Iteration 0) ──
+// Lifecycle: QUEUED → RUNNING → VERIFYING → WAITING_APPROVAL → VERIFIED
+// (or FAILED/CANCELLED). Transitions are validated in src/lib/task-state.ts so
+// an agent can never mark its own work VERIFIED out of order.
+
+export const tasks = pgTable("tasks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  repo: varchar("repo", { length: 255 }),
+  title: varchar("title", { length: 500 }).notNull(),
+  prompt: text("prompt").notNull().default(""),
+  branch: varchar("branch", { length: 255 }),
+  status: varchar("status", { length: 20 }).notNull().default("QUEUED"),
+  workspaceDir: text("workspace_dir"),
+  commitHash: varchar("commit_hash", { length: 255 }),
+  diff: text("diff"),
+  error: text("error"),
+  retries: integer("retries").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
+  user: one(users, { fields: [tasks.userId], references: [users.id] }),
+  project: one(projects, { fields: [tasks.projectId], references: [projects.id] }),
+  processRuns: many(processRuns),
+}));
+
+// ── Foundation: Persistent Process Runs (Iteration 0) ──
+// Mirrors the in-memory ProcessRegistry so process history survives restarts.
+
+export const processRuns = pgTable("process_runs", {
+  id: uuid("id").primaryKey(),
+  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  pid: integer("pid"),
+  command: text("command").notNull(),
+  args: text("args"),
+  cwd: text("cwd"),
+  status: varchar("status", { length: 20 }).notNull().default("running"),
+  exitCode: integer("exit_code"),
+  signal: varchar("signal", { length: 20 }),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  endedAt: timestamp("ended_at"),
+  stdoutBytes: integer("stdout_bytes").notNull().default(0),
+  stderrBytes: integer("stderr_bytes").notNull().default(0),
+  error: text("error"),
+});
+
+export const processRunsRelations = relations(processRuns, ({ one }) => ({
+  task: one(tasks, { fields: [processRuns.taskId], references: [tasks.id] }),
+  user: one(users, { fields: [processRuns.userId], references: [users.id] }),
+}));
+
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),

@@ -43,6 +43,57 @@ export function getRepoWorkspaceDir(userId: string, owner: string, name: string)
   return path.join(getWorkspaceRoot(), safeUser, `${safeOwner}__${safeName}`);
 }
 
+// Per-task workspace lives OUTSIDE the repo clone (under <root>/<userId>/tasks/)
+// so an agent working in a task workspace never pollutes the project repo's
+// `git status` (workspace isolation, Iteration 0).
+export function getTaskWorkspaceDir(userId: string, taskId: string): string {
+  const safeUser = userId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeTask = taskId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return path.join(getWorkspaceRoot(), safeUser, "tasks", safeTask);
+}
+
+/**
+ * Collect task workspace directories under `root` for the cleanup janitor.
+ * Scans <root>/<userId>/tasks/<taskId>; never throws on a missing/empty root.
+ */
+export function collectTaskWorkspaceDirs(root: string): string[] {
+  const out: string[] = [];
+  let userDirs: string[] = [];
+  try {
+    userDirs = fs.readdirSync(root);
+  } catch {
+    return out;
+  }
+  for (const userDir of userDirs) {
+    const userPath = path.join(root, userDir);
+    let userStat: fs.Stats;
+    try {
+      userStat = fs.statSync(userPath);
+    } catch {
+      continue;
+    }
+    if (!userStat.isDirectory()) continue;
+    const tasksRoot = path.join(userPath, "tasks");
+    let taskDirs: string[] = [];
+    try {
+      taskDirs = fs.readdirSync(tasksRoot);
+    } catch {
+      continue;
+    }
+    for (const td of taskDirs) {
+      const p = path.join(tasksRoot, td);
+      let s: fs.Stats;
+      try {
+        s = fs.statSync(p);
+      } catch {
+        continue;
+      }
+      if (s.isDirectory()) out.push(p);
+    }
+  }
+  return out;
+}
+
 let gitBinaryCheck: boolean | null = null;
 
 export async function hasGitBinary(): Promise<boolean> {

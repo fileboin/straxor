@@ -250,11 +250,20 @@ runMigrations()
     console.error("[migrate] Migration check failed:", err);
   });
 
-// ── Graceful shutdown: kill spawned local engine processes ──
+// ── Foundation janitor: orphan processes, stale tasks, task workspaces ──
+import { startCleanupScheduler, stopCleanupScheduler } from "./lib/cleanup.js";
+startCleanupScheduler();
+
+// ── Graceful shutdown: kill spawned local engine processes + stop janitor ──
 import { stopAllLocalEngines } from "./runtime/local/engine.js";
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
   process.on(signal, () => {
-    stopAllLocalEngines();
+    try {
+      stopCleanupScheduler();
+    } catch {}
+    try {
+      stopAllLocalEngines();
+    } catch {}
     process.exit(0);
   });
 }

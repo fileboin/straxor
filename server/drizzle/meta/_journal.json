@@ -71,6 +71,13 @@
       "when": 1787000000000,
       "tag": "0009_github_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786907699000,
+      "tag": "0010_task_state_process_registry",
+      "breakpoints": true
     }
   ]
 }
