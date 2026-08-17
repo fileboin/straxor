@@ -834,6 +834,7 @@ async function runBackground(
   const { machineId } = job;
 
   let snapshotTimer: ReturnType<typeof setInterval> | undefined;
+  let hardTimeout: ReturnType<typeof setTimeout> | undefined;
 
   try {
     // Send async first, fall back to sync if unsupported.
@@ -876,9 +877,20 @@ async function runBackground(
       job.status = finalStatusForTimeline(job.timeline);
       job.error = job.timeline.find((e) => e.t === "error")?.content;
       if (snapshotTimer) clearInterval(snapshotTimer);
+      if (hardTimeout) clearTimeout(hardTimeout);
       try { stream.destroy(); } catch {}
       void persistJob(job, { final: true });
     };
+
+    // Hard timeout: a stuck engine must not leave the job running forever,
+    // neither in memory nor in the persisted agent_jobs row.
+    hardTimeout = setTimeout(() => {
+      if (finished) return;
+      job.timeline.push({ t: "error", content: "Agent turn timed out after 30 minutes" });
+      adapter.abortSession(machineId, sessionId).catch(() => {});
+      setDone();
+    }, CONNECTION_TIMEOUT_MS);
+    hardTimeout.unref?.();
 
     stream.on("data", (chunk: Buffer) => {
       if (finished) return;
@@ -970,6 +982,7 @@ async function runBackground(
     job.finished = true;
     job.status = "error";
     if (snapshotTimer) clearInterval(snapshotTimer);
+    if (hardTimeout) clearTimeout(hardTimeout);
     void persistJob(job, { final: true });
   }
 }

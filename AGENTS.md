@@ -11,6 +11,7 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
   - `routes/agent.ts`: `/background` sada generiše UUID (`randomUUID()`) umesto `bg-...` i **write-through** u `agent_jobs` pre odgovora; `runBackground` snima timeline u DB svake 3 s (periodic snapshot) i finalni `finishAgentJob` na kraju/grešci; `GET /background/:jobId` vraća in-memory job ili, ako ga nema (posle restarta), čita iz DB. Sve DB operacije best-effort (try/catch) — ako tabela još nije migrirana, stari in-memory tok i dalje radi.
   - `index.ts`: posle `runMigrations()` na startu pomiri stale running jobove (marked error "Interrupted").
 - **Verifikovano**: server `tsc --noEmit` čist, vitest **142/142** (novih 8 testova u `agent-jobs.test.ts`), client build prolazi.
+- **Dodatno (isti krug)**: `runBackground` dobio 30-min hard timeout (`CONNECTION_TIMEOUT_MS`, kao `/send` SSE) — zaglavljeni engine više ne ostavlja job `running` zauvek; pri timeout-u abortuje remote session i perzistira "Agent turn timed out" kao error.
 
 ## Zadnji zadatak — Uklanjanje sistemskog spama iz Panela 1 (Opcja A, urađeno)
 - **Uzrok**: Ask panel pokreće punoi agent turn kroz `runAgentTurn`, a sistemska uloga (`[SISTEMSKA ULOGA: Developer]` + prompts) bila je ugradjena DIREKTNO u tijelo vidljive korisničke poruke koju je model vidio i session pamti. Paralelno, server je u `agent.ts` prepend-ovao `[STRAXOR GITHUB CONTEXT]` (repo/branch/dir/slot) u isti vidljivi `fullText`. Zato se uloga i kontekst ispisuju u chatu i vraćaju pri restoru.
@@ -79,6 +80,5 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
 
 ## Next Move
 1. **Task Queue / multi-uloga fan-out (audit FAZA 6/7b ostatak)**: `/api/agent/send` prima JEDAN machineId; dodati per-slot red zadataka (QUEUED) + fan-out na uloge (Architect/UI/Backend/DB/Security/Testing) preko `multi-agent` sloja. Model-injekcija u engine spawn je već urađena (`opencode-model.ts`).
-2. **Background job hard timeout**: `runBackground` nema 30-min hard timeout (kao `/send` SSE); dodati da zaglavljeni turn ne ostane `running` zauvek (ni u DB ni in-memory).
-3. **FAZA 6 pravi token (korisnik)**: korisnik unese pravi GitHub token kroz UI (⚙ PanelMenu → "GitHub token" → "+ Dodaj token") → `POST /api/repos/push` → 200/OK → screenshot.
-4. **drizzle-orm**: već na `^0.45.2` (HIGH GHSA-gpj5-g38j-94v9 rešen) — TODO #2 zatvoren.
+2. **FAZA 6 pravi token (korisnik)**: korisnik unese pravi GitHub token kroz UI (⚙ PanelMenu → "GitHub token" → "+ Dodaj token") → `POST /api/repos/push` → 200/OK → screenshot.
+3. **drizzle-orm**: već na `^0.45.2` (HIGH GHSA-gpj5-g38j-94v9 rešen) — TODO #2 zatvoren.
