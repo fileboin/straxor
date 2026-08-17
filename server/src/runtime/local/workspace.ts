@@ -7,6 +7,7 @@
 
 import { execFile } from "child_process";
 import { promisify } from "util";
+import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
 import { getTerminalOutput, startTerminalProcess, waitForTerminalExit } from "../../lib/terminal.js";
@@ -302,6 +303,8 @@ export async function statusWorkspace(
 export interface WorkspaceDiff {
   stat: string;
   diff: string;
+  /** SHA-256 of the diff text — binds an approval to the exact diff shown. */
+  hash: string;
 }
 
 /**
@@ -318,10 +321,17 @@ export async function diffWorkspace(
   const stagedDiff = await gitExec(dir, ["diff", "--cached"]).catch(() => "");
   const unstagedStat = await gitExec(dir, ["diff", "--stat"]).catch(() => "");
   const stagedStat = await gitExec(dir, ["diff", "--cached", "--stat"]).catch(() => "");
+  const diff = [stagedDiff, unstagedDiff].filter(Boolean).join("\n");
   return {
     stat: [stagedStat, unstagedStat].filter(Boolean).join("\n"),
-    diff: [stagedDiff, unstagedDiff].filter(Boolean).join("\n"),
+    diff,
+    hash: diffHash(diff),
   };
+}
+
+/** SHA-256 of a diff string (used as the approval fingerprint). */
+export function diffHash(diff: string): string {
+  return createHash("sha256").update(diff, "utf8").digest("hex");
 }
 
 export interface WorkspaceCommandResult {
@@ -329,6 +339,136 @@ export interface WorkspaceCommandResult {
   stdout: string;
   stderr: string;
   durationMs: number;
+}
+
+export interface WorkspaceVerifyStep {
+  name: "install" | "build" | "test";
+  command: string;
+  args: string[];
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+  passed: boolean;
+}
+
+export interface WorkspaceVerifyResult {
+  steps: WorkspaceVerifyStep[];
+  passed: boolean;
+  /** True when the fixture has no npm scripts to verify at all. */
+  skipped: boolean;
+}
+
+async function detectScripts(cwd: string): Promise<{ build?: string; test?: string }> {
+  try {
+    const raw = await fs.promises.readFile(path.join(cwd, "package.json"), "utf8");
+    const scripts = (JSON.parse(raw) as { scripts?: Record<string, string> }).scripts || {};
+    return { build: scripts.build, test: scripts.test };
+  } catch {
+    return {};
+  }
+}
+
+export interface WorkspaceVerifyOptions {
+  /** Install deps first (auto-runs when node_modules is missing). */
+  install?: boolean;
+  /** Run `npm run build` (default true; skipped when no build script). */
+  build?: boolean;
+  /** Run `npm test` (default true; skipped when no test script). */
+  test?: boolean;
+  timeoutMs?: number;
+  taskId?: string | null;
+}
+
+/**
+ * Iteration 4 — Verification: run the project's build + test commands in the
+ * sandbox through the TerminalManager and return a structured report. `passed`
+ * is true only when every executed step exited 0. A fixture without any npm
+ * scripts reports `skipped` so the caller can decide how to treat it.
+ */
+export async function verifyWorkspace(
+  userId: string,
+  owner: string,
+  name: string,
+  options: WorkspaceVerifyOptions = {},
+): Promise<WorkspaceVerifyResult> {
+  const dir = getRepoWorkspaceDir(userId, owner, name);
+  const scripts = await detectScripts(dir);
+  const hasNodeModules = fs.existsSync(path.join(dir, "node_modules"));
+  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+  const steps: WorkspaceVerifyStep[] = [];
+
+  const run = async (step: WorkspaceVerifyStep["name"], command: string, args: string[]) => {
+    const result = await runWorkspaceCommand(userId, owner, name, command, args, {
+      timeoutMs: options.timeoutMs,
+      taskId: options.taskId ?? null,
+    });
+    steps.push({
+      name: step,
+      command,
+      args,
+      exitCode: result.exitCode,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      durationMs: result.durationMs,
+      passed: result.exitCode === 0,
+    });
+  };
+
+  if (options.install !== false && !hasNodeModules) {
+    await run("install", npm, ["install", "--no-audit", "--no-fund"]);
+  }
+  if (options.build !== false && scripts.build) {
+    await run("build", npm, ["run", "build"]);
+  }
+  if (options.test !== false && scripts.test) {
+    await run("test", npm, ["run", "test"]);
+  }
+
+  if (steps.length === 0) {
+    return { steps, passed: false, skipped: true };
+  }
+  return { steps, passed: steps.every((s) => s.passed), skipped: false };
+}
+
+export interface ApproveResult {
+  committed: boolean;
+  hash: string;
+  message: string;
+  /** True when the current diff no longer matches the one the user approved. */
+  diffChanged: boolean;
+  /** True when there is nothing to commit. */
+  empty: boolean;
+}
+
+/**
+ * Iteration 4 — Approval gate: commit the sandbox changes ONLY if the current
+ * diff still matches the fingerprint the user approved. Passing a stale
+ * `expectedDiffHash` (files changed since the diff was shown) refuses the
+ * commit so an unapproved change can never sneak into the repository.
+ */
+export async function approveAndCommitWorkspace(
+  userId: string,
+  owner: string,
+  name: string,
+  message: string,
+  expectedDiffHash?: string,
+): Promise<ApproveResult> {
+  const diff = await diffWorkspace(userId, owner, name);
+  if (expectedDiffHash && diff.hash !== expectedDiffHash) {
+    return { committed: false, hash: "", message, diffChanged: true, empty: false };
+  }
+  if (!diff.diff.trim()) {
+    return { committed: false, hash: "", message, diffChanged: false, empty: true };
+  }
+  const result = await commitWorkspace(userId, owner, name, message);
+  return {
+    committed: result.committed,
+    hash: result.hash,
+    message: result.message,
+    diffChanged: false,
+    empty: false,
+  };
 }
 
 export interface WorkspaceCommandOptions {

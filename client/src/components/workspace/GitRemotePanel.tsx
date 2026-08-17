@@ -13,7 +13,11 @@ import {
   createIssue,
 } from "../../lib/git-remote";
 import type { GitPlatformId } from "../../lib/git-remote";
-import { listRepoConnections, connectRepo, setActiveRepo, disconnectRepo, pushRepo, connectRepoUrl } from "../../lib/repos";
+import {
+  listRepoConnections, connectRepo, setActiveRepo, disconnectRepo, pushRepo, connectRepoUrl,
+  verifyRepo, getRepoDiff, approveRepo,
+  type RepoVerifyResult, type RepoDiffResult,
+} from "../../lib/repos";
 import type { RepoConnection, UrlRepoMeta } from "../../lib/repos";
 
 interface Props {
@@ -44,6 +48,12 @@ export default function GitRemotePanel({ onClose, onRepoChanged, slot }: Props) 
   const [connectingUrl, setConnectingUrl] = useState(false);
   const [urlError, setUrlError] = useState("");
   const [urlMeta, setUrlMeta] = useState<UrlRepoMeta | null>(null);
+  // Iteration 4 — closed loop (Verify → Diff → Approve → Commit → Push)
+  const [verifyResult, setVerifyResult] = useState<RepoVerifyResult | null>(null);
+  const [diffResult, setDiffResult] = useState<RepoDiffResult | null>(null);
+  const [commitMsg, setCommitMsg] = useState("Straxor Agent commit");
+  const [loopBusy, setLoopBusy] = useState(false);
+  const [loopError, setLoopError] = useState("");
 
   const meta = GIT_PLATFORMS.find((p) => p.id === platform)!;
 
@@ -162,6 +172,58 @@ export default function GitRemotePanel({ onClose, onRepoChanged, slot }: Props) 
     } catch (e: any) {
       setActionMsg("Push neuspio: " + e.message);
     }
+  }
+
+  async function handleVerify() {
+    setLoopBusy(true);
+    setLoopError("");
+    setVerifyResult(null);
+    try {
+      const r = await verifyRepo({ install: true });
+      setVerifyResult(r);
+      setActionMsg(r.passed ? "Verifikacija prošla ✓" : "Verifikacija nije prošla ✗");
+    } catch (e: any) {
+      setLoopError(e.message);
+    }
+    setLoopBusy(false);
+  }
+
+  async function handleShowDiff() {
+    setLoopBusy(true);
+    setLoopError("");
+    try {
+      const d = await getRepoDiff();
+      setDiffResult(d);
+      setActionMsg(d.diff ? "Diff prikazan — pregledaj i odobri" : "Nema promjena u sandboxu");
+    } catch (e: any) {
+      setLoopError(e.message);
+    }
+    setLoopBusy(false);
+  }
+
+  async function handleApprove(push: boolean) {
+    setLoopBusy(true);
+    setLoopError("");
+    try {
+      const r = await approveRepo(commitMsg.trim() || "Straxor Agent commit", diffResult?.hash, push);
+      setActionMsg(
+        r.diffChanged
+          ? "Diff se promijenio — ponovo pregledaj"
+          : r.empty
+          ? "Nema promjena za commit"
+          : push
+          ? "Odobreno + push uspio: " + r.hash
+          : "Odobreno i commit-ano: " + r.hash,
+      );
+      if (r.diffChanged || r.pushed || r.committed) {
+        setDiffResult(null);
+        setVerifyResult(null);
+        loadConnections();
+      }
+    } catch (e: any) {
+      setLoopError(e.message);
+    }
+    setLoopBusy(false);
   }
 
   async function handleFork(fullName: string) {
@@ -546,6 +608,96 @@ export default function GitRemotePanel({ onClose, onRepoChanged, slot }: Props) 
                 </div>
               )}
             </div>
+
+            {/* Iteration 4 — closed loop: Verify → Diff → Approve → Commit → Push */}
+            {(() => {
+              const active = connections.find((c) => c.platform === platform && c.isActive);
+              if (!active || active.connectionType === "url") return null;
+              return (
+                <div className="mt-4 border border-blue-500/30 bg-blue-500/5 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold text-blue-300">
+                      Zatvoreni ciklus · {active.fullName}
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button
+                        className="btn btn-xs px-2 py-0.5 border border-blue-500/40 text-blue-300 rounded hover:bg-blue-500/20"
+                        onClick={handleVerify}
+                        disabled={loopBusy}
+                      >
+                        {loopBusy ? "..." : "\u2713 Verify"}
+                      </button>
+                      <button
+                        className="btn btn-xs px-2 py-0.5 border border-blue-500/40 text-blue-300 rounded hover:bg-blue-500/20"
+                        onClick={handleShowDiff}
+                        disabled={loopBusy}
+                      >
+                        {loopBusy ? "..." : "Diff"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {loopError && (
+                    <div className="text-xs text-red-400 bg-red-400/10 px-2 py-1 rounded">{loopError}</div>
+                  )}
+
+                  {verifyResult && (
+                    <div className={"text-xs px-2 py-1 rounded " + (verifyResult.passed ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400")}>
+                      {verifyResult.skipped
+                        ? "Nema npm build/test skripti za verifikaciju"
+                        : verifyResult.passed
+                        ? "Build + test prošli ✓"
+                        : "Verifikacija pala ✗"}
+                      {verifyResult.steps.map((s) => (
+                        <div key={s.name} className="mt-0.5 flex items-center gap-1.5">
+                          <span>{s.passed ? "\u2713" : "\u2717"}</span>
+                          <span className="font-mono text-[10px]">{s.name}</span>
+                          <span className="text-[10px] opacity-70">exit {s.exitCode} · {s.durationMs}ms</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {diffResult && (
+                    <div className="space-y-1">
+                      <div className="text-[10px] text-blue-300/80 font-mono break-all">
+                        diff hash: {diffResult.hash.slice(0, 16)}…
+                      </div>
+                      {diffResult.diff ? (
+                        <pre className="max-h-40 overflow-auto text-[9px] leading-relaxed bg-black/40 border border-blue-500/20 rounded p-2 whitespace-pre-wrap">
+                          {diffResult.diff}
+                        </pre>
+                      ) : (
+                        <div className="text-[10px] text-text-muted">Nema promjena u sandboxu.</div>
+                      )}
+                      <input
+                        className="input w-full text-xs"
+                        placeholder="Commit poruka"
+                        value={commitMsg}
+                        onChange={(e) => setCommitMsg(e.target.value)}
+                      />
+                      <div className="flex gap-1.5">
+                        <button
+                          className="btn btn-xs flex-1 px-2 py-0.5 border border-green-500/40 text-green-400 rounded hover:bg-green-500/20"
+                          onClick={() => handleApprove(false)}
+                          disabled={loopBusy || !diffResult.diff}
+                        >
+                          {loopBusy ? "..." : "\u2713 Odobri i commit"}
+                        </button>
+                        <button
+                          className="btn btn-xs flex-1 px-2 py-0.5 bg-green-600/30 text-green-300 rounded hover:bg-green-600/50"
+                          onClick={() => handleApprove(true)}
+                          disabled={loopBusy || !diffResult.diff}
+                          title="Odobri, commit i push na GitHub"
+                        >
+                          {loopBusy ? "..." : "\u2713 Odobri + push"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 

@@ -77,6 +77,71 @@ export async function pushRepo() {
   });
 }
 
+export interface RepoVerifyStep {
+  name: "install" | "build" | "test";
+  command: string;
+  args: string[];
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+  passed: boolean;
+}
+
+export interface RepoVerifyResult {
+  success: boolean;
+  repo: string;
+  branch: string;
+  steps: RepoVerifyStep[];
+  passed: boolean;
+  skipped: boolean;
+}
+
+export async function verifyRepo(opts?: {
+  build?: boolean;
+  test?: boolean;
+  install?: boolean;
+  timeoutMs?: number;
+}): Promise<RepoVerifyResult> {
+  return api<RepoVerifyResult>(`/verify`, {
+    method: "POST",
+    body: JSON.stringify(opts ?? {}),
+  });
+}
+
+export interface RepoDiffResult {
+  success: boolean;
+  repo: string;
+  branch: string;
+  stat: string;
+  diff: string;
+  hash: string;
+}
+
+export async function getRepoDiff(): Promise<RepoDiffResult> {
+  return api<RepoDiffResult>(`/diff`);
+}
+
+export interface RepoApproveResult {
+  success: boolean;
+  repo: string;
+  branch: string;
+  committed: boolean;
+  hash: string;
+  message: string;
+  diffChanged: boolean;
+  empty: boolean;
+  pushed: boolean;
+  pushOutput: string;
+}
+
+export async function approveRepo(message: string, diffHash?: string, push = false): Promise<RepoApproveResult> {
+  return api<RepoApproveResult>(`/approve`, {
+    method: "POST",
+    body: JSON.stringify({ message, diffHash, push }),
+  });
+}
+
 export async function connectRepoUrl(repoUrl: string) {
   const token = localStorage.getItem("token");
   const res = await fetch("/api/github/connect-url", {

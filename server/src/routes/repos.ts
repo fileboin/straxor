@@ -9,7 +9,7 @@ import {
   getGitRemoteToken,
 } from "../adapters/git/remote/registry.js";
 import type { GitPlatformId } from "../adapters/git/remote/adapter.js";
-import { ensureWorkspace, getRepoWorkspaceDir, hasGitBinary, pushWorkspace, commitWorkspace, statusWorkspace, diffWorkspace } from "../runtime/local/workspace.js";
+import { ensureWorkspace, getRepoWorkspaceDir, hasGitBinary, pushWorkspace, commitWorkspace, statusWorkspace, diffWorkspace, verifyWorkspace, approveAndCommitWorkspace } from "../runtime/local/workspace.js";
 import { stopLocalEnginesForUser } from "../runtime/local/engine.js";
 import { normalizeSlot, type RepoSlot } from "../runtime/local/shared-workspace.js";
 
@@ -374,6 +374,115 @@ router.post("/push", async (req, res) => {
       });
       return;
     }
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/repos/verify — Iteration 4: run the project's build + test in the
+// active repo's sandbox and return a structured report (exit codes, output).
+router.post("/verify", async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { build, test, install, timeoutMs, taskId } = req.body as {
+      build?: boolean;
+      test?: boolean;
+      install?: boolean;
+      timeoutMs?: number;
+      taskId?: string | null;
+    };
+
+    const active = await db
+      .select()
+      .from(repoConnections)
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+      .limit(1);
+
+    if (active.length === 0) {
+      res.status(404).json({ error: "No active repo — connect one first" });
+      return;
+    }
+
+    const conn = active[0];
+    const result = await verifyWorkspace(userId, conn.owner, conn.name, {
+      build: build !== false,
+      test: test !== false,
+      install: install ?? true,
+      timeoutMs: typeof timeoutMs === "number" && timeoutMs > 0 ? timeoutMs : undefined,
+      taskId: taskId ?? null,
+    });
+
+    res.json({ success: true, repo: conn.fullName, branch: conn.defaultBranch, ...result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/repos/approve — Iteration 4: approval gate. Commits the sandbox
+// changes ONLY when the current diff still matches the fingerprint the user
+// approved (diffHash from GET /api/repos/diff). Optional push=true also pushes.
+router.post("/approve", async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const message: string = (req.body?.message as string) || "Straxor Agent commit";
+    const diffHash: string | undefined = typeof req.body?.diffHash === "string" ? req.body.diffHash : undefined;
+    const push: boolean = req.body?.push === true;
+
+    const active = await db
+      .select()
+      .from(repoConnections)
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+      .limit(1);
+
+    if (active.length === 0) {
+      res.status(404).json({ error: "No active repo — connect one first" });
+      return;
+    }
+
+    const conn = active[0];
+    const result = await approveAndCommitWorkspace(userId, conn.owner, conn.name, message, diffHash);
+
+    if (result.diffChanged) {
+      res.status(409).json({
+        error: "Diff se promijenio od prikaza — ponovo pregledaj i odobri novi diff",
+        ...result,
+      });
+      return;
+    }
+    if (result.empty) {
+      res.status(400).json({ error: "Nema promjena za commit", ...result });
+      return;
+    }
+
+    let pushed = false;
+    let pushOutput = "";
+    if (push) {
+      const token = await getGitRemoteToken(userId, conn.platform as GitPlatformId);
+      if (!token) {
+        res.status(401).json({
+          error: "Platform token missing — save a token first to push",
+          ...result,
+          pushed: false,
+        });
+        return;
+      }
+      await ensureWorkspace({
+        userId,
+        platform: conn.platform,
+        owner: conn.owner,
+        name: conn.name,
+        fullName: conn.fullName,
+        cloneUrl: conn.cloneUrl,
+        defaultBranch: conn.defaultBranch,
+        token,
+      });
+      pushOutput = await pushWorkspace(userId, conn.owner, conn.name, conn.defaultBranch);
+      pushed = true;
+    }
+
+    res.json({ success: true, repo: conn.fullName, branch: conn.defaultBranch, ...result, pushed, pushOutput });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({ error: message });
   }
 });
