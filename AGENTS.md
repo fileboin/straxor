@@ -13,6 +13,14 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
 - **Verifikovano**: server `tsc --noEmit` čist, vitest **142/142** (novih 8 testova u `agent-jobs.test.ts`), client build prolazi.
 - **Dodatno (isti krug)**: `runBackground` dobio 30-min hard timeout (`CONNECTION_TIMEOUT_MS`, kao `/send` SSE) — zaglavljeni engine više ne ostavlja job `running` zauvek; pri timeout-u abortuje remote session i perzistira "Agent turn timed out" kao error.
 
+## Zadnji zadatak — Team fan-out UI (klijent, urađeno)
+- **Cilj**: server ima `/api/agent/team` (per-slot QUEUED red + role fan-out) — nedostajao je klijentski UI koji ga zove i prikazuje per-role progres.
+- **Implementacija**:
+  - `client/src/lib/team.ts` (novo): `startTeamRun` (POST /agent/team), `fetchTeamTask` (GET /agent/team/:taskId), `approveTeamTask` (POST /agent/team/:taskId/approve) + tipovi (`TeamJob`, `TeamTask`, `TeamTaskDetail`).
+  - `client/src/components/workspace/TeamRunPanel.tsx` (novo): modal — prompt textarea, birač uloga (coding/testing/security/research/documentation), dugme "Pokreni tim", poll na 1.5s, per-role status badge + text/tool sažetak + error, task status (QUEUED→…→WAITING_APPROVAL→VERIFIED/FAILED), dugme "✓ Odobri rad tima" → approve → VERIFIED.
+  - `Workspace.tsx`: "👥 Tim" dugme u Agent headerLeft (pored RoleSelector) otvara panel; panel se renderuje uz BusHistoryPanel.
+- **Verifikovano**: client `npm run build` prolazi (226 modula, 0 grešaka). Server netaknut ovog kruga (vitest 153/153 iz prethodnog).
+
 ## Zadnji zadatak — Task Queue + Team fan-out (FAZA 7b/7c, urađeno)
 - **Cilj**: `/api/agent/background` je pokretao job-ove odmah i konkurentno na jednom lokalnom engine-u; nedostajao je per-slot red zadataka (QUEUED) i fan-out na uloge.
 - **Implementacija**:
@@ -88,6 +96,6 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
 - **(push test + puna lista repoa)** — čeka korisnikov pravi GitHub token unesen LIČNO kroz UI (GitRemotePanel → 🔑 Token → "GitHub Personal Access Token" polje; ili ⚙ PanelMenu → "GitHub token" → "+ Dodaj token"). Agent nikad ne rukuje sirovim tokenom. Nakon unosa: `/api/git-remote/github/repos` treba da vrati 200 + sve repoe (ne 401), i `POST /api/repos/push` → 200/OK → screenshot.
 
 ## Next Move
-1. **Team fan-out UI (klijent)**: `/api/agent/team` je gotov na serveru (per-slot QUEUED red + role fan-out); ostaje UI dugme/panel u Workspace-u koji ga zove i prikazuje per-role job progres.
-2. **FAZA 6 pravi token (korisnik)**: korisnik unese pravi GitHub token kroz UI (⚙ PanelMenu → "GitHub token" → "+ Dodaj token") → `POST /api/repos/push` → 200/OK → screenshot.
+1. **FAZA 6 pravi token (korisnik)**: korisnik unese pravi GitHub token kroz UI (⚙ PanelMenu → "GitHub token" → "+ Dodaj token") → `POST /api/repos/push` → 200/OK → screenshot.
+2. **Team fan-out E2E verifikacija (UI)**: pokrenuti tim kroz UI na aktivnom repou i potvrditi per-role progres + WAITING_APPROVAL → approve.
 3. **drizzle-orm**: već na `^0.45.2` (HIGH GHSA-gpj5-g38j-94v9 rešen) — TODO #2 zatvoren.

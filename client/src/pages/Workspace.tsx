@@ -68,6 +68,7 @@ import type { OrbState } from "thinking-orbs";
 import AdminCenter from "../components/workspace/AdminCenter.js";
 import VerificationPanel from "../components/workspace/VerificationPanel.js";
 import BusHistoryPanel from "../components/workspace/BusHistoryPanel.js";
+import TeamRunPanel from "../components/workspace/TeamRunPanel.js";
 import PwaDiagnosticsPanel from "../components/workspace/PwaDiagnosticsPanel.js";
 import HandshakeSelfTestPanel, { type HandshakeSelfTestResult } from "../components/workspace/HandshakeSelfTestPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
@@ -337,6 +338,7 @@ export default function Workspace() {
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
   const [activePromptIds, setActivePromptIds] = useState<Set<string>>(new Set());
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
+  const [showTeamRun, setShowTeamRun] = useState(false);
 
   // Security scan state
   const [securityVerdict, setSecurityVerdict] = useState<ScanVerdict | null>(null);
@@ -3214,6 +3216,14 @@ export default function Workspace() {
             })()}
             headerLeft={
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTeamRun(true)}
+                  className="px-2.5 h-7 rounded-md border border-accent/40 bg-accent/10 text-[10px] font-semibold text-accent hover:bg-accent/20 transition-colors"
+                  title="Pokreni tim agenta (više uloga sekvencijalno)"
+                >
+                  👥 Tim
+                </button>
                 <RoleSelector role={agentRole} onChange={setAgentRole} />
                 <ChatAgentToggle
                   mode={agentPanelMode}
@@ -3796,6 +3806,12 @@ export default function Workspace() {
         />
       )}
 
+      <TeamRunPanel
+        open={showTeamRun}
+        onClose={() => setShowTeamRun(false)}
+        machineId={agentMachineId}
+        defaultPrompt={agentDraftInput || agentPrefill}
+      />
       <BusHistoryPanel
         open={showBusHistory}
         events={agentBusEvents}
