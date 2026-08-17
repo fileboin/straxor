@@ -13,9 +13,17 @@ import {
   updateAgentJob,
   finishAgentJob,
   getAgentJob,
+  listAgentJobsForTask,
   finalStatusForTimeline,
+  type AgentJobStatus,
   type AgentJobTimelineEntry,
 } from "../lib/agent-jobs.js";
+import { createTask, getTask, transitionTaskStatus } from "../lib/tasks.js";
+import {
+  buildRoleSystem,
+  normalizeTeamRoles,
+  roleLabel,
+} from "../lib/team-roles.js";
 import { randomUUID } from "node:crypto";
 
 type AgentBusAction = "help" | "review" | "warn";
@@ -727,12 +735,28 @@ interface BackgroundJob {
   machineId: string;
   sessionId: string;
   timeline: AgentJobTimelineEntry[];
-  status: "running" | "done" | "error";
+  status: "queued" | "running" | "done" | "error";
   error?: string;
   finished: boolean;
+  taskId?: string | null;
+  label?: string | null;
+  // The turn payload is kept on the queued job so it can actually run once the
+  // per-slot queue drains (a queued job has no other copy of its prompt).
+  payload?: { fullText: string; engineAttachments: unknown[]; systemPrompt?: string };
 }
 
 const backgroundJobs = new Map<string, BackgroundJob>();
+
+// Per-slot FIFO queue: exactly ONE running job per (userId, machineId). When a
+// slot is busy, new jobs are persisted as QUEUED and start as soon as the
+// running job finishes (releaseSlot). This serializes turns on the single
+// local OpenCode engine per user+panel.
+const slotRunning = new Set<string>();
+const slotQueues = new Map<string, BackgroundJob[]>();
+
+function slotKeyOf(userId: string, machineId: string): string {
+  return `${userId}:${machineId}`;
+}
 
 // POST /api/agent/background — start the agent fire-and-forget. Returns the
 // job id immediately; status is polled via GET /:id. Works on mobile even when
@@ -754,84 +778,153 @@ router.post("/background", async (req: Request, res: Response) => {
     return;
   }
 
-  let job: BackgroundJob;
   try {
-    const adapter = getAdapters().runtime(userId);
-
-    // Auto-create session if none provided.
-    let activeSessionId = sessionId;
-    if (!activeSessionId) {
-      const created = await adapter.createSession(machineId, "Straxor Session");
-      activeSessionId = created.id;
-    }
-
-    const { engineAttachments, notes } = await resolveAttachments(attachments);
-    const fullText =
-      notes.length > 0 ? [msgText, ...notes].filter(Boolean).join("\n\n") : msgText;
-
-    // Same workspace-context-as-system-prompt behavior as the /send route.
-    let systemPrompt = system || "";
-    if (isLocalMachineId(machineId)) {
-      try {
-        const workspace = await withSharedWorkspace(userId, async (context) => context, slotFromMachineId(machineId));
-        const githubContext = [
-          "[STRAXOR GITHUB CONTEXT]",
-          `Active repository: ${workspace.repo}`,
-          `Active branch: ${workspace.branch}`,
-          `Workspace directory: ${workspace.dir}`,
-          `Panel slot: ${slotFromMachineId(machineId)}`,
-          `Workspace mode: ${workspace.readOnly ? "read-only" : "read-write"}`,
-          "This context is shared across Straxor OpenCode agents and GitHub integration for the active panel.",
-          "You are already running inside this workspace. Inspect its files before answering. Use this repository for all reads, edits, tests, and git operations; never use /tmp or another clone. Do not claim a repository is unavailable unless a tool call proves it.",
-          "[/STRAXOR GITHUB CONTEXT]",
-        ].join("\n");
-        systemPrompt = systemPrompt ? `${githubContext}\n\n${systemPrompt}` : githubContext;
-      } catch {
-        // No workspace — run as general chat.
-      }
-    }
-
-    job = {
-      id: randomUUID(),
-      userId,
-      machineId,
-      sessionId: activeSessionId,
-      timeline: [],
-      status: "running",
-      finished: false,
-    };
-    backgroundJobs.set(job.id, job);
-
-    // Persist the job before responding so the client can poll it (and it
-    // survives a restart). Best-effort: a missing/unmigrated table must never
-    // break the existing in-memory flow.
-    try {
-      await createAgentJob({ id: job.id, userId, machineId, sessionId: activeSessionId });
-    } catch (err) {
-      console.log(`[agent:memory] create ${job.id} not persisted: ${err instanceof Error ? err.message : err}`);
-    }
-
-    res.json({ jobId: job.id, sessionId: activeSessionId, status: "running" });
-
-    // Fire-and-forget: run the send + event stream detached from the request.
-    runBackground(job.id, adapter, activeSessionId, fullText, engineAttachments, systemPrompt).catch(() => {});
+    const { jobId, sessionId: activeSessionId, status } = await enqueueBackgroundJob(userId, machineId, {
+      message,
+      text,
+      sessionId,
+      attachments,
+      system,
+    });
+    res.json({ jobId, sessionId: activeSessionId, status });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({ error: message });
   }
 });
 
-async function runBackground(
-  jobId: string,
-  adapter: any,
-  sessionId: string,
-  fullText: string,
-  engineAttachments: unknown[],
-  systemPrompt?: string
-): Promise<void> {
-  const job = backgroundJobs.get(jobId);
-  if (!job) return;
-  const { machineId } = job;
+/**
+ * Build + start (or queue) one background agent turn. Shared by the /background
+ * route and the /team fan-out endpoint. Returns the job's status: "running"
+ * when it started immediately, "queued" when the slot is busy (FIFO).
+ */
+async function enqueueBackgroundJob(
+  userId: string,
+  machineId: string,
+  opts: {
+    message?: string;
+    text?: string;
+    sessionId?: string;
+    attachments?: AttachmentRef[];
+    system?: string;
+    taskId?: string | null;
+    label?: string | null;
+  }
+): Promise<{ jobId: string; sessionId: string; status: "queued" | "running" }> {
+  const adapter = getAdapters().runtime(userId);
+  const msgText = opts.message || opts.text;
+  if (!msgText) throw new Error("Missing message/text");
+
+  // Auto-create session if none provided.
+  let activeSessionId = opts.sessionId;
+  if (!activeSessionId) {
+    const created = await adapter.createSession(machineId, "Straxor Session");
+    activeSessionId = created.id;
+  }
+
+  const { engineAttachments, notes } = await resolveAttachments(opts.attachments);
+  const fullText =
+    notes.length > 0 ? [msgText, ...notes].filter(Boolean).join("\n\n") : msgText;
+
+  // Same workspace-context-as-system-prompt behavior as the /send route.
+  let systemPrompt = opts.system || "";
+  if (isLocalMachineId(machineId)) {
+    try {
+      const workspace = await withSharedWorkspace(userId, async (context) => context, slotFromMachineId(machineId));
+      const githubContext = [
+        "[STRAXOR GITHUB CONTEXT]",
+        `Active repository: ${workspace.repo}`,
+        `Active branch: ${workspace.branch}`,
+        `Workspace directory: ${workspace.dir}`,
+        `Panel slot: ${slotFromMachineId(machineId)}`,
+        `Workspace mode: ${workspace.readOnly ? "read-only" : "read-write"}`,
+        "This context is shared across Straxor OpenCode agents and GitHub integration for the active panel.",
+        "You are already running inside this workspace. Inspect its files before answering. Use this repository for all reads, edits, tests, and git operations; never use /tmp or another clone. Do not claim a repository is unavailable unless a tool call proves it.",
+        "[/STRAXOR GITHUB CONTEXT]",
+      ].join("\n");
+      systemPrompt = systemPrompt ? `${githubContext}\n\n${systemPrompt}` : githubContext;
+    } catch {
+      // No workspace — run as general chat.
+    }
+  }
+
+  const job: BackgroundJob = {
+    id: randomUUID(),
+    userId,
+    machineId,
+    sessionId: activeSessionId,
+    timeline: [],
+    status: "running",
+    finished: false,
+    taskId: opts.taskId ?? null,
+    label: opts.label ?? null,
+    payload: { fullText, engineAttachments, systemPrompt },
+  };
+  backgroundJobs.set(job.id, job);
+
+  // Persist the job before responding so the client can poll it (and it
+  // survives a restart). Best-effort: a missing/unmigrated table must never
+  // break the existing in-memory flow.
+  try {
+    await createAgentJob({
+      id: job.id,
+      userId,
+      machineId,
+      sessionId: activeSessionId,
+      taskId: opts.taskId ?? null,
+      label: opts.label ?? null,
+    });
+  } catch (err) {
+    console.log(`[agent:memory] create ${job.id} not persisted: ${err instanceof Error ? err.message : err}`);
+  }
+
+  // Per-slot FIFO: only one turn per (user, engine) at a time.
+  const slotKey = slotKeyOf(userId, machineId);
+  if (slotRunning.has(slotKey)) {
+    job.status = "queued";
+    try {
+      await updateAgentJob(userId, job.id, { status: "queued" });
+    } catch {}
+    const queue = slotQueues.get(slotKey) ?? [];
+    queue.push(job);
+    slotQueues.set(slotKey, queue);
+    return { jobId: job.id, sessionId: activeSessionId, status: "queued" };
+  }
+
+  slotRunning.add(slotKey);
+  // Fire-and-forget: run the send + event stream detached from the request.
+  runBackground(job, adapter).catch(() => {});
+  return { jobId: job.id, sessionId: activeSessionId, status: "running" };
+}
+
+/** Free the slot after a job finishes and start the next queued job (FIFO). */
+function releaseSlot(job: BackgroundJob): void {
+  const slotKey = slotKeyOf(job.userId, job.machineId);
+  slotRunning.delete(slotKey);
+  const queue = slotQueues.get(slotKey);
+  const next = queue?.shift();
+  if (queue && queue.length === 0) slotQueues.delete(slotKey);
+  if (!next) return;
+  slotRunning.add(slotKey);
+  const adapter = getAdapters().runtime(job.userId);
+  runBackground(next, adapter).catch(() => {});
+}
+
+async function runBackground(job: BackgroundJob, adapter: any): Promise<void> {
+  const { machineId, sessionId } = job;
+  const { fullText, engineAttachments, systemPrompt } = job.payload ?? {
+    fullText: "",
+    engineAttachments: [],
+    systemPrompt: undefined,
+  };
+
+  // A queued job becomes running the moment it is dequeued.
+  if (job.status === "queued") {
+    job.status = "running";
+    try {
+      await updateAgentJob(job.userId, job.id, { status: "running" });
+    } catch {}
+  }
 
   let snapshotTimer: ReturnType<typeof setInterval> | undefined;
   let hardTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -880,6 +973,7 @@ async function runBackground(
       if (hardTimeout) clearTimeout(hardTimeout);
       try { stream.destroy(); } catch {}
       void persistJob(job, { final: true });
+      releaseSlot(job);
     };
 
     // Hard timeout: a stuck engine must not leave the job running forever,
@@ -984,6 +1078,7 @@ async function runBackground(
     if (snapshotTimer) clearInterval(snapshotTimer);
     if (hardTimeout) clearTimeout(hardTimeout);
     void persistJob(job, { final: true });
+    releaseSlot(job);
   }
 }
 
@@ -1037,5 +1132,164 @@ router.get("/background/:jobId", async (req: Request, res: Response) => {
 
   res.status(404).json({ error: "Job not found" });
 });
+
+// ---------------------------------------------------------------------------
+// FAZA 7b/7c: Team fan-out. One prompt → N role-specific turns on the shared
+// repository, drained sequentially through the per-slot queue. Backed by the
+// persistent `tasks` lifecycle (QUEUED → RUNNING → VERIFYING → WAITING_APPROVAL
+// → VERIFIED/FAILED) so the whole team run survives restarts.
+// ---------------------------------------------------------------------------
+
+// POST /api/agent/team — fan out a prompt to a team of roles.
+router.post("/team", async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const { prompt, machineId, roles, repo, branch } = req.body as {
+    prompt?: string;
+    machineId?: string;
+    roles?: string[];
+    repo?: string | null;
+    branch?: string | null;
+  };
+
+  if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
+    res.status(400).json({ error: "Missing required field: prompt" });
+    return;
+  }
+
+  const engine = machineId || "local:opencode";
+  const roleIds = normalizeTeamRoles(roles);
+
+  try {
+    // Persistent team task (Iteration 0 lifecycle).
+    const task = await createTask({
+      userId,
+      title: prompt.trim().slice(0, 200),
+      prompt: prompt.trim(),
+      repo: repo ?? null,
+      branch: branch ?? null,
+    });
+
+    // Fan-out: one background job per role, queued on the same slot so turns
+    // run strictly sequentially on the single engine.
+    const jobs: { role: string; jobId: string; sessionId: string; status: string }[] = [];
+    for (const role of roleIds) {
+      const enqueued = await enqueueBackgroundJob(userId, engine, {
+        text: prompt.trim(),
+        taskId: task.id,
+        label: role,
+        system: buildRoleSystem(role),
+      });
+      jobs.push({ role, jobId: enqueued.jobId, sessionId: enqueued.sessionId, status: enqueued.status });
+    }
+
+    try {
+      await transitionTaskStatus(userId, task.id, "RUNNING");
+    } catch {}
+
+    // Watch the fan-out jobs; when they all drain, move the task through
+    // VERIFYING → WAITING_APPROVAL (or FAILED on any error).
+    void trackTeamTask(userId, task.id, jobs.map((j) => j.jobId));
+
+    res.json({
+      taskId: task.id,
+      roles: roleIds.map((r) => ({ id: r, name: roleLabel(r) })),
+      jobs,
+      status: "RUNNING",
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+// GET /api/agent/team/:taskId — task + per-role job progress.
+router.get("/team/:taskId", async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const taskId = req.params.taskId as string;
+  try {
+    const task = await getTask(userId, taskId);
+    if (!task) {
+      res.status(404).json({ error: "Team task not found" });
+      return;
+    }
+    let jobs: Awaited<ReturnType<typeof listAgentJobsForTask>> = [];
+    try {
+      jobs = await listAgentJobsForTask(userId, taskId);
+    } catch {}
+    res.json({
+      task,
+      jobs: jobs.map((j) => ({
+        jobId: j.id,
+        sessionId: j.sessionId,
+        machineId: j.machineId,
+        role: j.label,
+        status: j.status,
+        error: j.error,
+        finished: j.finished,
+        timeline: j.timeline,
+      })),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/agent/team/:taskId/approve — accept the team run (closes loop).
+router.post("/team/:taskId/approve", async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const taskId = req.params.taskId as string;
+  try {
+    const task = await getTask(userId, taskId);
+    if (!task) {
+      res.status(404).json({ error: "Team task not found" });
+      return;
+    }
+    await transitionTaskStatus(userId, taskId, "VERIFIED");
+    res.json({ ok: true, status: "VERIFIED" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+/** Poll the fan-out jobs; advance the persistent task when they all finish. */
+async function trackTeamTask(userId: string, taskId: string, jobIds: string[]): Promise<void> {
+  const poll = async (): Promise<boolean> => {
+    const statuses: AgentJobStatus[] = [];
+    for (const jobId of jobIds) {
+      const mem = backgroundJobs.get(jobId);
+      if (mem && mem.userId === userId) {
+        statuses.push(mem.status);
+        continue;
+      }
+      try {
+        const stored = await getAgentJob(userId, jobId);
+        statuses.push(stored?.status ?? "done");
+      } catch {
+        statuses.push("done");
+      }
+    }
+    if (statuses.some((s) => s === "queued" || s === "running")) return false;
+    if (statuses.some((s) => s === "error")) {
+      try {
+        await transitionTaskStatus(userId, taskId, "FAILED");
+      } catch {}
+      return true;
+    }
+    try {
+      await transitionTaskStatus(userId, taskId, "VERIFYING");
+      await transitionTaskStatus(userId, taskId, "WAITING_APPROVAL");
+    } catch {}
+    return true;
+  };
+
+  const timer = setInterval(async () => {
+    try {
+      if (await poll()) clearInterval(timer);
+    } catch {}
+  }, 3000);
+  timer.unref?.();
+}
 
 export default router;

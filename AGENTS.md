@@ -13,6 +13,15 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
 - **Verifikovano**: server `tsc --noEmit` čist, vitest **142/142** (novih 8 testova u `agent-jobs.test.ts`), client build prolazi.
 - **Dodatno (isti krug)**: `runBackground` dobio 30-min hard timeout (`CONNECTION_TIMEOUT_MS`, kao `/send` SSE) — zaglavljeni engine više ne ostavlja job `running` zauvek; pri timeout-u abortuje remote session i perzistira "Agent turn timed out" kao error.
 
+## Zadnji zadatak — Task Queue + Team fan-out (FAZA 7b/7c, urađeno)
+- **Cilj**: `/api/agent/background` je pokretao job-ove odmah i konkurentno na jednom lokalnom engine-u; nedostajao je per-slot red zadataka (QUEUED) i fan-out na uloge.
+- **Implementacija**:
+  - **Per-slot FIFO red** (`agent.ts`): tačno JEDAN running job po (userId, machineId). Zauzet slot → novi job se perzistira kao `queued` (agent_jobs.status dobio `queued`) i čeka u redu; `releaseSlot` pokreće sledeći FIFO čim se tekući završi (setDone/catch). Payload (fullText/attachments/system) se čuva na in-memory job-u da queued job može da se izvrši kad dođe na red.
+  - **Team fan-out** (`POST /api/agent/team`): jedan prompt → N role-specific turn-ova (default coding/testing/security) preko `team-roles.ts` (čisti helperi `normalizeTeamRoles`/`buildRoleSystem`, testirani). Svaki turn ide kroz isti slot red (strogo sekvencijalno), sa role system promptom u pozadini (ne u chat). Persistentni `tasks` lifecycle: QUEUED → RUNNING → VERIFYING → WAITING_APPROVAL (ili FAILED); `POST /team/:taskId/approve` → VERIFIED. `GET /team/:taskId` vraća task + per-role job progres.
+  - `agent_jobs` dobio `task_id` + `label` kolone (migracija `0012_agent_jobs_task_label.sql`) + `listAgentJobsForTask`.
+  - `markStaleAgentJobsInterrupted` sada pomiri i `queued` job-ove (restart gubi in-memory red).
+- **Verifikovano**: server `tsc --noEmit` čist, vitest **153/153** (novih 10 testova u `team-roles.test.ts` + 1 u `agent-jobs.test.ts`).
+
 ## Zadnji zadatak — Uklanjanje sistemskog spama iz Panela 1 (Opcja A, urađeno)
 - **Uzrok**: Ask panel pokreće punoi agent turn kroz `runAgentTurn`, a sistemska uloga (`[SISTEMSKA ULOGA: Developer]` + prompts) bila je ugradjena DIREKTNO u tijelo vidljive korisničke poruke koju je model vidio i session pamti. Paralelno, server je u `agent.ts` prepend-ovao `[STRAXOR GITHUB CONTEXT]` (repo/branch/dir/slot) u isti vidljivi `fullText`. Zato se uloga i kontekst ispisuju u chatu i vraćaju pri restoru.
 - **Fix (Opcja A — uloga u pozadini kao pravi system prompt)**:
@@ -79,6 +88,6 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
 - **(push test + puna lista repoa)** — čeka korisnikov pravi GitHub token unesen LIČNO kroz UI (GitRemotePanel → 🔑 Token → "GitHub Personal Access Token" polje; ili ⚙ PanelMenu → "GitHub token" → "+ Dodaj token"). Agent nikad ne rukuje sirovim tokenom. Nakon unosa: `/api/git-remote/github/repos` treba da vrati 200 + sve repoe (ne 401), i `POST /api/repos/push` → 200/OK → screenshot.
 
 ## Next Move
-1. **Task Queue / multi-uloga fan-out (audit FAZA 6/7b ostatak)**: `/api/agent/send` prima JEDAN machineId; dodati per-slot red zadataka (QUEUED) + fan-out na uloge (Architect/UI/Backend/DB/Security/Testing) preko `multi-agent` sloja. Model-injekcija u engine spawn je već urađena (`opencode-model.ts`).
+1. **Team fan-out UI (klijent)**: `/api/agent/team` je gotov na serveru (per-slot QUEUED red + role fan-out); ostaje UI dugme/panel u Workspace-u koji ga zove i prikazuje per-role job progres.
 2. **FAZA 6 pravi token (korisnik)**: korisnik unese pravi GitHub token kroz UI (⚙ PanelMenu → "GitHub token" → "+ Dodaj token") → `POST /api/repos/push` → 200/OK → screenshot.
 3. **drizzle-orm**: već na `^0.45.2` (HIGH GHSA-gpj5-g38j-94v9 rešen) — TODO #2 zatvoren.

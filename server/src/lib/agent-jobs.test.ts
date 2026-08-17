@@ -31,9 +31,14 @@ describe("agent-jobs — finalStatusForTimeline", () => {
 describe("agent-jobs — isStaleAgentJob", () => {
   const now = 1_000_000;
 
-  it("ignores non-running jobs", () => {
+  it("ignores terminal jobs", () => {
     expect(isStaleAgentJob(new Date(0), now, "done")).toBe(false);
     expect(isStaleAgentJob(new Date(0), now, "error")).toBe(false);
+  });
+
+  it("flags an untouched queued job (dropped in-memory queue on restart)", () => {
+    expect(isStaleAgentJob(new Date(now - 10_000), now, "queued")).toBe(true);
+    expect(isStaleAgentJob(new Date(now + 5_000), now, "queued")).toBe(false);
   });
 
   it("flags a running job not touched since the cutoff", () => {

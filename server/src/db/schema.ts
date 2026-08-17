@@ -73,7 +73,7 @@ export const processRunsRelations = relations(processRuns, ({ one }) => ({
 // result survive a server restart. Running rows left behind by a restart are
 // reconciled to "error (interrupted)" on the next boot.
 
-export type AgentJobStatus = "running" | "done" | "error";
+export type AgentJobStatus = "queued" | "running" | "done" | "error";
 
 export interface AgentJobTimelineEntry {
   t: string; // message type forwarded to client (text/tool_call/tool_result/error)
@@ -90,6 +90,8 @@ export const agentJobs = pgTable("agent_jobs", {
     .references(() => users.id, { onDelete: "cascade" }),
   machineId: varchar("machine_id", { length: 255 }).notNull(),
   sessionId: varchar("session_id", { length: 255 }).notNull(),
+  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  label: varchar("label", { length: 50 }),
   status: varchar("status", { length: 20 }).notNull().default("running"),
   error: text("error"),
   finished: boolean("finished").notNull().default(false),
@@ -100,6 +102,7 @@ export const agentJobs = pgTable("agent_jobs", {
 
 export const agentJobsRelations = relations(agentJobs, ({ one }) => ({
   user: one(users, { fields: [agentJobs.userId], references: [users.id] }),
+  task: one(tasks, { fields: [agentJobs.taskId], references: [tasks.id] }),
 }));
 
 export const users = pgTable("users", {
