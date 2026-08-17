@@ -8,6 +8,15 @@ import { withSharedWorkspace } from "../runtime/local/shared-workspace.js";
 import { db } from "../db/index.js";
 import { agentBusEvents } from "../db/schema.js";
 import { and, desc, eq } from "drizzle-orm";
+import {
+  createAgentJob,
+  updateAgentJob,
+  finishAgentJob,
+  getAgentJob,
+  finalStatusForTimeline,
+  type AgentJobTimelineEntry,
+} from "../lib/agent-jobs.js";
+import { randomUUID } from "node:crypto";
 
 type AgentBusAction = "help" | "review" | "warn";
 type PanelSlot = "ask" | "agent";
@@ -717,18 +726,10 @@ interface BackgroundJob {
   userId: string;
   machineId: string;
   sessionId: string;
-  timeline: BackgroundTimelineEntry[];
+  timeline: AgentJobTimelineEntry[];
   status: "running" | "done" | "error";
   error?: string;
   finished: boolean;
-}
-
-interface BackgroundTimelineEntry {
-  t: string; // message type forwarded to client (text/tool_call/...)
-  content?: string;
-  toolId?: string;
-  toolName?: string;
-  toolStatus?: "running" | "completed" | "error";
 }
 
 const backgroundJobs = new Map<string, BackgroundJob>();
@@ -791,7 +792,7 @@ router.post("/background", async (req: Request, res: Response) => {
     }
 
     job = {
-      id: `bg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: randomUUID(),
       userId,
       machineId,
       sessionId: activeSessionId,
@@ -800,6 +801,15 @@ router.post("/background", async (req: Request, res: Response) => {
       finished: false,
     };
     backgroundJobs.set(job.id, job);
+
+    // Persist the job before responding so the client can poll it (and it
+    // survives a restart). Best-effort: a missing/unmigrated table must never
+    // break the existing in-memory flow.
+    try {
+      await createAgentJob({ id: job.id, userId, machineId, sessionId: activeSessionId });
+    } catch (err) {
+      console.log(`[agent:memory] create ${job.id} not persisted: ${err instanceof Error ? err.message : err}`);
+    }
 
     res.json({ jobId: job.id, sessionId: activeSessionId, status: "running" });
 
@@ -823,6 +833,8 @@ async function runBackground(
   if (!job) return;
   const { machineId } = job;
 
+  let snapshotTimer: ReturnType<typeof setInterval> | undefined;
+
   try {
     // Send async first, fall back to sync if unsupported.
     let result;
@@ -844,6 +856,14 @@ async function runBackground(
     let sawDelta = false;
     let finished = false;
 
+    // Periodically snapshot in-flight progress to the DB (Agent Memory) so a
+    // crash/restart leaves at least a partial timeline behind. Best-effort.
+    snapshotTimer = setInterval(() => {
+      if (finished) return;
+      void persistJob(job);
+    }, 3000);
+    snapshotTimer.unref?.();
+
     const ourSession = (event: unknown): boolean => {
       const sid = (event as any)?.properties?.sessionID;
       return !sid || sid === sessionId;
@@ -853,8 +873,11 @@ async function runBackground(
       if (finished) return;
       finished = true;
       job.finished = true;
-      job.status = job.timeline.some((e) => e.t === "error") ? "error" : "done";
+      job.status = finalStatusForTimeline(job.timeline);
+      job.error = job.timeline.find((e) => e.t === "error")?.content;
+      if (snapshotTimer) clearInterval(snapshotTimer);
       try { stream.destroy(); } catch {}
+      void persistJob(job, { final: true });
     };
 
     stream.on("data", (chunk: Buffer) => {
@@ -946,26 +969,60 @@ async function runBackground(
     job.error = message;
     job.finished = true;
     job.status = "error";
+    if (snapshotTimer) clearInterval(snapshotTimer);
+    void persistJob(job, { final: true });
+  }
+}
+
+/** Best-effort write-through for the in-memory background job. */
+async function persistJob(job: BackgroundJob, opts?: { final?: boolean }): Promise<void> {
+  try {
+    if (opts?.final) {
+      await finishAgentJob(job.userId, job.id, job.status, job.error ?? null, job.timeline);
+    } else {
+      await updateAgentJob(job.userId, job.id, { timeline: job.timeline });
+    }
+  } catch {
+    // The in-memory map stays authoritative when the agent_jobs table has not
+    // been migrated yet or the database is temporarily unreachable.
   }
 }
 
 // GET /api/agent/background/:jobId — poll progress of a background job.
-router.get("/background/:jobId", (req: Request, res: Response) => {
+router.get("/background/:jobId", async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   const jobId = req.params.jobId as string;
   const job = backgroundJobs.get(jobId);
-  if (!job || job.userId !== userId) {
-    res.status(404).json({ error: "Job not found" });
+  if (job && job.userId === userId) {
+    res.json({
+      jobId: job.id,
+      sessionId: job.sessionId,
+      status: job.status,
+      error: job.error ?? null,
+      finished: job.finished,
+      timeline: job.timeline,
+    });
     return;
   }
-  res.json({
-    jobId: job.id,
-    sessionId: job.sessionId,
-    status: job.status,
-    error: job.error,
-    finished: job.finished,
-    timeline: job.timeline,
-  });
+
+  // Fall back to the persisted copy so a completed (or interrupted) job stays
+  // pollable after a server restart.
+  try {
+    const stored = await getAgentJob(userId, jobId);
+    if (stored) {
+      res.json({
+        jobId: stored.id,
+        sessionId: stored.sessionId,
+        status: stored.status,
+        error: stored.error,
+        finished: stored.finished,
+        timeline: stored.timeline,
+      });
+      return;
+    }
+  } catch {}
+
+  res.status(404).json({ error: "Job not found" });
 });
 
 export default router;

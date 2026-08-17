@@ -3,6 +3,15 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — Agent Memory (FAZA 7b, urađeno)
+- **Cilj (audit FAZA 7b)**: background agent job-ovi su bili isključivo in-memory (`backgroundJobs` Map u `agent.ts`) → gubili su se na restart servera.
+- **Implementacija**:
+  - Nova tabela `agent_jobs` (`schema.ts` + migracija `0011_agent_jobs.sql` + journal entry) — id (uuid), userId, machineId, sessionId, status (running|done|error), error, finished, timeline (jsonb), timestamps. Idempotentna migracija (IF NOT EXISTS + DO $$ EXCEPTION WHEN duplicate_object).
+  - `server/src/lib/agent-jobs.ts` (novo) — CRUD (create/update/finish/get), `markStaleAgentJobsInterrupted(cutoffMs)` za pomirenje, plus čisti helperi `finalStatusForTimeline` i `isStaleAgentJob` (testirani).
+  - `routes/agent.ts`: `/background` sada generiše UUID (`randomUUID()`) umesto `bg-...` i **write-through** u `agent_jobs` pre odgovora; `runBackground` snima timeline u DB svake 3 s (periodic snapshot) i finalni `finishAgentJob` na kraju/grešci; `GET /background/:jobId` vraća in-memory job ili, ako ga nema (posle restarta), čita iz DB. Sve DB operacije best-effort (try/catch) — ako tabela još nije migrirana, stari in-memory tok i dalje radi.
+  - `index.ts`: posle `runMigrations()` na startu pomiri stale running jobove (marked error "Interrupted").
+- **Verifikovano**: server `tsc --noEmit` čist, vitest **142/142** (novih 8 testova u `agent-jobs.test.ts`), client build prolazi.
+
 ## Zadnji zadatak — Uklanjanje sistemskog spama iz Panela 1 (Opcja A, urađeno)
 - **Uzrok**: Ask panel pokreće punoi agent turn kroz `runAgentTurn`, a sistemska uloga (`[SISTEMSKA ULOGA: Developer]` + prompts) bila je ugradjena DIREKTNO u tijelo vidljive korisničke poruke koju je model vidio i session pamti. Paralelno, server je u `agent.ts` prepend-ovao `[STRAXOR GITHUB CONTEXT]` (repo/branch/dir/slot) u isti vidljivi `fullText`. Zato se uloga i kontekst ispisuju u chatu i vraćaju pri restoru.
 - **Fix (Opcja A — uloga u pozadini kao pravi system prompt)**:
@@ -69,7 +78,7 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
 - **(push test + puna lista repoa)** — čeka korisnikov pravi GitHub token unesen LIČNO kroz UI (GitRemotePanel → 🔑 Token → "GitHub Personal Access Token" polje; ili ⚙ PanelMenu → "GitHub token" → "+ Dodaj token"). Agent nikad ne rukuje sirovim tokenom. Nakon unosa: `/api/git-remote/github/repos` treba da vrati 200 + sve repoe (ne 401), i `POST /api/repos/push` → 200/OK → screenshot.
 
 ## Next Move
-1. **TODO #2 (memorisano, kad bude vremena)**: nadograditi `drizzle-orm` 0.36→0.45.x da reši HIGH (GHSA-gpj5-g38j-94v9). Major bump — prvo proučiti breaking changes (`relations()`, `postgres-js` binding), popraviti tipove, pa build + testovi. Stvarni rizik trenutno NIZAK (nema dinamičkih SQL identifikatora u kodu).
-2. **Korak C (kad bude vremena)**: Engine orkestracija sa više radnika — `/api/agent/send` prima JEDAN machineId, treba fan-out sloj + model-injekcija u engine spawn (trenutno samo `PORT` env u `engine.ts:137`). Odgođeno jer je jedini lokalni engine OpenCode.
-3. **FAZA 6**: Korisnik unese pravi token kroz UI (Workspace → bilo koji panel → ⚙ PanelMenu → "GitHub token" → "+ Dodaj token", ili stari put GitRemotePanel → "🔑 Token") → pokrenuti `POST /api/repos/push` (ili "↑ Push" dugme) → potvrditi 200/OK sa GitHub-a → screenshot.
-4. Per user's rule: do NOT touch tests or Swagger until password reset + email verification are confirmed working (potvrđeno radi u dev → rad na testovima otključan).
+1. **Task Queue / multi-uloga fan-out (audit FAZA 6/7b ostatak)**: `/api/agent/send` prima JEDAN machineId; dodati per-slot red zadataka (QUEUED) + fan-out na uloge (Architect/UI/Backend/DB/Security/Testing) preko `multi-agent` sloja. Model-injekcija u engine spawn je već urađena (`opencode-model.ts`).
+2. **Background job hard timeout**: `runBackground` nema 30-min hard timeout (kao `/send` SSE); dodati da zaglavljeni turn ne ostane `running` zauvek (ni u DB ni in-memory).
+3. **FAZA 6 pravi token (korisnik)**: korisnik unese pravi GitHub token kroz UI (⚙ PanelMenu → "GitHub token" → "+ Dodaj token") → `POST /api/repos/push` → 200/OK → screenshot.
+4. **drizzle-orm**: već na `^0.45.2` (HIGH GHSA-gpj5-g38j-94v9 rešen) — TODO #2 zatvoren.

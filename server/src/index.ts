@@ -260,8 +260,15 @@ const server = app.listen(PORT, () => {
 server.on("upgrade", createPreviewUpgradeHandler());
 
 runMigrations()
-  .then(() => {
+  .then(async () => {
     console.log("[migrate] Startup migrations check complete.");
+    try {
+      const { markStaleAgentJobsInterrupted } = await import("./lib/agent-jobs.js");
+      const stale = await markStaleAgentJobsInterrupted(Date.now() - 2 * 60 * 1000);
+      if (stale > 0) console.log(`[agent:memory] marked ${stale} interrupted job(s) from a previous run`);
+    } catch (err) {
+      console.log(`[agent:memory] stale-job reconciliation skipped: ${err instanceof Error ? err.message : err}`);
+    }
   })
   .catch((err) => {
     console.error("[migrate] Migration check failed:", err);

@@ -67,6 +67,41 @@ export const processRunsRelations = relations(processRuns, ({ one }) => ({
   user: one(users, { fields: [processRuns.userId], references: [users.id] }),
 }));
 
+// ── Agent Memory: Persistent Background Jobs (FAZA 7b) ──
+// The /api/agent/background flow keeps an in-memory map for the hot path, but
+// every job is also written through to this table so its progress and final
+// result survive a server restart. Running rows left behind by a restart are
+// reconciled to "error (interrupted)" on the next boot.
+
+export type AgentJobStatus = "running" | "done" | "error";
+
+export interface AgentJobTimelineEntry {
+  t: string; // message type forwarded to client (text/tool_call/tool_result/error)
+  content?: string;
+  toolId?: string;
+  toolName?: string;
+  toolStatus?: "running" | "completed" | "error";
+}
+
+export const agentJobs = pgTable("agent_jobs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  machineId: varchar("machine_id", { length: 255 }).notNull(),
+  sessionId: varchar("session_id", { length: 255 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("running"),
+  error: text("error"),
+  finished: boolean("finished").notNull().default(false),
+  timeline: jsonb("timeline").$type<AgentJobTimelineEntry[]>().notNull().default([]),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const agentJobsRelations = relations(agentJobs, ({ one }) => ({
+  user: one(users, { fields: [agentJobs.userId], references: [users.id] }),
+}));
+
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
