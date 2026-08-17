@@ -67,6 +67,10 @@ import modelsRouter from "./routes/models.js";
 import uploadRoutes, { UPLOADS_DIR } from "./routes/upload.js";
 import knowledgeRoutes from "./knowledge/api/routes.js";
 import { default as imageRoutes } from "./image/api/routes.js";
+import {
+  createPreviewProxyHandler,
+  createPreviewUpgradeHandler,
+} from "./runtime/local/preview-proxy.js";
 import { createMarketplaceRouter } from "./marketplace/api/routes.js";
 import { createConnectionsRouter } from "./connections/api/routes.js";
 import { imageAgentRoutes } from "./agents/image-agent/api/routes.js";
@@ -87,6 +91,13 @@ app.use(cors({
   origin: (origin, cb) => cb(null, origin || true),
   credentials: true,
 }));
+
+// ── Local preview reverse proxy ──
+// Mounted BEFORE express.json() so request bodies stream through untouched,
+// and before the /api rate limiter so a real app's asset requests are not
+// throttled. Token-protected via a short-lived httpOnly cookie (see
+// runtime/local/preview-proxy.ts).
+app.use("/api/preview/proxy", createPreviewProxyHandler());
 
 // ── Security: Rate limiting ──
 // Auth endpoints: stricter limit (20 per 15 min per IP)
@@ -240,9 +251,13 @@ if (fs.existsSync(clientDist)) {
 // ── Run DB migrations before accepting requests ──
 import { runMigrations } from "./db/migrate.js";
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+// Forward WebSocket upgrades (Vite/CRA HMR) for local previews through the
+// same proxy path so hot-reload works inside the production iframe.
+server.on("upgrade", createPreviewUpgradeHandler());
 
 runMigrations()
   .then(() => {

@@ -3287,7 +3287,12 @@ export default function Workspace() {
         </div>
       </div>
 
-      <BottomBar machineId={agentMachineId || null} />
+      <BottomBar
+        machineId={agentMachineId || null}
+        owner={activeRepo?.owner || null}
+        name={activeRepo?.name || null}
+        taskId={dbSessionId || null}
+      />
 
       {/* Mobile bottom navigation — single-panel switching */}
       <div className="fixed bottom-0 inset-x-0 z-40 md:hidden border-t border-border bg-surface">

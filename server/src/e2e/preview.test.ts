@@ -95,7 +95,9 @@ describe("Iteration 3 — Live Preview (E2E)", () => {
     const running = await waitForState(key, "running");
     expect(running.port).toBeGreaterThan(0);
     expect(running.internalUrl).toContain(String(running.port));
-    expect(running.url).toContain(String(running.port));
+    // Public URL is the same-origin reverse proxy (works in production).
+    expect(running.url).toContain("/api/preview/proxy/");
+    expect(running.url).toContain(encodeURIComponent(key));
     expect(running.health).toBe("ok");
 
     await stopPreview(key);

@@ -14,6 +14,7 @@ import {
   stopPreview,
 } from "../runtime/local/preview.js";
 import { getRepoWorkspaceDir } from "../runtime/local/workspace.js";
+import { issuePreviewCookie } from "../runtime/local/preview-proxy.js";
 
 const router = Router();
 
@@ -43,6 +44,9 @@ router.post("/start", requireAuth, async (req: any, res) => {
         port: typeof port === "number" ? port : undefined,
         env: envVars,
       });
+      // Cookie lets the same-origin iframe (and every sub-request) reach the
+      // proxy without exposing a token in the URL.
+      issuePreviewCookie(res, info.previewId);
       return res.json(info);
     }
 
@@ -110,6 +114,7 @@ router.post("/restart", requireAuth, async (req: any, res) => {
       port: typeof port === "number" ? port : undefined,
       env: envVars,
     });
+    issuePreviewCookie(res, info.previewId);
     res.json(info);
   } catch (error: any) {
     console.error("Preview restart error:", error);
@@ -129,6 +134,7 @@ router.get("/status", requireAuth, async (req: any, res) => {
       }
       const info = await refreshPreviewStatus(previewKey(userId, owner, name, taskId ?? null));
       if (!info) return res.status(404).json({ error: "No local preview for this task" });
+      issuePreviewCookie(res, info.previewId);
       return res.json(info);
     }
 

@@ -1,15 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   startPreview, stopPreview, getPreviewStatus, getPreviewLogs,
-  detectFramework, type PreviewStatus, type PreviewLog, type DeviceSize,
+  detectFramework,
+  startLocalPreview, stopLocalPreview, getLocalPreviewStatus, getLocalPreviewLogs,
+  restartLocalPreview, detectLocalFramework, isProxyPreviewUrl,
+  type PreviewStatus, type PreviewLog, type DeviceSize, type LocalPreviewParams,
   DEVICE_PRESETS,
 } from "../../lib/preview";
 
 interface Props {
-  machineId: string | null;
+  machineId?: string | null;
+  owner?: string | null;
+  name?: string | null;
+  taskId?: string | null;
 }
 
-export default function PreviewPanel({ machineId }: Props) {
+export default function PreviewPanel({ machineId, owner, name, taskId }: Props) {
   const [status, setStatus] = useState<PreviewStatus | null>(null);
   const [logs, setLogs] = useState<PreviewLog[]>([]);
   const [device, setDevice] = useState<DeviceSize>("desktop");
@@ -22,8 +28,28 @@ export default function PreviewPanel({ machineId }: Props) {
 
   const preset = DEVICE_PRESETS.find((d) => d.id === device)!;
 
+  // A connected repo (owner+name) uses the LOCAL preview manager — the dev
+  // server is spawned inside the server process and reached through the
+  // same-origin proxy, so it works in production on Render without a VPS.
+  const useLocal = !!owner && !!name;
+  const hasTarget = useLocal || !!machineId;
+  const localParams: LocalPreviewParams = useLocal
+    ? { owner: owner!, name: name!, taskId: taskId ?? null }
+    : { owner: "", name: "" };
+
   // Poll status
   const refreshStatus = useCallback(async () => {
+    if (useLocal) {
+      try {
+        const s = await getLocalPreviewStatus(localParams);
+        setStatus(s);
+        if (s.running) {
+          const l = await getLocalPreviewLogs(localParams, 50);
+          setLogs(l);
+        }
+      } catch { /* ok */ }
+      return;
+    }
     if (!machineId) return;
     try {
       const s = await getPreviewStatus(machineId);
@@ -33,27 +59,33 @@ export default function PreviewPanel({ machineId }: Props) {
         setLogs(l);
       }
     } catch { /* ok */ }
-  }, [machineId]);
+  }, [useLocal, localParams.owner, localParams.name, localParams.taskId, machineId]);
 
   useEffect(() => {
-    if (!machineId) return;
+    if (!hasTarget) return;
     refreshStatus();
     pollRef.current = setInterval(refreshStatus, 5000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [machineId, refreshStatus]);
+  }, [hasTarget, refreshStatus]);
 
   // Detect framework on mount
   useEffect(() => {
-    if (!machineId) return;
-    detectFramework(machineId).then(setFramework);
-  }, [machineId]);
+    if (!hasTarget) return;
+    if (useLocal) {
+      detectLocalFramework(localParams).then(setFramework);
+    } else if (machineId) {
+      detectFramework(machineId).then(setFramework);
+    }
+  }, [hasTarget, useLocal, localParams.owner, localParams.name, machineId]);
 
   const handleStart = useCallback(async () => {
-    if (!machineId) return;
+    if (!hasTarget) return;
     setLoading(true);
     setError(null);
     try {
-      const s = await startPreview({ machineId, framework: framework || undefined });
+      const s = useLocal
+        ? await startLocalPreview(localParams)
+        : await startPreview({ machineId: machineId!, framework: framework || undefined });
       setStatus(s);
       if (!s.running && s.error) setError(s.error);
       // Refresh iframe after a delay
@@ -67,13 +99,30 @@ export default function PreviewPanel({ machineId }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [machineId, framework]);
+  }, [hasTarget, useLocal, localParams.owner, localParams.name, localParams.taskId, machineId, framework]);
 
-  const handleStop = useCallback(async () => {
-    if (!machineId) return;
+  const handleRestart = useCallback(async () => {
+    if (!useLocal) return;
     setLoading(true);
     try {
-      await stopPreview(machineId);
+      const s = await restartLocalPreview(localParams);
+      setStatus(s);
+      setTimeout(() => {
+        if (iframeRef.current && s.url) iframeRef.current.src = s.url;
+      }, 1000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [useLocal, localParams.owner, localParams.name, localParams.taskId]);
+
+  const handleStop = useCallback(async () => {
+    if (!hasTarget) return;
+    setLoading(true);
+    try {
+      if (useLocal) await stopLocalPreview(localParams);
+      else await stopPreview(machineId!);
       setStatus(null);
       setLogs([]);
     } catch (err: any) {
@@ -81,7 +130,7 @@ export default function PreviewPanel({ machineId }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [machineId]);
+  }, [hasTarget, useLocal, localParams.owner, localParams.name, localParams.taskId, machineId]);
 
   const handleRefresh = useCallback(() => {
     if (iframeRef.current && status?.url) {
@@ -90,7 +139,7 @@ export default function PreviewPanel({ machineId }: Props) {
     refreshStatus();
   }, [status, refreshStatus]);
 
-  if (!machineId) {
+  if (!hasTarget) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 text-text-muted">
         <div className="text-3xl opacity-20">👁</div>
@@ -99,19 +148,38 @@ export default function PreviewPanel({ machineId }: Props) {
     );
   }
 
+  // Same-origin proxy previews must NOT grant the previewed app access to the
+  // parent origin (Straxor's localStorage/auth token) — drop allow-same-origin.
+  const proxyPreview = isProxyPreviewUrl(status?.url);
+  const iframeSandbox = proxyPreview
+    ? "allow-scripts allow-forms allow-popups"
+    : "allow-scripts allow-same-origin allow-forms allow-popups";
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#202838] bg-[#0e1422] shrink-0">
-        {/* Start / Stop */}
+        {/* Start / Stop / Restart */}
         {status?.running ? (
-          <button
-            onClick={handleStop}
-            disabled={loading}
-            className="px-2 py-0.5 bg-red-500/10 text-red-400 text-[10px] rounded hover:bg-red-500/20 disabled:opacity-30 transition-colors"
-          >
-            {loading ? "…" : "⏹ Zaustavi"}
-          </button>
+          <>
+            <button
+              onClick={handleStop}
+              disabled={loading}
+              className="px-2 py-0.5 bg-red-500/10 text-red-400 text-[10px] rounded hover:bg-red-500/20 disabled:opacity-30 transition-colors"
+            >
+              {loading ? "…" : "⏹ Zaustavi"}
+            </button>
+            {useLocal && (
+              <button
+                onClick={handleRestart}
+                disabled={loading}
+                className="px-2 py-0.5 bg-surface-2 text-text-secondary text-[10px] rounded hover:bg-surface-2/70 disabled:opacity-30 transition-colors"
+                title="Restartaj dev server"
+              >
+                ↻ Restart
+              </button>
+            )}
+          </>
         ) : (
           <button
             onClick={handleStart}
@@ -128,6 +196,11 @@ export default function PreviewPanel({ machineId }: Props) {
             {framework}
           </span>
         )}
+
+        {/* Target badge */}
+        <span className="text-[9px] px-1.5 py-0.5 bg-surface-2 text-text-muted rounded">
+          {useLocal ? "Lokalno" : "VPS"}
+        </span>
 
         {/* Status */}
         {status?.running && (
@@ -193,7 +266,7 @@ export default function PreviewPanel({ machineId }: Props) {
                 src={status.url}
                 className="w-full h-full border-0"
                 title="Preview"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                sandbox={iframeSandbox}
               />
             </div>
           ) : (
@@ -206,7 +279,9 @@ export default function PreviewPanel({ machineId }: Props) {
                 </div>
               )}
               <div className="text-[9px] opacity-30 max-w-[200px] text-center">
-                Preview pokreće dev server na VPS-u i prikazuje ga u iframe-u
+                {useLocal
+                  ? "Preview pokreće dev server lokalno i prikazuje ga kroz proxy (radi i u produkciji)"
+                  : "Preview pokreće dev server na VPS-u i prikazuje ga u iframe-u"}
               </div>
             </div>
           )}

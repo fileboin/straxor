@@ -16,6 +16,7 @@ import {
   subscribeToTerminal,
 } from "../../lib/terminal.js";
 import { getRepoWorkspaceDir } from "./workspace.js";
+import { buildPreviewUrl } from "./preview-proxy.js";
 
 export type LocalPreviewState = "starting" | "running" | "crashed" | "stopped" | "error";
 
@@ -153,6 +154,17 @@ function log(entry: PreviewEntry, line: string): void {
   if (entry.logs.length > MAX_LOGS) entry.logs.shift();
 }
 
+/**
+ * Keep the public `url` pointing at the same-origin reverse proxy (works in
+ * production on Render, where the browser cannot reach this server's
+ * localhost). Regenerated on every read so the signed cookie stays fresh.
+ */
+function syncProxyUrl(entry: PreviewEntry): void {
+  if (entry.info.state === "running" && entry.info.port) {
+    entry.info.url = buildPreviewUrl(entry.info.previewId);
+  }
+}
+
 function baseInfo(key: string, command: string): LocalPreviewInfo {
   return {
     previewId: key,
@@ -178,6 +190,7 @@ export async function startPreview(input: LocalPreviewStartInput): Promise<Local
 
   // Unique instance per task: an already-running preview is returned as-is.
   if (existing && (existing.info.state === "starting" || existing.info.state === "running")) {
+    syncProxyUrl(existing);
     return existing.info;
   }
 
@@ -268,6 +281,7 @@ export async function startPreview(input: LocalPreviewStartInput): Promise<Local
         entry.info.state = "running";
         entry.info.readyAt = Date.now();
         entry.info.health = (await httpHealth(port)) ? "ok" : "unreachable";
+        syncProxyUrl(entry);
         clearInterval(entry.healthTimer!);
       } else if (Date.now() > deadline) {
         entry.info.state = "error";
@@ -310,7 +324,9 @@ export async function restartPreview(input: LocalPreviewStartInput): Promise<Loc
 
 export function getPreviewInfo(key: string): LocalPreviewInfo | null {
   const entry = previews.get(key);
-  return entry ? entry.info : null;
+  if (!entry) return null;
+  syncProxyUrl(entry);
+  return entry.info;
 }
 
 /** Re-check liveness/health of a running preview (crash detection on poll). */
@@ -324,6 +340,7 @@ export async function refreshPreviewStatus(key: string): Promise<LocalPreviewInf
       entry.info.lastError = "Dev server stopped responding on its port";
     } else {
       entry.info.health = (await httpHealth(entry.info.port)) ? "ok" : "unreachable";
+      syncProxyUrl(entry);
     }
   }
   return entry.info;
@@ -357,7 +374,10 @@ export function listPreviews(userId: string): LocalPreviewInfo[] {
   const prefix = `${userId}:`;
   return Array.from(previews.entries())
     .filter(([k]) => k.startsWith(prefix))
-    .map(([, e]) => e.info);
+    .map(([, e]) => {
+      syncProxyUrl(e);
+      return e.info;
+    });
 }
 
 export async function stopAllPreviews(): Promise<number> {
