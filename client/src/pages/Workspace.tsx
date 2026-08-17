@@ -1998,10 +1998,8 @@ export default function Workspace() {
     for (const p of activePrompts) {
       systemParts.push(`[${p.name}]\n${p.content}`);
     }
-    const fullMsg =
-      systemParts.length > 0
-        ? `${systemParts.join("\n\n")}\n\n---\n\n${msg}`
-        : msg;
+    const system = systemParts.join("\n\n");
+    const fullMsg = msg;
 
     // FAZA 6: background execution — fire-and-forget server-side run + polling.
     if (agentBackground) {
@@ -2073,7 +2071,7 @@ export default function Workspace() {
       };
 
       try {
-        const started = await startAgentBackground(agentMachineId, fullMsg, agentSessionId, attachments);
+        const started = await startAgentBackground(agentMachineId, fullMsg, agentSessionId, attachments, system);
         setAgentSessionId(started.sessionId);
         statusRef.timeline = [];
         await poll(started.jobId, started.sessionId);
@@ -2267,7 +2265,7 @@ export default function Workspace() {
         setAgentLoading(false);
         agentAbortRef.current = null;
       },
-    }, attachments, agentCtl.signal);
+    }, attachments, system, agentCtl.signal);
   }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch, agentOrchestratedModels, availableModels, agentBackground, agentPanelMode, transferByBus]);
 
   useEffect(() => {

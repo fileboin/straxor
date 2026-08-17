@@ -101,7 +101,7 @@ export default function Help() {
               ["feedback", "💬", "Send Feedback"],
               ["feature-requests", "💡", "Feature Requests"],
             ] as const).map(([id, icon, label]) => (
-              <button key={id} onClick={() => { setTab(id as HelpTab); if (id === "ticket-detail") setActiveTicket(null); }} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium transition-colors text-left ${tab === id ? "bg-accent/15 text-accent border border-accent/20" : "text-text-secondary hover:text-text hover:bg-surface-2 border border-transparent"}`}>
+              <button key={id} onClick={() => { setTab(id as HelpTab); }} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium transition-colors text-left ${tab === id ? "bg-accent/15 text-accent border border-accent/20" : "text-text-secondary hover:text-text hover:bg-surface-2 border border-transparent"}`}>
                 <span>{icon}</span><span>{label}</span>
               </button>
             ))}

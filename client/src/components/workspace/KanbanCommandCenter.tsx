@@ -442,7 +442,7 @@ function CardItem({
         )}
         {card.type === "session" && typeof card.metadata.todoCount === "number" && (
           <span className="text-[9px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded">
-            📋 {card.metadata.completedTodos}/{card.metadata.todoCount}
+            📋 {card.metadata.completedTodos as number}/{card.metadata.todoCount}
           </span>
         )}
       </div>
@@ -481,7 +481,7 @@ function CardItem({
             ⚙ Runtime
           </button>
         )}
-        {card.type === "session" && card.metadata.machineId && (
+        {card.type === "session" && !!card.metadata.machineId && (
           <button
             onClick={() => onNavigate(card.id, card.metadata.machineId as string)}
             className="text-[9px] px-2 py-1 rounded-lg border border-border bg-surface-2 text-text-muted hover:text-green-400 hover:border-green-500/30 transition-colors ml-auto"

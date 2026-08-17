@@ -206,7 +206,7 @@ export default function Connections() {
                 ) : field.type === "select" ? (
                   <select value={formConfig[field.key] || ""} onChange={e => setFormConfig(p => ({ ...p, [field.key]: e.target.value }))}>
                     <option value="">-- Select --</option>
-                    {field.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    {field.options?.map((o: { value: string; label: string }) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 ) : (
                   <input type={field.type === "password" ? "password" : "text"} value={formConfig[field.key] || ""} onChange={e => setFormConfig(p => ({ ...p, [field.key]: e.target.value }))} placeholder={field.placeholder} />

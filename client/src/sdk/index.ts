@@ -121,6 +121,10 @@ class PluginEventBus {
     this.handlers.delete(event);
   }
 
+  clear() {
+    this.handlers.clear();
+  }
+
   async emit(event: string, data?: unknown) {
     const list = this.handlers.get(event);
     if (!list) return;
@@ -299,7 +303,7 @@ class StraxorPlugin {
     window.dispatchEvent(new CustomEvent("straxor:plugin:deactivated", {
       detail: { pluginId: this.id },
     }));
-    this.bus.handlers.clear();
+    this.bus.clear();
     return this;
   }
 }
