@@ -3,6 +3,14 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — FORCE VPS + auto-reconnect (FAZA 19b, urađeno)
+- **Cilj**: oba panela moraju se automatski vezati na aktivan VPS i sinhronizovati sa GitHub repom; na grešku engine-a ne sme se prikazivati timeout, već se mora automatski pokrenuti SSH/server reconnect.
+- **Implementacija** (`client/src/pages/Workspace.tsx`):
+  - `recoverVpsEngine(machineId)` (novo) — za ne-local VPS id poziva `verifyVpsConnection` (health + auto-reconnect preko `/runtimes/opencode/reconnect`), ažurira per-panel prep status i vraća `true` kad se engine oporavi.
+  - Auto-bind na mount: `useEffect` čita `listMachines()`, nalazi mašinu `status=ready`/`opencodeRunning` i poziva `handleVpsConnected(id)` — oba panela se odmah spoje na postojeći VPS (ako ga nema, ostaju na lokalnom OpenCode-u).
+  - Error handleri u `handleAskSend` (onErrorFallback) i `handleAgentSend` (onError): prepoznaju `machine not found / opencode not running / failed to create session` → umesto prikaza greške/timeout-a pozivaju `recoverVpsEngine` i prikazuju "Automatski ponovno povezujem…"; greška se ispisuje tek ako reconnect ne uspe.
+- **Verifikovano**: client `tsc --noEmit` — **0 grešaka**; client `npm run build` — **prolazi** (`index-3xBwgGtm.js`, `Workspace-BD2BM8En.js`). Server netaknut.
+
 ## Zadnji zadatak — EnginePicker: prava pozadinska logika za svaku opciju (FAZA 19, urađeno)
 - **Cilj (hitna ispravka)**: izborni meni za engine ("Lokalni engine (repo)", "VPS mašina", "GitHub repo", "Runtime Manager") je vizuelno postojao, ali opcije nisu radile pravi posao — "Lokalni engine" je bio goli `setMachineId` bez ikakve pripreme, VPS konekcija nije verifikovala/reconnect-ovala engine (prvi agent turn → "Machine not found / Opencode not running" = "nema alat"), a "Prekini VPS vezu" (`onDisconnectVps`) je bio mrtav prop koji se nikad nije renderovao.
 - **Implementacija**:

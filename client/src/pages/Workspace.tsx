@@ -26,6 +26,7 @@ import { fetchProjects } from "../lib/projects.js";
 import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
 import { type AgentRole, getRoleById, fetchPrompts, type SavedPrompt } from "../lib/roles.js";
 import { verifyVpsConnection } from "../lib/runtime-manager.js";
+import { listMachines } from "../lib/machines.js";
 import { t, useLang } from "../lib/i18n.js";
 import { checkBeforeInstall, type ScanVerdict } from "../lib/security.js";
 import RoleSelector from "../components/workspace/RoleSelector.js";
@@ -389,6 +390,36 @@ export default function Workspace() {
   type EnginePrepStatus = "idle" | "preparing" | "ready" | "error" | "no-repo";
   const [askEnginePrep, setAskEnginePrep] = useState<{ status: EnginePrepStatus; message: string }>({ status: "idle", message: "" });
   const [agentEnginePrep, setAgentEnginePrep] = useState<{ status: EnginePrepStatus; message: string }>({ status: "idle", message: "" });
+
+  // Auto-reconnect a VPS engine when an agent turn reports the daemon is not
+  // running / machine not found. Returns true when the engine recovered so the
+  // caller can surface "ponovno povezan" instead of a timeout. Local: ids are
+  // never reconnected this way — the local engine self-spawns on demand.
+  const recoverVpsEngine = useCallback(async (machineId: string): Promise<boolean> => {
+    if (!machineId || machineId.startsWith("local:")) return false;
+    setVpsStatus("reconnecting");
+    setAskEnginePrep({ status: "preparing", message: "Automatski ponovno povezujem VPS OpenCode…" });
+    setAgentEnginePrep({ status: "preparing", message: "Automatski ponovno povezujem VPS OpenCode…" });
+    try {
+      const result = await verifyVpsConnection(machineId);
+      if (result.vpsStatus === "ready") {
+        setVpsStatus("ready");
+        setAskEnginePrep({ status: "ready", message: "VPS OpenCode ponovno povezan" });
+        setAgentEnginePrep({ status: "ready", message: "VPS OpenCode ponovno povezan" });
+        return true;
+      }
+      setVpsStatus("offline");
+      setAskEnginePrep({ status: "error", message: "VPS OpenCode nije dostupan — proveri SSH konfiguraciju" });
+      setAgentEnginePrep({ status: "error", message: "VPS OpenCode nije dostupan — proveri SSH konfiguraciju" });
+      return false;
+    } catch {
+      setVpsStatus("offline");
+      setAskEnginePrep({ status: "error", message: "VPS OpenCode nije dostupan — proveri SSH konfiguraciju" });
+      setAgentEnginePrep({ status: "error", message: "VPS OpenCode nije dostupan — proveri SSH konfiguraciju" });
+      return false;
+    }
+  }, []);
+
 
   const loadActiveRepo = useCallback(async () => {
     try {
@@ -1573,6 +1604,26 @@ export default function Workspace() {
               // On error: do NOT automatically re-run handleAskSend (would loop).
               onErrorFallback: (error) => {
                 if (!isMine()) return;
+                // VPS daemon gone → auto-reconnect instead of reporting a
+                // timeout. The local engine self-spawns, so only non-local ids
+                // reach recoverVpsEngine.
+                const engineDown = /machine not found|opencode not running|no engine|nema alat|failed to create session/i.test(error);
+                if (engineDown) {
+                  recoverVpsEngine(askAgentMachineId).then((ok) => {
+                    if (!ok && isMine()) {
+                      setAskMessages((prev) =>
+                        prev.map((m) =>
+                          m.id === assistantMsg.id
+                            ? { ...m, content: m.content + `\n\n[Greška: ${error}]` }
+                            : m
+                        )
+                      );
+                    }
+                  });
+                  setAskStreamingId(null);
+                  setAskLoading(false);
+                  return;
+                }
                 setAskMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMsg.id
@@ -1951,6 +2002,23 @@ export default function Workspace() {
         },
         onError: (error) => {
           if (!isMineAgent()) return;
+          const engineDown = /machine not found|opencode not running|no engine|nema alat|failed to create session/i.test(error);
+          if (engineDown) {
+            recoverVpsEngine(agentMachineId || "").then((ok) => {
+              if (!ok && isMineAgent()) {
+                setAgentMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsg.id
+                      ? { ...m, content: `[Greška: ${error}]` }
+                      : m
+                  )
+                );
+              }
+            });
+            setAgentStreamingId(null);
+            setAgentLoading(false);
+            return;
+          }
           setAgentMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsg.id
@@ -2395,6 +2463,24 @@ export default function Workspace() {
     setAgentEnginePrep({ status: "idle", message: "" });
     setVpsStatus("disconnected");
   }, []);
+
+  // FORCE VPS: auto-bind both panels to an already-provisioned VPS on load.
+  // If a ready/opencode-running machine exists, both panels connect to it and
+  // the daemon is verified + auto-reconnected. Otherwise panels stay local.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const machines = await listMachines();
+        const ready = machines.find((m) => m.status === "ready" || m.opencodeRunning);
+        if (!ready || cancelled) return;
+        handleVpsConnected(ready.id);
+      } catch {
+        // No saved machines / offline — keep the local OpenCode engine.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [handleVpsConnected]);
 
   const toggleAskExpand = useCallback(() => {
     setPanelMode((prev) => (prev === "ask-full" ? "split" : "ask-full"));
