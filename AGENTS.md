@@ -3,6 +3,12 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — Route-level code splitting (FAZA 11, urađeno)
+- **Cilj**: ROADMAP Phase 2 — bundle optimization. Build je emitovao JEDAN 1.9 MB JS chunk (gzip 544 KB) sa warning-om "chunks larger than 500 kB".
+- **Implementacija**: `App.tsx` — teške rute (`Workspace`, `Admin`, `Dashboard`, `Help`, `DeployManager`, `Knowledge`, `ImageStudio`, `ImageAgent`, `Marketplace`, `Connections`) prebačene na `React.lazy(() => import(...))`; `<Routes>` umotan u `<Suspense fallback={<RouteFallback />}>` (centriran „Učitavanje…" spinner). Auth/male stranice (`Login`, `Register`, `ForgotPassword`, `ResetPassword`, `VerifyEmail`, `GitHubAuthCallback`, `Onboarding`) ostaju eager.
+- **Rezultat**: initial bundle **1.9 MB → 367 KB (gzip 127 KB)**; Workspace chunk 1.4 MB (gzip 387 KB) se učitava tek posle logina; +12 per-route chunkova (Dashboard 9.5 KB, Admin 72 KB, Marketplace 14 KB…).
+- **Verifikovano**: `client tsc --noEmit` **0 grešaka**; `npm run build` prolazi (16 modula); jedini preostali warning je „sessions.ts dynamically+statically imported" (bezopasno — modul ostaje u Workspace chunku).
+
 ## Zadnji zadatak — Client hardening: `tsc --noEmit` čist (FAZA 10, urađeno)
 - **Cilj**: TODO.md (hardening) — `client tsc --noEmit` imao je **97 grešaka** (95 TS6133 unused + 2 TS2322). Sada je **0**.
 - **Implementacija**:

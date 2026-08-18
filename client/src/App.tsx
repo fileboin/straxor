@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth, isAdmin } from "./lib/auth.js";
 import { ThemeProvider } from "./lib/theme.js";
@@ -9,17 +10,20 @@ import ForgotPassword from "./pages/ForgotPassword.js";
 import ResetPassword from "./pages/ResetPassword.js";
 import VerifyEmail from "./pages/VerifyEmail.js";
 import GitHubAuthCallback from "./pages/GitHubAuthCallback.js";
-import Dashboard from "./pages/Dashboard.js";
-import Workspace from "./pages/Workspace.js";
 import OnboardingPage from "./pages/Onboarding.js";
-import Admin from "./pages/Admin.js";
-import Help from "./pages/Help.js";
-import DeployManager from "./pages/DeployManager.js";
-import Knowledge from "./pages/Knowledge.js";
-import ImageStudio from "./pages/ImageStudio.js";
-import ImageAgent from "./pages/ImageAgent.js";
-import Marketplace from "./pages/Marketplace.js";
-import Connections from "./pages/Connections.js";
+
+// Route-level code splitting: heavy pages load on demand so the initial
+// bundle stays small and one failing chunk doesn't blank the whole app.
+const Dashboard = lazy(() => import("./pages/Dashboard.js"));
+const Workspace = lazy(() => import("./pages/Workspace.js"));
+const Admin = lazy(() => import("./pages/Admin.js"));
+const Help = lazy(() => import("./pages/Help.js"));
+const DeployManager = lazy(() => import("./pages/DeployManager.js"));
+const Knowledge = lazy(() => import("./pages/Knowledge.js"));
+const ImageStudio = lazy(() => import("./pages/ImageStudio.js"));
+const ImageAgent = lazy(() => import("./pages/ImageAgent.js"));
+const Marketplace = lazy(() => import("./pages/Marketplace.js"));
+const Connections = lazy(() => import("./pages/Connections.js"));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -52,12 +56,21 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RouteFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-bg">
+      <span className="text-sm text-text-muted animate-pulse">Učitavanje…</span>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
         <Layout>
-          <Routes>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
             <Route
               path="/login"
               element={
@@ -211,6 +224,7 @@ export default function App() {
               }
             />
           </Routes>
+          </Suspense>
         </Layout>
       </AuthProvider>
     </ThemeProvider>
