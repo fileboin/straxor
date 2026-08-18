@@ -11,11 +11,21 @@ interface Props {
   onDisconnectVps?: () => void;
   onOpenGitRemote: () => void;
   onOpenRuntimeManager: () => void;
+  // Per-panel preparation feedback from the local/VPS engine selection.
+  prepStatus?: "idle" | "preparing" | "ready" | "error" | "no-repo";
+  prepMessage?: string;
 }
 
 const isLocal = (id: string | null) => !!id && id.startsWith("local:");
 
 const MENU_W = 264;
+
+const PREP_LABELS: Record<string, string> = {
+  preparing: "Priprema…",
+  ready: "Spreman",
+  error: "Greška",
+  "no-repo": "Bez repo-a",
+};
 
 export default function EnginePicker({
   machineId,
@@ -24,8 +34,11 @@ export default function EnginePicker({
   panelLabel = "Panel",
   onSelectLocal,
   onConnectVps,
+  onDisconnectVps,
   onOpenGitRemote,
   onOpenRuntimeManager,
+  prepStatus = "idle",
+  prepMessage = "",
 }: Props) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -92,6 +105,13 @@ export default function EnginePicker({
     mode === "vps" ? "text-blue-400 border-blue-400/40 bg-blue-400/10" :
     "text-text-muted border-border bg-surface-2";
 
+  const prepColor =
+    prepStatus === "ready" ? "text-green-400 border-green-500/30 bg-green-500/10" :
+    prepStatus === "error" ? "text-red-400 border-red-500/30 bg-red-500/10" :
+    prepStatus === "preparing" ? "text-accent border-accent/30 bg-accent/10" :
+    prepStatus === "no-repo" ? "text-amber-400 border-amber-500/30 bg-amber-500/10" :
+    "text-text-muted border-border bg-surface-2";
+
   const menu = open ? (
     createPortal(
       <div
@@ -143,6 +163,16 @@ export default function EnginePicker({
           {mode === "vps" && <span className="ml-auto text-[9px] shrink-0" style={{ color: "#60a5fa" }}>●</span>}
         </button>
 
+        {mode === "vps" && onDisconnectVps && (
+          <button
+            onClick={() => { setOpen(false); onDisconnectVps(); }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-surface-2"
+          >
+            <span className="text-base leading-none">⏻</span>
+            <span className="text-[11px]" style={{ color: "#f87171" }}>Prekini VPS vezu → lokalni engine</span>
+          </button>
+        )}
+
         <button
           onClick={() => { setOpen(false); onOpenGitRemote(); }}
           className="w-full flex items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
@@ -158,8 +188,6 @@ export default function EnginePicker({
           </span>
         </button>
 
-
-
         <div className="border-t border-border">
           <button
             onClick={() => { setOpen(false); onOpenRuntimeManager(); }}
@@ -172,6 +200,13 @@ export default function EnginePicker({
             </span>
           </button>
         </div>
+
+        {prepStatus !== "idle" && (
+          <div className={`px-3 py-2 border-t border-border text-[10px] ${prepColor}`}>
+            <span className="font-semibold">{PREP_LABELS[prepStatus] || prepStatus}:</span>{" "}
+            <span className="break-words">{prepMessage}</span>
+          </div>
+        )}
       </div>,
       document.body
     )
@@ -186,6 +221,7 @@ export default function EnginePicker({
         className={`h-7 px-2 rounded-md text-[10px] font-medium border transition-colors flex items-center gap-1 ${modeColor}`}
       >
         {modeLabel}
+        {prepStatus === "preparing" && <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />}
         <span className="text-[8px] opacity-70">{open ? "▴" : "▾"}</span>
       </button>
       {menu}

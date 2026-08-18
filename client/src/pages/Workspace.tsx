@@ -21,7 +21,7 @@ import { routeChat, orchestrateChat, type OrchestrateModel } from "../lib/orches
 import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges, sendSteerInstruction, startAgentBackground, fetchBackgroundStatus, type BackgroundTimelineEntry } from "../lib/agent.js";
 import { createAgentBusTransfer, listAgentBusEvents, updateAgentBusEventStatus, type AgentBusEnvelope } from "../lib/agent-bus.js";
 import { runAgentTurn } from "../lib/agent-turn.js";
-import { listRepoConnections, type RepoConnection } from "../lib/repos.js";
+import { listRepoConnections, prepareRepo, type RepoConnection } from "../lib/repos.js";
 import { fetchProjects } from "../lib/projects.js";
 import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
 import { type AgentRole, getRoleById, fetchPrompts, type SavedPrompt } from "../lib/roles.js";
@@ -381,6 +381,14 @@ export default function Workspace() {
   // agent runs on the LOCAL engine inside the cloned repo (no VPS needed).
   const [activeRepo, setActiveRepo] = useState<RepoConnection | null>(null);
   const [askActiveRepo, setAskActiveRepo] = useState<RepoConnection | null>(null);
+
+  // Per-panel engine preparation feedback. Selecting "Lokalni engine (repo)"
+  // or "VPS mašina" now performs real backend work (workspace prepare + engine
+  // health), and this state drives the EnginePicker status line so the option
+  // visibly does something instead of silently flipping a machineId string.
+  type EnginePrepStatus = "idle" | "preparing" | "ready" | "error" | "no-repo";
+  const [askEnginePrep, setAskEnginePrep] = useState<{ status: EnginePrepStatus; message: string }>({ status: "idle", message: "" });
+  const [agentEnginePrep, setAgentEnginePrep] = useState<{ status: EnginePrepStatus; message: string }>({ status: "idle", message: "" });
 
   const loadActiveRepo = useCallback(async () => {
     try {
@@ -2304,26 +2312,87 @@ export default function Workspace() {
 
   // ONE shared VPS engine is the central brain for BOTH panels. Connecting a
   // VPS binds the same machineId to both panels (no per-panel VPS split, no
-  // local redirect once a VPS engine is live). Each panel's Chat|OpenCode
-  // toggle then decides whether that panel runs as a full agent or plain chat.
+  // local redirect once a VPS engine is live). Both panels run as full agents
+  // against that engine — there is no plain-chat mode.
   const handleVpsConnected = useCallback((machineId: string) => {
     setAskMachineId(machineId);
     setAgentMachineId(machineId);
     setAskSessionId(null);
     setAgentSessionId(null);
+    setAskEnginePrep({ status: "ready", message: "VPS mašina povezana — OpenCode radi preko SSH" });
+    setAgentEnginePrep({ status: "ready", message: "VPS mašina povezana — OpenCode radi preko SSH" });
     // Restore stable "ready" on connect (regression 0810539 downgraded this to
     // a false "offline" when a transient health-check timed out, even though
     // the VPS engine was alive). The daemon is still lazily health-checked on
     // restore; a busy health probe must never block the connected state.
     setVpsStatus("ready");
     setShowSshModal(false);
+
+    // Safety net: verify the daemon is actually reachable and auto-reconnect
+    // if opencode isn't running. Without this the first agent turn can fail
+    // with "Machine not found / Opencode not running" (= "nema alat") even
+    // though the user just provisioned the VPS. Never downgrades to chat.
+    verifyVpsConnection(machineId)
+      .then((result) => {
+        if (result.vpsStatus === "ready") {
+          setVpsStatus("ready");
+          setAskEnginePrep({ status: "ready", message: "VPS OpenCode potvrđen (health OK)" });
+          setAgentEnginePrep({ status: "ready", message: "VPS OpenCode potvrđen (health OK)" });
+        } else {
+          setVpsStatus("offline");
+          setAskEnginePrep({ status: "error", message: "VPS OpenCode nije dostupan — otvori Runtime Manager → Reconnect" });
+          setAgentEnginePrep({ status: "error", message: "VPS OpenCode nije dostupan — otvori Runtime Manager → Reconnect" });
+        }
+      })
+      .catch(() => {
+        setVpsStatus("offline");
+      });
   }, []);
+
+  // Select "Lokalni engine (repo)" — real backend work, not just a string swap.
+  // 1) bind the panel to its own local OpenCode slot,
+  // 2) clone/pull the active repo into the sandbox via POST /api/repos/prepare,
+  // 3) surface the result in the EnginePicker so the option visibly executes.
+  const handleSelectLocalEngine = useCallback((panel: "ask" | "agent") => {
+    const setMachineId = panel === "ask" ? setAskMachineId : setAgentMachineId;
+    const setSessionId = panel === "ask" ? setAskSessionId : setAgentSessionId;
+    const setPrep = panel === "ask" ? setAskEnginePrep : setAgentEnginePrep;
+    const machineId = panel === "ask" ? "local:opencode:ask" : "local:opencode";
+
+    setMachineId(machineId);
+    setSessionId(null);
+    setPrep({ status: "preparing", message: "Pripremam lokalni workspace + repo sandbox…" });
+
+    prepareRepo()
+      .then((info) => {
+        if (!info.connected || !info.repo) {
+          setPrep({ status: "no-repo", message: "Nema aktivnog repo-a — lokalni OpenCode radi u bare sandboxu" });
+        } else if (info.cloned === false) {
+          setPrep({ status: "preparing", message: `Kloniran ${info.repo}…` });
+        } else {
+          setPrep({ status: "ready", message: `Spreman — ${info.repo} (${info.branch || "default"}) u sandboxu` });
+        }
+        loadActiveRepo();
+      })
+      .catch((err) => {
+        // 404 = no active repo (bare sandbox, still a full agent). Other errors
+        // are surfaced but never downgrade the panel to plain chat.
+        const msg = err instanceof Error ? err.message : "Greška pri pripremi workspace-a";
+        if (/no active repo|404/i.test(msg)) {
+          setPrep({ status: "no-repo", message: "Nema aktivnog repo-a — lokalni OpenCode radi u bare sandboxu" });
+        } else {
+          setPrep({ status: "error", message: msg });
+        }
+      });
+  }, [loadActiveRepo]);
 
   const handleVpsDisconnected = useCallback(() => {
     setAskMachineId((prev) => (prev && !prev.startsWith("local:") ? "local:opencode:ask" : prev));
     setAgentMachineId((prev) => (prev && !prev.startsWith("local:") ? "local:opencode" : prev));
     setAskSessionId(null);
     setAgentSessionId(null);
+    setAskEnginePrep({ status: "idle", message: "" });
+    setAgentEnginePrep({ status: "idle", message: "" });
     setVpsStatus("disconnected");
   }, []);
 
@@ -3085,7 +3154,9 @@ export default function Workspace() {
                 hasRepo={!!askActiveRepo}
                 repoName={askActiveRepo?.fullName}
                 panelLabel="Ask"
-                onSelectLocal={() => setAskMachineId("local:opencode:ask")}
+                onSelectLocal={() => handleSelectLocalEngine("ask")}
+                prepStatus={askEnginePrep.status}
+                prepMessage={askEnginePrep.message}
                 onConnectVps={() => openSshModalForPanel("ask")}
                 onDisconnectVps={() => handleVpsDisconnected()}
                 onOpenGitRemote={() => { setGitRemoteSlot("ask"); setShowGitRemote(true); }}
@@ -3223,7 +3294,9 @@ export default function Workspace() {
                 hasRepo={!!activeRepo}
                 repoName={activeRepo?.fullName}
                 panelLabel="Agent"
-                onSelectLocal={() => setAgentMachineId("local:opencode")}
+                onSelectLocal={() => handleSelectLocalEngine("agent")}
+                prepStatus={agentEnginePrep.status}
+                prepMessage={agentEnginePrep.message}
                 onConnectVps={() => openSshModalForPanel("agent")}
                 onDisconnectVps={() => handleVpsDisconnected()}
                 onOpenGitRemote={() => { setGitRemoteSlot("agent"); setShowGitRemote(true); }}
@@ -3581,7 +3654,7 @@ export default function Workspace() {
         <GitRemotePanel
           slot={gitRemoteSlot}
           onClose={() => setShowGitRemote(false)}
-          onRepoChanged={() => loadActiveRepo()}
+          onRepoChanged={() => { loadActiveRepo(); if (gitRemoteSlot === "ask" || gitRemoteSlot === "agent") handleSelectLocalEngine(gitRemoteSlot); }}
         />
       )}
 

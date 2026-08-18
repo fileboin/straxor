@@ -142,6 +142,34 @@ export async function approveRepo(message: string, diffHash?: string, push = fal
   });
 }
 
+export interface RepoWorkspaceInfo {
+  success: boolean;
+  connected: boolean;
+  repo?: string;
+  branch?: string;
+  sandboxDir?: string;
+  cloned: boolean;
+  readOnly: boolean;
+  connectionType?: string;
+  pushCapable?: boolean;
+  gitBinary?: boolean;
+}
+
+/**
+ * Clone/pull the active repo into the local sandbox so the local OpenCode
+ * engine has a real workspace to run in. Best-effort at the call site: when no
+ * repo is active the server returns 404 and the caller falls back to the bare
+ * sandbox (general-purpose agent) instead of failing the engine selection.
+ */
+export async function prepareRepo(): Promise<RepoWorkspaceInfo> {
+  return api<RepoWorkspaceInfo>(`/prepare`, { method: "POST" });
+}
+
+/** Report the active repo's local sandbox status without mutating it. */
+export async function getRepoWorkspace(): Promise<RepoWorkspaceInfo> {
+  return api<RepoWorkspaceInfo>(`/workspace`);
+}
+
 export async function connectRepoUrl(repoUrl: string) {
   const token = localStorage.getItem("token");
   const res = await fetch("/api/github/connect-url", {
