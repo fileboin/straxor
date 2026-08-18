@@ -3202,6 +3202,7 @@ export default function Workspace() {
             onRoleChange={setAskRole}
             copyLabel={`→ ${t("chat.send.help")}`}
             onCopyTo={sendToAgentForHelp}
+            repoLabel={askActiveRepo?.fullName ?? undefined}
             prefill={askPrefill}
             draftInput={askDraftInput}
             draftAttachments={askDraftAttachments}
@@ -3331,6 +3332,7 @@ export default function Workspace() {
             onRoleChange={setAgentRole}
             copyLabel={`← ${t("chat.send.review")}`}
             onCopyTo={sendToAskForReview}
+            repoLabel={activeRepo?.fullName ?? undefined}
             prefill={agentPrefill}
             draftInput={agentDraftInput}
             draftAttachments={agentDraftAttachments}

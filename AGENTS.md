@@ -3,6 +3,14 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — Bus vidljiv + per-panel projekat indikator (klijent, urađeno)
+- **Cilj**: dva panela rade nezavisno (svaki svoj repo/model/sesiju) i povezuju se samo po potrebi kao „bus". Bus mehanizam („→ Traži pomoć drugog panela" / „← Pošalji na review") je POSTOJAO end-to-end (`transferByBus` → `createAgentBusTransfer` → `/api/agent/bus/transfer` + prefill ciljanog panela + auto-execute guard), ali je u UI bio gotovo nevidljiv (`opacity-0` + mali + na dnu poruke), pa korisnik nije znao da postoji.
+- **Implementacija**:
+  - `ChatPanel.tsx` — bus dugme na assistant porukama sada je **uvek vidljivo** (accent, ⇄ ikona, gornji desni ugao balona, labela na sm/većim ekranima). Novi prop `repoLabel?: string` → chip „📁 <repo>" u headeru (row 2) ili isprekidani „📁 bez projekta" kad panel nema aktivan repo — svaki panel jasno pokazuje na kom projektu radi.
+  - `Workspace.tsx` — oba panela prosleđuju `repoLabel` (ask → `askActiveRepo.fullName`, agent → `activeRepo.fullName`).
+  - `lib/i18n.ts` — novi ključ `chat.noProject` (en/sr + ostali fallback).
+- **Verifikovano**: client `tsc --noEmit` — **0 grešaka**; client `npm run build` — **prolazi** (`index-C2qGlPlL.js`, `Workspace-BtSAsqwi.js`). Server netaknut.
+
 ## Zadnji zadatak — OpenCode ↔ Ollama direktna veza (VPS, urađeno)
 - **Cilj**: OpenCode u oba panela mora da komunicira DIREKTNO sa lokalnom Ollama instancom na VPS-u (`http://localhost:11434`), bez FCC-a, bez spoljnih proksija i bez prepisivanja modela. FCC ostaje kao opt-in runtime u Runtime Manageru (nije u OpenCode putanji).
 - **Implementacija**:
