@@ -4,136 +4,152 @@ import type {
   UsageBudget, BillingPeriod, ModelPricing,
 } from "./adapter.js";
 import { MODEL_PRICING, estimateCost as libEstimateCost } from "./pricing.js";
+import {
+  aggregateUsageEvents,
+  insertUsageEvent,
+  listUsageEvents,
+  listUsageBudgets,
+  createUsageBudget,
+  deleteUsageBudget,
+} from "../../lib/usage-store.js";
+
+const MAX_AGGREGATE_ROWS = 100_000;
 
 /**
- * Custom (local) usage tracker — stores events in-memory.
- * Suitable for development and single-user deployments.
- * For production, swap with OpenMeter or Lago adapter.
+ * Custom (local) usage tracker — DB-backed, per-user.
+ *
+ * Events and budgets persist in `usage_events` / `usage_budgets` so the
+ * Usage & Cost dashboard survives server restarts. If the tables have not been
+ * migrated yet (or the DB is temporarily down), reads degrade to empty results
+ * and writes are ignored — the adapter never throws into the HTTP layer.
  */
-export function createCustomUsageAdapter(): UsageAdapter {
-  const events: UsageEvent[] = [];
-  const budgets: UsageBudget[] = [];
-  const periods: BillingPeriod[] = [];
+export function createCustomUsageAdapter(userId?: string): UsageAdapter {
+  // In-memory fallback for unmigrated/offline environments.
+  const localEvents: UsageEvent[] = [];
+  const localBudgets: UsageBudget[] = [];
+
+  async function readEvents(params: {
+    from?: string;
+    to?: string;
+    provider?: string;
+    model?: string;
+    projectId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<UsageEvent[]> {
+    if (!userId) return [];
+    try {
+      return await listUsageEvents(userId, params);
+    } catch {
+      let filtered = [...localEvents];
+      if (params.from) filtered = filtered.filter((e) => e.timestamp >= params.from!);
+      if (params.to) filtered = filtered.filter((e) => e.timestamp <= params.to!);
+      if (params.provider) filtered = filtered.filter((e) => e.provider === params.provider);
+      if (params.model) filtered = filtered.filter((e) => e.model === params.model);
+      if (params.projectId) filtered = filtered.filter((e) => e.projectId === params.projectId);
+      filtered.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      return filtered.slice(params.offset || 0, (params.offset || 0) + (params.limit || 50));
+    }
+  }
 
   return {
     async logEvent(raw) {
-      const event: UsageEvent = {
-        ...raw,
-        id: crypto.randomUUID(),
-      };
-      events.push(event);
+      const event: UsageEvent = { ...raw, id: crypto.randomUUID() };
+      if (userId) {
+        try {
+          await insertUsageEvent({
+            timestamp: event.timestamp,
+            userId,
+            projectId: event.projectId,
+            machineId: event.machineId,
+            provider: event.provider,
+            model: event.model,
+            inputTokens: event.inputTokens,
+            outputTokens: event.outputTokens,
+            totalTokens: event.totalTokens,
+            costUsd: event.costUsd,
+            latencyMs: event.latencyMs,
+            success: event.success,
+            errorMessage: event.errorMessage,
+            metadata: event.metadata,
+          });
+        } catch {
+          localEvents.push(event);
+        }
+      } else {
+        localEvents.push(event);
+      }
       return event;
     },
 
-    async getEvents({ from, to, provider, model, projectId, limit = 50, offset = 0 }) {
-      let filtered = [...events];
-      if (from) filtered = filtered.filter((e) => e.timestamp >= from);
-      if (to) filtered = filtered.filter((e) => e.timestamp <= to);
-      if (provider) filtered = filtered.filter((e) => e.provider === provider);
-      if (model) filtered = filtered.filter((e) => e.model === model);
-      if (projectId) filtered = filtered.filter((e) => e.projectId === projectId);
-      filtered.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-      return filtered.slice(offset, offset + limit);
+    async getEvents(params) {
+      return readEvents(params);
     },
 
     async getAggregate({ dimension, from, to, provider, model }) {
-      let filtered = [...events];
-      if (from) filtered = filtered.filter((e) => e.timestamp >= from);
-      if (to) filtered = filtered.filter((e) => e.timestamp <= to);
-      if (provider) filtered = filtered.filter((e) => e.provider === provider);
-      if (model) filtered = filtered.filter((e) => e.model === model);
-
-      const groups = new Map<string, UsageEvent[]>();
-      for (const e of filtered) {
-        let key: string;
-        switch (dimension) {
-          case "provider": key = e.provider; break;
-          case "model": key = `${e.provider}/${e.model}`; break;
-          case "project": key = e.projectId || "unknown"; break;
-          case "machine": key = e.machineId || "unknown"; break;
-          case "day": key = e.timestamp.slice(0, 10); break;
-          case "hour": key = e.timestamp.slice(0, 13); break;
-          default: key = "unknown";
-        }
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key)!.push(e);
-      }
-
-      const result: UsageAggregate[] = [];
-      for (const [label, items] of groups) {
-        const totalTokens = items.reduce((s, e) => s + e.totalTokens, 0);
-        const inputTokens = items.reduce((s, e) => s + e.inputTokens, 0);
-        const outputTokens = items.reduce((s, e) => s + e.outputTokens, 0);
-        const totalCostUsd = items.reduce((s, e) => s + e.costUsd, 0);
-        const latencies = items.filter((e) => e.latencyMs).map((e) => e.latencyMs!);
-        const errors = items.filter((e) => !e.success).length;
-
-        result.push({
-          dimension,
-          label,
-          totalTokens,
-          inputTokens,
-          outputTokens,
-          totalCostUsd,
-          requestCount: items.length,
-          avgLatencyMs: latencies.length > 0 ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : 0,
-          errorRate: items.length > 0 ? errors / items.length : 0,
-        });
-      }
-
-      result.sort((a, b) => b.totalCostUsd - a.totalCostUsd);
-      return result;
+      const events = await readEvents({ from, to, provider, model, limit: MAX_AGGREGATE_ROWS });
+      return aggregateUsageEvents(events, dimension);
     },
 
     async getCostSummary({ from, to }) {
       const now = new Date();
       const defaultFrom = from || new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
-      const [byProvider, byModel, byProject, byDay] = await Promise.all([
-        this.getAggregate({ dimension: "provider", from: defaultFrom, to }),
-        this.getAggregate({ dimension: "model", from: defaultFrom, to }),
-        this.getAggregate({ dimension: "project", from: defaultFrom, to }),
-        this.getAggregate({ dimension: "day", from: defaultFrom, to }),
-      ]);
-
-      let filtered = [...events];
-      if (defaultFrom) filtered = filtered.filter((e) => e.timestamp >= defaultFrom);
-      if (to) filtered = filtered.filter((e) => e.timestamp <= to);
+      const events = await readEvents({ from: defaultFrom, to, limit: MAX_AGGREGATE_ROWS });
 
       return {
-        totalCostUsd: filtered.reduce((s, e) => s + e.costUsd, 0),
-        totalTokens: filtered.reduce((s, e) => s + e.totalTokens, 0),
-        totalRequests: filtered.length,
+        totalCostUsd: events.reduce((s, e) => s + e.costUsd, 0),
+        totalTokens: events.reduce((s, e) => s + e.totalTokens, 0),
+        totalRequests: events.length,
         period: { from: defaultFrom, to: to || now.toISOString() },
-        byProvider,
-        byModel,
-        byProject,
-        byDay,
-      };
+        byProvider: aggregateUsageEvents(events, "provider"),
+        byModel: aggregateUsageEvents(events, "model"),
+        byProject: aggregateUsageEvents(events, "project"),
+        byDay: aggregateUsageEvents(events, "day"),
+      } satisfies CostSummary;
     },
 
     async listBudgets() {
-      return [...budgets];
+      if (!userId) return [...localBudgets];
+      try {
+        return await listUsageBudgets(userId);
+      } catch {
+        return [...localBudgets];
+      }
     },
 
     async createBudget(raw) {
+      if (userId) {
+        try {
+          return await createUsageBudget(userId, raw);
+        } catch {
+          // fall through to in-memory
+        }
+      }
       const budget: UsageBudget = {
         ...raw,
         id: crypto.randomUUID(),
         currentSpendUsd: 0,
         createdAt: new Date().toISOString(),
       };
-      budgets.push(budget);
+      localBudgets.push(budget);
       return budget;
     },
 
     async deleteBudget(id) {
-      const idx = budgets.findIndex((b) => b.id === id);
-      if (idx >= 0) budgets.splice(idx, 1);
+      if (userId) {
+        try {
+          await deleteUsageBudget(userId, id);
+          return;
+        } catch {
+          // fall through
+        }
+      }
+      const idx = localBudgets.findIndex((b) => b.id === id);
+      if (idx >= 0) localBudgets.splice(idx, 1);
     },
 
     async listPeriods() {
-      return [...periods];
+      return [] as BillingPeriod[];
     },
 
     async getPricing() {

@@ -13,6 +13,7 @@ import {
   type AttachmentRef,
   type ContentBlock,
 } from "../lib/attachments.js";
+import { estimateTokenCount, estimateUsageCost, insertUsageEvent } from "../lib/usage-store.js";
 
 const router = Router();
 
@@ -201,14 +202,37 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     const adapter = getAdapters().aiProvider;
     const stream = adapter.streamChat({ providerId, modelId, messages: finalMessages, apiKey, thinking });
 
+    const startedAt = Date.now();
+    let outputText = "";
+    let streamError: string | undefined;
     for await (const event of stream) {
       if (event.type === "token") {
+        outputText += event.content;
         res.write(`data: ${JSON.stringify({ token: event.content })}\n\n`);
       } else if (event.type === "error") {
+        streamError = event.content;
         res.write(`data: ${JSON.stringify({ error: event.content })}\n\n`);
         break;
       }
     }
+
+    // Phase 3 — feed the Usage & Cost dashboard (best-effort, never blocks SSE).
+    const inputText = messages.map((m) => m.content).join("\n");
+    const inputTokens = estimateTokenCount(inputText);
+    const outputTokens = estimateTokenCount(outputText);
+    void insertUsageEvent({
+      timestamp: new Date().toISOString(),
+      userId: req.user!.userId,
+      provider: providerId,
+      model: modelId,
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
+      costUsd: estimateUsageCost(providerId, modelId, inputTokens, outputTokens),
+      latencyMs: Date.now() - startedAt,
+      success: !streamError,
+      errorMessage: streamError,
+    }).catch(() => {});
 
     res.write("data: [DONE]\n\n");
     res.end();

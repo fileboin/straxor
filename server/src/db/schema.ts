@@ -7,6 +7,7 @@ import {
   boolean,
   timestamp,
   jsonb,
+  doublePrecision,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -1537,4 +1538,48 @@ export const webhooks = pgTable("webhooks", {
 
 export const webhooksRelations = relations(webhooks, ({ one }) => ({
   user: one(users, { fields: [webhooks.userId], references: [users.id] }),
+}));
+
+// ── Usage analytics (Phase 3) — persistent events + budgets ──
+
+export const usageEvents = pgTable("usage_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  projectId: uuid("project_id"),
+  machineId: varchar("machine_id", { length: 255 }),
+  provider: varchar("provider", { length: 100 }).notNull(),
+  model: varchar("model", { length: 255 }).notNull(),
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  totalTokens: integer("total_tokens").notNull().default(0),
+  costUsd: doublePrecision("cost_usd").notNull().default(0),
+  latencyMs: integer("latency_ms"),
+  success: boolean("success").notNull().default(true),
+  errorMessage: text("error_message"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const usageEventsRelations = relations(usageEvents, ({ one }) => ({
+  user: one(users, { fields: [usageEvents.userId], references: [users.id] }),
+}));
+
+export const usageBudgets = pgTable("usage_budgets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  monthlyLimitUsd: doublePrecision("monthly_limit_usd").notNull().default(0),
+  currentSpendUsd: doublePrecision("current_spend_usd").notNull().default(0),
+  alertThresholdPercent: integer("alert_threshold_percent").notNull().default(80),
+  isHardLimit: boolean("is_hard_limit").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const usageBudgetsRelations = relations(usageBudgets, ({ one }) => ({
+  user: one(users, { fields: [usageBudgets.userId], references: [users.id] }),
 }));

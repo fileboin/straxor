@@ -3,6 +3,17 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — Persistent analytics + auto-instrumentacija (FAZA 16, urađeno)
+- **Cilj**: ROADMAP Phase 3 — „Analytics dashboard". Usage & Cost UI je već postojao (UsagePanel sa daily bar chart, po provideru/modelu, budžetima), ali je default `custom` adapter bio **in-memory** (svi podaci gubljeni na restartu, na Renderu često) i **ništa nije logovalo** događaje → dashboard uvek prazan.
+- **Implementacija**:
+  - Migracija `0015_usage.sql` + journal entry + tabele `usage_events` i `usage_budgets` u `schema.ts` (per-user FK, timestamp, provider/model, tokens, `cost_usd double precision`, latency, success, metadata).
+  - `server/src/lib/usage-store.ts` (novo) — DB CRUD (`insertUsageEvent/listUsageEvents/listUsageBudgets/createUsageBudget/deleteUsageBudget`, best-effort) + čisti helperi `estimateTokenCount` (~4 char/token), `estimateUsageCost` (preko `pricing.ts`) i `aggregateUsageEvents` (provider/model/project/machine/day/hour).
+  - `adapters/usage/custom.ts` prepisan na **DB-backed per-user** adapter (`createCustomUsageAdapter(userId)`) sa in-memory fallback-om za nemigrirane/offline slučajeve; `routes/usage.ts` prosleđuje `req.userId` u `getAdapter` (popravljeno i `(req as any).userId` → `req.userId`; `/pricing`, `/budgets`, `/periods` sada koriste `req` umesto `_req`).
+  - **Auto-instrumentacija** u `routes/chat.ts` (`POST /api/chat`): po završetku stream-a upisuje usage event (estimirani input/output tokeni iz teksta, cena iz pricing tabele, latency, success/error) — best-effort, ne blokira SSE. Dashboard sada sam popunjava podatke.
+- **Testovi**: `usage-store.test.ts` (novo, 7 testova) — token estimation, cost za poznati/nepoznati model, agregacija po provideru/modelu/danu sa sortiranjem.
+- **Verifikovano**: server `tsc --noEmit` čist; vitest **194/194** (24 fajla, +7 novih). Klijent netaknut.
+- **Napomena**: agent turn (opencode) i `/orchestrate` još nisu instrumentirani — sledeći korak ako treba precizniji token/cost tracking za agenta.
+
 ## Zadnji zadatak — Webhook dispatch uvezan u stvarne događaje (FAZA 15b, urađeno)
 - **Cilj**: FAZA 15 je napravila webhook CRUD/dispatch infrastrukturu, ali `dispatchWebhook` nije nigde bio pozvan — webhook-ovi nisu mogli ništa da isporuče. Sada su uvezani u stvarne lifecycle događaje.
 - **Implementacija**:
