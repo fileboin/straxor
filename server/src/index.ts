@@ -78,6 +78,7 @@ import { verificationRoutes } from "./verification/api/routes.js";
 import appStateRoutes from "./routes/app-state.js";
 import handshakeSelfTestRoutes from "./routes/handshake-self-test.js";
 import docsRoutes from "./routes/docs.js";
+import webhookRoutes from "./routes/webhooks.js";
 import { httpRequestLogger } from "./lib/http-logger.js";
 
 const app = express();
@@ -257,6 +258,7 @@ app.use("/api/image", imageRoutes);
 app.use("/api/support", supportRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/docs", docsRoutes);
+app.use("/api/webhooks", webhookRoutes);
 
 // Set up Marketplace Core (independent system)
 const marketplaceRouter = createMarketplaceRouter();

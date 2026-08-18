@@ -1517,3 +1517,24 @@ export const userAppState = pgTable("user_app_state", {
 export const userAppStateRelations = relations(userAppState, ({ one }) => ({
   user: one(users, { fields: [userAppState.userId], references: [users.id] }),
 }));
+
+// ── Webhooks (Phase 3) ──
+
+export const webhooks = pgTable("webhooks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  url: varchar("url", { length: 2000 }).notNull(),
+  secret: varchar("secret", { length: 500 }),
+  events: jsonb("events").$type<string[]>().notNull().default([]),
+  active: boolean("active").notNull().default(true),
+  lastDeliveryAt: timestamp("last_delivery_at"),
+  lastDeliveryStatus: varchar("last_delivery_status", { length: 20 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const webhooksRelations = relations(webhooks, ({ one }) => ({
+  user: one(users, { fields: [webhooks.userId], references: [users.id] }),
+}));

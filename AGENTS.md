@@ -3,6 +3,15 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — Webhook sistem (FAZA 15, urađeno)
+- **Cilj**: ROADMAP Phase 3 — „Webhook system" (eksterne integracije). Nije postojao outbound webhook mehanizam.
+- **Implementacija**:
+  - Migracija `0014_webhooks.sql` + journal entry + `webhooks` tabela u `schema.ts` (id, userId FK, url, secret, events jsonb, active, lastDeliveryAt/Status, timestamps).
+  - `server/src/lib/webhooks.ts` (novo) — `WEBHOOK_EVENTS` (agent.run.completed/failed, team.task.verified/approved, terminal.process.exited, preview.started/stopped, deploy.completed/failed), `signWebhookPayload` (HMAC-SHA256), `webhookMatchesEvent` (podrška `*`), `normalizeWebhookUrl`, CRUD (`createWebhook/listWebhooks/getWebhook/updateWebhook/deleteWebhook`), `dispatchWebhook` (best-effort POST sa `X-Straxor-*` headerima + 5s timeout + perzistencija delivery statusa), `deliverTestEvent`.
+  - `server/src/routes/webhooks.ts` (novo) — `GET/POST /api/webhooks`, `PATCH/DELETE /api/webhooks/:id`, `POST /api/webhooks/:id/test` (test ping). Uvezano u `index.ts`.
+- **Testovi**: `webhooks.test.ts` (novo, 9 testova) — HMAC determinističnost + promena secret/payload, event matching (`*`/exact/non-match), URL validacija.
+- **Verifikovano**: server `tsc --noEmit` čist; vitest **187/187** (23 fajla, +9 novih). Klijent netaknut.
+
 ## Zadnji zadatak — Swagger/OpenAPI dokumentacija (FAZA 14, urađeno)
 - **Cilj**: ROADMAP Phase 2 — „API documentation (Swagger/OpenAPI)". Nije postojala nikakva API dokumentacija.
 - **Implementacija**: `server/src/openapi/spec.ts` (novo) — ručno pisana OpenAPI 3.0 spec (info, `bearerAuth` security scheme, sheme Error/Health/AuthResult/TeamTask/TeamApproveResult/RepoDiff) + ~25 ključnih endpointa (health, auth, chat+route, agent send/background/team/approve, repos connect/diff/push, terminal start/stream/cancel, preview start/stop, git-remote repos). `server/src/routes/docs.ts` (novo) — `GET /api/docs` (Swagger UI preko CDN-a, bez novih npm zavisnosti) + `GET /api/docs/openapi.json` (raw spec). Uvezano u `index.ts` pre SPA fallback-a.
