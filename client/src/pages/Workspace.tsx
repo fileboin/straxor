@@ -29,7 +29,6 @@ import { verifyVpsConnection } from "../lib/runtime-manager.js";
 import { t, useLang } from "../lib/i18n.js";
 import { checkBeforeInstall, type ScanVerdict } from "../lib/security.js";
 import RoleSelector from "../components/workspace/RoleSelector.js";
-import ChatAgentToggle from "../components/workspace/ChatAgentToggle.js";
 import PromptLibrary from "../components/workspace/PromptLibrary.js";
 import SecurityScanResult from "../components/workspace/SecurityScanResult.js";
 import ExportPanel from "../components/workspace/ExportPanel.js";
@@ -256,13 +255,8 @@ export default function Workspace() {
   const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([]);
   const [mobileTab, setMobileTab] = useState<"ask" | "agent">("ask");
   const [askPanelMode] = useState<"agent" | "chat">("agent");
-  const [agentPanelMode, setAgentPanelMode] = useState<"agent" | "chat">(() => {
-    try {
-      return localStorage.getItem("straxor.agent.mode") === "chat" ? "chat" : "agent";
-    } catch {
-      return "agent";
-    }
-  });
+  // FAZA 18 — Panel 2 (Agent) je uvek OpenCode agent, nikad pasivni chat.
+  const [agentPanelMode] = useState<"agent" | "chat">("agent");
 
   const [askStreamingId, setAskStreamingId] = useState<string | null>(null);
   const [agentStreamingId, setAgentStreamingId] = useState<string | null>(null);
@@ -346,14 +340,14 @@ export default function Workspace() {
   // Agent session state
   const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
   const [agentMachineId, setAgentMachineId] = useState<string | null>(() => {
-    try { return localStorage.getItem("straxor.machine.agent"); } catch { return null; }
+    try { return localStorage.getItem("straxor.machine.agent") || "local:opencode"; } catch { return "local:opencode"; }
   });
 
   // Ask panel session state (Ask is a full independent agent on the local
   // engine with its own slot/repo, parallel to Agent).
   const [askSessionId, setAskSessionId] = useState<string | null>(null);
   const [askMachineId, setAskMachineId] = useState<string | null>(() => {
-    try { return localStorage.getItem("straxor.machine.ask"); } catch { return null; }
+    try { return localStorage.getItem("straxor.machine.ask") || "local:opencode:ask"; } catch { return "local:opencode:ask"; }
   });
   const askDirectFallbackRef = useRef(false);
   const askAbortRef = useRef<AbortController | null>(null);
@@ -506,22 +500,21 @@ export default function Workspace() {
     typeof window !== "undefined" &&
     ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
 
-  // When an active repo exists, point the agent at the local engine (so it can
-  // run opencode/tools/git push) UNLESS we are on a remote host (Render/phone),
-  // where there is no local runtime — in that case force local:opencode so the
-  // localEngineOnRemote guard turns the panel into plain AI chat. We must NOT
-  // keep a stale VPS machineId from a restored session here, otherwise the
-  // agent panel would hang on a VPS that doesn't exist on this host.
-  // When a GitHub repo is active and no explicit VPS machine is selected for a
-  // panel, bind that panel to its slot-specific local OpenCode runtime.
+  // FAZA 18 — the agent panel is ALWAYS an OpenCode agent. When an active repo
+  // exists it binds to its slot-specific local OpenCode runtime (which is also
+  // spawnable on Render via the opencode-ai server dependency). An explicitly
+  // selected VPS machineId (non-"local:") is always respected and never
+  // overridden. There is no plain-chat downgrade anymore.
   useEffect(() => {
     if (agentMachineId && !agentMachineId.startsWith("local:")) return;
     if (activeRepo) {
       setAgentMachineId("local:opencode");
       console.log("[machine-debug] agent activeRepo=", activeRepo.fullName, "-> local:opencode", isLocalHost ? "(localhost)" : "(remote)");
     } else {
-      setAgentMachineId((prev) => (prev && prev.startsWith("local:") ? null : prev));
-      console.log("[machine-debug] agent no activeRepo -> clearing local");
+      // FAZA 18 — bez aktivnog repoa agent i dalje radi na lokalnom OpenCode
+      // (bare sandbox); nikad se ne degradira u pasivni chat.
+      setAgentMachineId((prev) => (prev && prev.startsWith("local:") ? prev : "local:opencode"));
+      console.log("[machine-debug] agent no activeRepo -> keeping local:opencode");
     }
   }, [activeRepo, isLocalHost, agentMachineId]);
 
@@ -531,8 +524,9 @@ export default function Workspace() {
       setAskMachineId("local:opencode:ask");
       console.log("[machine-debug] ask activeRepo=", askActiveRepo.fullName, "-> local:opencode:ask");
     } else {
-      setAskMachineId((prev) => (prev && prev.startsWith("local:") ? null : prev));
-      console.log("[machine-debug] ask no activeRepo -> clearing local");
+      // FAZA 18 — bez aktivnog repoa ask i dalje radi na lokalnom OpenCode.
+      setAskMachineId((prev) => (prev && prev.startsWith("local:") ? prev : "local:opencode:ask"));
+      console.log("[machine-debug] ask no activeRepo -> keeping local:opencode:ask");
     }
   }, [askActiveRepo, askMachineId]);
 
@@ -688,7 +682,6 @@ export default function Workspace() {
         if (typeof s.askPanelAccent === "string") setAskPanelAccent(s.askPanelAccent);
         if (typeof s.agentPanelAccent === "string") setAgentPanelAccent(s.agentPanelAccent);
         if (s.mobileTab === "ask" || s.mobileTab === "agent") setMobileTab(s.mobileTab);
-        if (s.agentPanelMode === "agent" || s.agentPanelMode === "chat") setAgentPanelMode(s.agentPanelMode);
         if (typeof s.dbSessionId === "string") setDbSessionId(s.dbSessionId);
         if (typeof s.askSessionId === "string") setAskSessionId(s.askSessionId);
         if (typeof s.agentSessionId === "string") setAgentSessionId(s.agentSessionId);
@@ -1812,11 +1805,10 @@ export default function Workspace() {
     const myGenAgent = ++agentGenRef.current;
     const isMineAgent = () => agentGenRef.current === myGenAgent;
 
-    // On a remote host (Render / phone) there is no local opencode runtime, so
-    // the Agent panel must run as plain AI chat (exactly like the Ask panel).
-    // The local `opencode` engine is only used when served from localhost.
-    const localEngineOnRemote = !!agentMachineId?.startsWith("local:") && !isLocalHost;
-    if (agentPanelMode === "chat" || !agentMachineId || localEngineOnRemote || agentDirectFallbackRef.current) {
+    // FAZA 18 — Panel 2 je uvek OpenCode agent (VPS ili lokalni runtime).
+    // Pasivni chat fallback se NIKAD ne koristi; lokalni opencode je spawnabilan
+    // i na Renderu (opencode-ai je server dependency).
+    if (agentDirectFallbackRef.current) {
       // FAZA 5: parallel multi-model execution when 2+ models selected.
       if (agentOrchestratedModels.length >= 2 && (!attachments || attachments.length === 0)) {
         const systemParts: string[] = [];
@@ -1973,7 +1965,7 @@ export default function Workspace() {
         const PROJECT_ID = projectId || "straxor-landing";
         const sess = await createSession(
           PROJECT_ID,
-          agentMachineId,
+          agentMachineId || "local:opencode",
           msg.slice(0, 100),
           { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, machineId: agentMachineId, sessionId: agentSessionId },
           { provider: askProvider, model: askModel, thinking: askThinking, role: askRole, machineId: askMachineId, sessionId: askSessionId }
@@ -2071,7 +2063,7 @@ export default function Workspace() {
       };
 
       try {
-        const started = await startAgentBackground(agentMachineId, fullMsg, agentSessionId, attachments, system);
+        const started = await startAgentBackground(agentMachineId || "local:opencode", fullMsg, agentSessionId, attachments, system);
         setAgentSessionId(started.sessionId);
         statusRef.timeline = [];
         await poll(started.jobId, started.sessionId);
@@ -2088,7 +2080,7 @@ export default function Workspace() {
       return;
     }
 
-    streamAgentMessage(agentMachineId, fullMsg, agentSessionId, {
+    streamAgentMessage(agentMachineId || "local:opencode", fullMsg, agentSessionId, {
       onSession: (sessionId) => {
         setAgentSessionId(sessionId);
       },
@@ -2244,15 +2236,7 @@ export default function Workspace() {
         }
       },
       onError: (error) => {
-        // If a *local* engine (local:opencode) couldn't start — e.g. opencode isn't
-        // installed, the GitHub token can't be decrypted, or there are no API keys —
-        // silently switch this panel to plain AI chat instead of leaving it silent.
-        if (agentMachineId?.startsWith("local:") && !agentDirectFallbackRef.current) {
-          agentDirectFallbackRef.current = true;
-          if (isMineAgent()) setAgentLoading(false);
-          handleAgentSend(msg, attachments);
-          return;
-        }
+        // FAZA 18 — grešku prikazujemo direktno; NIKAD ne prelazimo u pasivni chat.
         if (!isMineAgent()) return;
         setAgentMessages((prev) =>
           prev.map((m) =>
@@ -2336,8 +2320,8 @@ export default function Workspace() {
   }, []);
 
   const handleVpsDisconnected = useCallback(() => {
-    setAskMachineId((prev) => (prev && !prev.startsWith("local:") ? null : prev));
-    setAgentMachineId((prev) => (prev && !prev.startsWith("local:") ? null : prev));
+    setAskMachineId((prev) => (prev && !prev.startsWith("local:") ? "local:opencode:ask" : prev));
+    setAgentMachineId((prev) => (prev && !prev.startsWith("local:") ? "local:opencode" : prev));
     setAskSessionId(null);
     setAgentSessionId(null);
     setVpsStatus("disconnected");
@@ -3223,12 +3207,6 @@ export default function Workspace() {
                   👥 Tim
                 </button>
                 <RoleSelector role={agentRole} onChange={setAgentRole} />
-                <ChatAgentToggle
-                  mode={agentPanelMode}
-                  onChange={setAgentPanelMode}
-                  side="right"
-                  noEngine={!agentMachineId || (!!agentMachineId?.startsWith("local:") && !isLocalHost)}
-                />
                 <button
                   type="button"
                   onClick={() => setShowBusHistory(true)}

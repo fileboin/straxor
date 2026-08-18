@@ -3,6 +3,17 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — Oba panela uvek OpenCode agent (FAZA 18, urađeno)
+- **Cilj (hitna ispravka arhitekture)**: I Panel 1 (Ask) i Panel 2 (Agent) moraju biti aktivni OpenCode agenti (alati, workspace, komande, git), NIKAD pasivni tekstualni chat. Panel 2 je do sada imao trostruki downgrade na plain chat: `agentPanelMode==="chat"` (toggle), `!agentMachineId`, i `localEngineOnRemote` (local: engine na Renderu) — plus `onError` auto-fallback. Panel 2 je na Renderu prikazivao i `noEngine` crvenu tačku (netočno).
+- **Implementacija** (`client/src/pages/Workspace.tsx`):
+  - `agentPanelMode` je sada konstanta `"agent"` (uklonjen setter + restore + `ChatAgentToggle` iz Agent headera i import).
+  - `agentMachineId`/`askMachineId` default na `local:opencode` / `local:opencode:ask` (init + auto-set efekat više ne čiste na null; `handleVpsDisconnected` vraća na local umesto null).
+  - Uklonjen `localEngineOnRemote` downgrade + `onError` auto-fallback → greške se prikazuju direktno, nikad prelazak u chat.
+  - `streamAgentMessage`/`startAgentBackground`/`createSession` u agent putanji koriste `agentMachineId || "local:opencode"` (nikad null).
+  - Ask panel je već bio agent-only (učvršćen default local slot); njegov mrtvi chat fallback je i dalje neaktivan (`askDirectFallbackRef` nikad ne postaje true).
+- **VPS**: eksplicitno izabran VPS machineId (EnginePicker → SSH) se i dalje poštuje za oba panela i nikad se ne prepisuje; lokalni OpenCode (`opencode-ai` server dependency) je uvek dostupan fallback runtime na Renderu.
+- **Verifikovano**: client `tsc --noEmit` — **0 grešaka**; client `npm run build` — **prolazi**. Server netaknut.
+
 ## Zadnji zadatak — i18n: Usage & Cost panel lokalizovan (FAZA 17, urađeno)
 - **Cilj**: ROADMAP Phase 3 — „i18n support". **Fondacija je već postojala** (`client/src/lib/i18n.ts`: 27 jezika, `t/getLang/setLang/useLang`, fallback na engleski, language switcher u `StatusBar`, rečnik za auth/toolbar/welcome/chat/modeli; koristi se u 17 fajlova). Preostala praznina: novi **Usage & Cost panel (FAZA 16) je bio 100% hardkodiran na srpskom**.
 - **Implementacija**:
