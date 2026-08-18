@@ -26,6 +26,23 @@ export interface TeamJob {
   timeline: BackgroundTimelineEntry[];
 }
 
+export interface TeamVerifyStep {
+  name: "install" | "build" | "test";
+  command: string;
+  args: string[];
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+  passed: boolean;
+}
+
+export interface TeamVerifyResult {
+  steps: TeamVerifyStep[];
+  passed: boolean;
+  skipped: boolean;
+}
+
 export interface TeamTask {
   id: string;
   title: string;
@@ -34,6 +51,7 @@ export interface TeamTask {
   repo?: string | null;
   branch?: string | null;
   commitHash?: string | null;
+  verify?: TeamVerifyResult | null;
   error?: string | null;
 }
 

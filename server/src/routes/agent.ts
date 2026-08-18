@@ -11,7 +11,9 @@ import {
   approveAndCommitWorkspace,
   diffWorkspace,
   ensureWorkspace,
+  getRepoWorkspaceDir,
   pushWorkspace,
+  verifyWorkspace,
 } from "../runtime/local/workspace.js";
 import { db } from "../db/index.js";
 import { agentBusEvents, repoConnections } from "../db/schema.js";
@@ -33,6 +35,7 @@ import {
   roleLabel,
 } from "../lib/team-roles.js";
 import { randomUUID } from "node:crypto";
+import path from "path";
 
 type AgentBusAction = "help" | "review" | "warn";
 type PanelSlot = "ask" | "agent";
@@ -85,6 +88,8 @@ function buildAgentBusPrompt(input: {
 }
 
 const CONNECTION_TIMEOUT_MS = 30 * 60 * 1000; // 30 min hard timeout
+// FAZA 8 — per-step budget for the team verification gate (install/build/test).
+const TEAM_VERIFY_TIMEOUT_MS = 10 * 60 * 1000;
 const router = Router();
 
 router.use(requireAuth);
@@ -1381,6 +1386,7 @@ router.post("/team/:taskId/approve", async (req: Request, res: Response) => {
 
 /** Poll the fan-out jobs; advance the persistent task when they all finish. */
 async function trackTeamTask(userId: string, taskId: string, jobIds: string[]): Promise<void> {
+  let verifying = false;
   const poll = async (): Promise<boolean> => {
     const statuses: AgentJobStatus[] = [];
     for (const jobId of jobIds) {
@@ -1403,10 +1409,22 @@ async function trackTeamTask(userId: string, taskId: string, jobIds: string[]): 
       } catch {}
       return true;
     }
+
+    // All roles drained. FAZA 8 — VERIFYING is a REAL gate: the project's
+    // build + test run in the sandbox before the run can be approved, so
+    // nothing unverified ever reaches Diff → Approve → Commit → Push.
+    if (verifying) return false;
+    verifying = true;
     try {
       await transitionTaskStatus(userId, taskId, "VERIFYING");
-      await transitionTaskStatus(userId, taskId, "WAITING_APPROVAL");
     } catch {}
+    try {
+      await runTeamVerification(userId, taskId);
+    } catch (err) {
+      console.log(
+        `[agent:team] verify ${taskId} failed to run: ${err instanceof Error ? err.message : err}`
+      );
+    }
     return true;
   };
 
@@ -1416,6 +1434,106 @@ async function trackTeamTask(userId: string, taskId: string, jobIds: string[]): 
     } catch {}
   }, 3000);
   timer.unref?.();
+}
+
+/**
+ * FAZA 8 — Verification gate. Clones/refreshes the active repo sandbox and
+ * runs the project's build + test (structured result persisted on the task).
+ * A failing verification fails the whole team run; a fixture without a
+ * package.json (or without an active repo) cannot be verified and proceeds to
+ * WAITING_APPROVAL. Never throws — infrastructure problems are logged and
+ * treated as "cannot verify" so a platform hiccup never locks the run.
+ */
+async function runTeamVerification(userId: string, taskId: string): Promise<void> {
+  let conn: typeof repoConnections.$inferSelect | null = null;
+  try {
+    const rows = await db
+      .select()
+      .from(repoConnections)
+      .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+      .limit(1);
+    conn = rows[0] ?? null;
+  } catch (err) {
+    console.log(
+      `[agent:team] verify ${taskId} — repo resolution skipped: ${err instanceof Error ? err.message : err}`
+    );
+  }
+
+  if (!conn) {
+    // No active repo — nothing to verify against.
+    try {
+      await transitionTaskStatus(userId, taskId, "WAITING_APPROVAL");
+    } catch {}
+    return;
+  }
+
+  const token = await getGitRemoteToken(userId, conn.platform as GitPlatformId).catch(() => undefined);
+  try {
+    await ensureWorkspace({
+      userId,
+      platform: conn.platform,
+      owner: conn.owner,
+      name: conn.name,
+      fullName: conn.fullName,
+      cloneUrl: conn.cloneUrl,
+      defaultBranch: conn.defaultBranch,
+      token,
+    });
+  } catch (err) {
+    // Workspace unavailable — cannot verify; the run still proceeds.
+    console.log(
+      `[agent:team] verify ${taskId} — workspace unavailable: ${err instanceof Error ? err.message : err}`
+    );
+    try {
+      await transitionTaskStatus(userId, taskId, "WAITING_APPROVAL");
+    } catch {}
+    return;
+  }
+
+  const dir = getRepoWorkspaceDir(userId, conn.owner, conn.name);
+  const fsMod = await import("fs");
+  if (!fsMod.existsSync(path.join(dir, "package.json"))) {
+    // No npm manifest — nothing to build/test; proceed to approval.
+    try {
+      await transitionTaskStatus(userId, taskId, "WAITING_APPROVAL");
+    } catch {}
+    return;
+  }
+
+  const result = await verifyWorkspace(userId, conn.owner, conn.name, {
+    install: true,
+    timeoutMs: TEAM_VERIFY_TIMEOUT_MS,
+    taskId,
+  });
+  try {
+    await setTaskFields(userId, taskId, { verify: result });
+  } catch {}
+
+  if (result.skipped) {
+    // Manifest without scripts — cannot verify; proceed.
+    try {
+      await transitionTaskStatus(userId, taskId, "WAITING_APPROVAL");
+    } catch {}
+    return;
+  }
+
+  if (!result.passed) {
+    const failed = result.steps.filter((s) => !s.passed);
+    const summary = failed
+      .map((s) => `${s.name} (exit ${s.exitCode}): ${(s.stderr + s.stdout).trim().slice(0, 400)}`)
+      .join(" | ");
+    try {
+      await setTaskFields(userId, taskId, {
+        error: `Verifikacija nije prošla — ${summary}`,
+      });
+      await transitionTaskStatus(userId, taskId, "FAILED");
+    } catch {}
+    return;
+  }
+
+  try {
+    await transitionTaskStatus(userId, taskId, "WAITING_APPROVAL");
+  } catch {}
 }
 
 export default router;

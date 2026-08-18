@@ -30,6 +30,8 @@ export const tasks = pgTable("tasks", {
   commitHash: varchar("commit_hash", { length: 255 }),
   diff: text("diff"),
   error: text("error"),
+  /** FAZA 8 — structured build+test result captured during VERIFYING. */
+  verify: jsonb("verify"),
   retries: integer("retries").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

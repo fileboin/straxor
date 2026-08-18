@@ -23,6 +23,8 @@ export interface TaskPatch {
   commitHash?: string | null;
   diff?: string | null;
   error?: string | null;
+  /** FAZA 8 — structured build+test verification result (see workspace verify). */
+  verify?: unknown | null;
   retries?: number;
 }
 

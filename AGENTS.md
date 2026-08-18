@@ -10,6 +10,14 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
   - Klijent: `team.ts` — `approveTeamTask(taskId, { push, commitMessage, diffHash })` + `TeamApproveResult` + `commitHash` u `TeamTask`. `TeamRunPanel.tsx` — na WAITING_APPROVAL jednom fetch-uje sandbox diff (`getRepoDiff`), prikazuje stat + hash + skraćeni diff + commit poruku, i dva dugmeta "✓ Odobri + push" / "✓ Odobri i commit"; poslije prikazuje commit hash + push status (ili upozorenje ako push nije uspio). 409 → refetch diff-a.
 - **Verifikovano**: novi `server/src/routes/agent-team-loop.test.ts` (5 E2E, offline bare remote): happy path commit+push + task VERIFIED sa commitHash + remote HEAD == local HEAD + commit poruka na remote-u; stale diffHash → 409 + ništa ne stiže na remote; approve prije WAITING_APPROVAL → 400; bez aktivnog repoa → committed:false ali VERIFIED; push:false → commit lokalno bez push-a. Server `tsc --noEmit` čist, vitest **164/164**, client build prolazi.
 
+## Zadnji zadatak — Team Verification Gate (FAZA 8, urađeno)
+- **Cilj**: u MVP lancu (GitHub → Tim → Verification → Diff → Approval → Commit → Push) VERIFYING je bio prazna tranzicija — ništa se nije izvršavalo, run je samo prešao u WAITING_APPROVAL. Sada je to PRAVI gate: build + test moraju proći pre odobravanja.
+- **Implementacija**:
+  - `trackTeamTask` (`agent.ts`) — kad svi role job-ovi drain-uju: transition → VERIFYING → `runTeamVerification` (JEDNOM, guarded flag). `runTeamVerification`: resolvuje aktivni repo (best-effort), `ensureWorkspace`, provera `package.json` (nema manifesta → skip → WAITING_APPROVAL), `verifyWorkspace({ install: true, timeoutMs: 10min/korak, taskId })`, perzistira strukturisani rezultat na task (`verify` jsonb). Passed → WAITING_APPROVAL; failed → task FAILED sa `error: "Verifikacija nije prošla — <step> (exit N): <tail outputa>"`; infra greška → logged + treated kao "cannot verify" → WAITING_APPROVAL (platforma ne zaključava run).
+  - Migracija `0013_task_verify.sql` (`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS verify jsonb`, idempotentna) + journal entry + `verify: jsonb("verify")` u schema.ts + `verify?` u `TaskPatch`.
+  - Klijent: `team.ts` — `TeamVerifyResult`/`TeamVerifyStep` tipovi, `verify` u `TeamTask`. `TeamRunPanel.tsx` — "⏳ Verifikujem build + test…" tokom VERIFYING, zeleni/crveni blok sa per-step ✓/✗ (exit code + trajanje) kad `task.verify` postoji, crveni box sa `task.error` kad je FAILED.
+- **Verifikovano**: `agent-team-loop.test.ts` dobio 2 nova E2E testa (7 ukupno): passing fixture (package.json + node build + node --test) → VERIFYING → WAITING_APPROVAL sa `verify.passed=true` + build/test exit 0; failing fixture → FAILED sa error "Verifikacija nije prošla" + ime stepa. Server `tsc --noEmit` čist, vitest **166/166**, client build prolazi.
+
 ## Zadnji zadatak — Agent Memory (FAZA 7b, urađeno)
 - **Cilj (audit FAZA 7b)**: background agent job-ovi su bili isključivo in-memory (`backgroundJobs` Map u `agent.ts`) → gubili su se na restart servera.
 - **Implementacija**:
@@ -104,5 +112,5 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
 
 ## Next Move
 1. **FAZA 6 pravi token (korisnik)**: korisnik unese pravi GitHub token kroz UI (⚙ PanelMenu → "GitHub token" → "+ Dodaj token") → `POST /api/repos/push` → 200/OK → screenshot.
-2. **Team → Closed Loop E2E verifikacija (UI)**: pokrenuti tim kroz UI na aktivnom repou, potvrditi per-role progres → WAITING_APPROVAL → diff pregled → "✓ Odobri + push" → commit hash + push status.
+2. **Team Verification Gate E2E verifikacija (UI)**: pokrenuti tim kroz UI na aktivnom repou sa build+test skriptama, potvrditi VERIFYING → zeleni/crveni verify blok → WAITING_APPROVAL → diff → "Odobri + push".
 3. **drizzle-orm**: već na `^0.45.2` (HIGH GHSA-gpj5-g38j-94v9 rešen) — TODO #2 zatvoren.

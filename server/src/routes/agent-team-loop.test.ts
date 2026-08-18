@@ -357,6 +357,62 @@ async function makeSandboxChange(): Promise<{ dir: string; hash: string }> {
   return { dir, hash };
 }
 
+/**
+ * Write a real npm fixture (build + node --test) into a cloned sandbox so the
+ * FAZA 8 verification gate has something to run. `failing` adds a test that
+ * always throws.
+ */
+async function writeFixture(dir: string, failing = false): Promise<void> {
+  fs.mkdirSync(path.join(dir, "src"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "scripts"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "test"), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, "package.json"),
+    JSON.stringify(
+      {
+        name: "team-verify-app",
+        version: "1.0.0",
+        private: true,
+        scripts: { build: "node scripts/build.js", test: "node --test" },
+      },
+      null,
+      2,
+    ),
+  );
+  fs.writeFileSync(
+    path.join(dir, "src", "index.js"),
+    'module.exports = function greet(name) { return "hello " + name; };\n',
+  );
+  fs.writeFileSync(
+    path.join(dir, "scripts", "build.js"),
+    [
+      'const fs = require("fs");',
+      'const path = require("path");',
+      'const src = fs.readFileSync(path.join(__dirname, "..", "src", "index.js"), "utf8");',
+      'if (!src.includes("greet")) throw new Error("missing greet");',
+      'console.log("build ok");',
+      "",
+    ].join("\n"),
+  );
+  if (failing) {
+    fs.writeFileSync(
+      path.join(dir, "test", "fail.test.js"),
+      ['const test = require("node:test");', 'test("boom", () => { throw new Error("boom"); });', ""].join("\n"),
+    );
+  } else {
+    fs.writeFileSync(
+      path.join(dir, "test", "index.test.js"),
+      [
+        'const test = require("node:test");',
+        'const assert = require("node:assert");',
+        'const greet = require("../src/index.js");',
+        'test("greet works", () => assert.strictEqual(greet("world"), "hello world"));',
+        "",
+      ].join("\n"),
+    );
+  }
+}
+
 describeRouteE2E("FAZA 7d — Team approve → commit → push (HTTP E2E, offline)", () => {
   it("1. happy path: approve with diffHash + push commits and pushes, task VERIFIED", async () => {
     dbState.active = [activeRow()];
@@ -460,5 +516,43 @@ describeRouteE2E("FAZA 7d — Team approve → commit → push (HTTP E2E, offlin
     expect(await git(["--git-dir", remoteDir, "log", "-1", "--format=%s"])).toBe("initial commit");
     const dir = getRepoWorkspaceDir(USER_ID, OWNER, NAME);
     expect(await git(["log", "-1", "--format=%s"], dir)).toBe("team: local only");
+  });
+
+  it("6. a passing build+test verifies the run (VERIFYING → WAITING_APPROVAL) and records the result", async () => {
+    dbState.active = [activeRow()];
+    const start = await post("/api/agent/team", { prompt: "Add verified feature" });
+    const taskId = start.body.taskId as string;
+
+    // Make the sandbox exist with a real (passing) npm fixture BEFORE the
+    // 3s verification-gate tick fires.
+    await ensureWorkspace(repo());
+    await writeFixture(getRepoWorkspaceDir(USER_ID, OWNER, NAME));
+
+    const detail = await waitForTaskStatus(taskId, "WAITING_APPROVAL");
+    expect(detail.task.verify).toBeTruthy();
+    expect(detail.task.verify.skipped).toBe(false);
+    expect(detail.task.verify.passed).toBe(true);
+    const names = detail.task.verify.steps.map((s: { name: string }) => s.name);
+    expect(names).toContain("build");
+    expect(names).toContain("test");
+    const build = detail.task.verify.steps.find((s: any) => s.name === "build");
+    const test = detail.task.verify.steps.find((s: any) => s.name === "test");
+    expect(build.exitCode).toBe(0);
+    expect(test.exitCode).toBe(0);
+  });
+
+  it("7. a failing test fails the whole team run (VERIFYING → FAILED) with the error captured", async () => {
+    dbState.active = [activeRow()];
+    const start = await post("/api/agent/team", { prompt: "Add broken feature" });
+    const taskId = start.body.taskId as string;
+
+    await ensureWorkspace(repo());
+    await writeFixture(getRepoWorkspaceDir(USER_ID, OWNER, NAME), true);
+
+    const detail = await waitForTaskStatus(taskId, "FAILED");
+    expect(detail.task.verify).toBeTruthy();
+    expect(detail.task.verify.passed).toBe(false);
+    expect(String(detail.task.error)).toContain("Verifikacija nije prošla");
+    expect(String(detail.task.error)).toContain("test");
   });
 });

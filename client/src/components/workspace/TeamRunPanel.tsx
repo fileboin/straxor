@@ -273,10 +273,16 @@ export default function TeamRunPanel({
                 </span>
                 {!isTerminal && (
                   <span className="text-[10px] text-text-muted animate-pulse">
-                    {busy ? "Pokreće se…" : "Radi…"}
+                    {busy ? "Pokreće se…" : taskStatus === "VERIFYING" ? "Verifikujem…" : "Radi…"}
                   </span>
                 )}
               </div>
+
+              {taskStatus === "VERIFYING" && (
+                <div className="px-3 py-2 rounded-lg border border-purple-500/20 bg-purple-500/10 text-purple-300 text-[11px]">
+                  ⏳ Verifikujem build + test u sandboxu…
+                </div>
+              )}
 
               <div className="space-y-2">
                 {jobs.map((job) => {
@@ -314,6 +320,46 @@ export default function TeamRunPanel({
                   );
                 })}
               </div>
+
+              {detail?.task.verify && (
+                <div
+                  className={`rounded-lg border p-2.5 space-y-1 ${
+                    detail.task.verify.passed
+                      ? "border-green-500/20 bg-green-500/5"
+                      : "border-red-500/20 bg-red-500/10"
+                  }`}
+                >
+                  <div
+                    className={`text-[11px] font-semibold ${
+                      detail.task.verify.passed ? "text-green-400" : "text-red-400"
+                    }`}
+                  >
+                    {detail.task.verify.skipped
+                      ? "Verifikacija preskočena (nema npm skripti)"
+                      : detail.task.verify.passed
+                      ? "✓ Build + test prošli"
+                      : "✗ Verifikacija nije prošla"}
+                  </div>
+                  {!detail.task.verify.skipped &&
+                    detail.task.verify.steps.map((s) => (
+                      <div key={s.name} className="flex items-center gap-1.5 text-[10px]">
+                        <span className={s.passed ? "text-green-400" : "text-red-400"}>
+                          {s.passed ? "✓" : "✗"}
+                        </span>
+                        <span className="text-text-secondary font-mono">{s.name}</span>
+                        <span className="text-text-muted">
+                          exit {s.exitCode} · {s.durationMs}ms
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {detail?.task.error && taskStatus === "FAILED" && (
+                <div className="px-3 py-2 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-[11px] whitespace-pre-wrap break-words">
+                  {detail.task.error}
+                </div>
+              )}
 
               {isWaitingApproval && (
                 <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-2.5 space-y-2">
