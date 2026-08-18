@@ -10,6 +10,11 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
   - Klijent: `team.ts` — `approveTeamTask(taskId, { push, commitMessage, diffHash })` + `TeamApproveResult` + `commitHash` u `TeamTask`. `TeamRunPanel.tsx` — na WAITING_APPROVAL jednom fetch-uje sandbox diff (`getRepoDiff`), prikazuje stat + hash + skraćeni diff + commit poruku, i dva dugmeta "✓ Odobri + push" / "✓ Odobri i commit"; poslije prikazuje commit hash + push status (ili upozorenje ako push nije uspio). 409 → refetch diff-a.
 - **Verifikovano**: novi `server/src/routes/agent-team-loop.test.ts` (5 E2E, offline bare remote): happy path commit+push + task VERIFIED sa commitHash + remote HEAD == local HEAD + commit poruka na remote-u; stale diffHash → 409 + ništa ne stiže na remote; approve prije WAITING_APPROVAL → 400; bez aktivnog repoa → committed:false ali VERIFIED; push:false → commit lokalno bez push-a. Server `tsc --noEmit` čist, vitest **164/164**, client build prolazi.
 
+## Zadnji zadatak — Finalni full-chain E2E test (FAZA 9, urađeno)
+- **Cilj**: plan (Objective) kaže "zatim **finalni test + screenshot**" — postojali su pojedinačni E2E testovi po iteracijama, ali ne i JEDAN test koji provlači ceo MVP lanac kroz realne module.
+- **Implementacija**: `server/src/e2e/full-chain.test.ts` (novo) — jedan tok, offline bare remote: (1) `ensureWorkspace` klonira (GitHub → Workspace), (2) agentova izmena = prava source promena (edit + novi test), (3) `runWorkspaceCommand` npm install kroz TerminalManager (Terminal/Process), (4) `startPreview` boot-uje pravi dev server + port detection + health (localhost/127.0.0.1) + same-origin proxy URL + stop (Live Preview), (5) `verifyWorkspace` build+test strukturisano (Verification), (6) `diffWorkspace` diff + SHA-256 fingerprint (Diff), (7) stale fingerprint → odbijen, trenutni → commit (Approval), (8) `pushWorkspace` → remote HEAD == local HEAD + agentov fajl na remote-u + commit poruka (Commit → Push). Plus `registrySize() >= 3` (procesi praćeni).
+- **Verifikovano**: test prolazi za <1s, server `tsc --noEmit` čist, vitest **167/167** (20 fajlova). Klijent netaknut ovog kruga. "Screenshot" deo plana = vizuelna UI verifikacija korisnika (preostaje uz pravi token).
+
 ## Zadnji zadatak — Team Verification Gate (FAZA 8, urađeno)
 - **Cilj**: u MVP lancu (GitHub → Tim → Verification → Diff → Approval → Commit → Push) VERIFYING je bio prazna tranzicija — ništa se nije izvršavalo, run je samo prešao u WAITING_APPROVAL. Sada je to PRAVI gate: build + test moraju proći pre odobravanja.
 - **Implementacija**:
@@ -112,5 +117,5 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
 
 ## Next Move
 1. **FAZA 6 pravi token (korisnik)**: korisnik unese pravi GitHub token kroz UI (⚙ PanelMenu → "GitHub token" → "+ Dodaj token") → `POST /api/repos/push` → 200/OK → screenshot.
-2. **Team Verification Gate E2E verifikacija (UI)**: pokrenuti tim kroz UI na aktivnom repou sa build+test skriptama, potvrditi VERIFYING → zeleni/crveni verify blok → WAITING_APPROVAL → diff → "Odobri + push".
+2. **Finalni UI screenshot (plan: "finalni test + screenshot")**: nakon unosa tokena — pokrenuti tim kroz UI na repou sa build+test, potvrditi VERIFYING → verify blok → WAITING_APPROVAL → diff → "Odobri + push" + screenshot produkcije.
 3. **drizzle-orm**: već na `^0.45.2` (HIGH GHSA-gpj5-g38j-94v9 rešen) — TODO #2 zatvoren.
