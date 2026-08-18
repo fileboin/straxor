@@ -12,8 +12,13 @@ export {
   getOpenCodePid,
   getOpenCodeUptime,
   updateOpenCode,
+  listOllamaModelsOnVps,
+  detectOllamaOnVps,
+  configureOpenCodeForOllama,
+  OLLAMA_VPS_DEFAULT_BASE_URL,
   type ProvisionStatus,
   type ProvisionEvent,
+  type OllamaVpsStatus,
 } from "./provisioner.js";
 export {
   hasDocker,

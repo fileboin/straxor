@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { listOllamaModels, pickOllamaCodingModel, ollamaEchoTest } from "../lib/ollama.js";
 
 const router = Router();
 
@@ -345,6 +346,28 @@ router.get("/", async (_req, res) => {
   );
 
   res.json({ providers, updatedAt: new Date().toISOString() });
+});
+
+// GET /api/models/ollama/tags — live list of models installed in the local
+// Ollama instance (http://localhost:11434/api/tags). No proxy, no FCC.
+router.get("/ollama/tags", async (_req, res) => {
+  try {
+    const models = await listOllamaModels();
+    res.json({
+      ok: true,
+      codingModel: pickOllamaCodingModel(models),
+      models: models.map((m) => ({ name: m.model || m.name, size: m.size })),
+    });
+  } catch (err) {
+    res.status(502).json({ ok: false, error: err instanceof Error ? err.message : "Ollama unreachable" });
+  }
+});
+
+// GET /api/models/ollama/test — live echo test. Proves the OpenCode->Ollama
+// HTTP path is alive and reports the selected coding model.
+router.get("/ollama/test", async (_req, res) => {
+  const result = await ollamaEchoTest();
+  res.status(result.alive ? 200 : 502).json(result);
 });
 
 export default router;

@@ -3,6 +3,18 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — OpenCode ↔ Ollama direktna veza (VPS, urađeno)
+- **Cilj**: OpenCode u oba panela mora da komunicira DIREKTNO sa lokalnom Ollama instancom na VPS-u (`http://localhost:11434`), bez FCC-a, bez spoljnih proksija i bez prepisivanja modela. FCC ostaje kao opt-in runtime u Runtime Manageru (nije u OpenCode putanji).
+- **Implementacija**:
+  - `server/src/lib/ollama.ts` (novo) — čisti helperi: `listOllamaModels` (`/api/tags`), `pickOllamaCodingModel` (deepseek-coder → qwen-coder → qwen2.5-coder → qwen3-coder → codellama → codegemma → deepseek-coder-v2, pa fallback na prvi model), `ollamaEchoTest` (live provera). `OLLAMA_BASE_URL` env override, default `http://localhost:11434`.
+  - `server/src/runtime/local/opencode-model.ts` — `buildOpenCodeModelConfig()` sada PREFERIRA dostupnu lokalnu Ollamu (keyless, direktno, bez proksija); ako Ollama nije dostupna pada na korisničke cloud ključeve. `openCodeModelConfig` za Ollamu piše `model: ollama/<model>` + `provider.ollama.options.baseURL` u `OPENCODE_CONFIG_CONTENT`.
+  - `server/src/runtime/opencode-adapter/provisioner.ts` — VPS-side integracija: `listOllamaModelsOnVps` / `detectOllamaOnVps` (SSH `curl` na VPS-ov `localhost:11434/api/tags`) i `configureOpenCodeForOllama` (base64-safe upis `~/.config/opencode/opencode.json`). `startOpenCodeServe` sada PRE spawn-a detektuje Ollamu na VPS-u i, ako postoji coding model, automatski pinuje OpenCode na `ollama/<model>` direktno (ne blokira provision ako Ollama nije instalirana).
+  - `server/src/routes/machines.ts` — `GET /api/machines/:id/ollama` (live echo test + lista modela + selektovan coding model preko SSH) i `POST /api/machines/:id/ollama/activate` (eksplicitan izbor modela → piše OpenCode config na VPS-u).
+  - `server/src/routes/models.ts` — `GET /api/models/ollama/tags` i `GET /api/models/ollama/test` (echo test na Render-ovom localhost-u — korisno za self-host, na VPS-u se koristi machine-scoped ruta).
+- **FCC provera**: `grep free-claude|FCC` u `adapters/runtime/opencode.ts` i `routes/agent.ts` → **0 pogodaka**; OpenCode putanja (`createBoundAdapter`) ne prolazi kroz FCC.
+- **Verifikovano**: server `tsc --noEmit` — **čist**; vitest — **203/203** (26 fajlova, novi `ollama.test.ts` + postojeći `opencode-model.test.ts`). Klijent netaknut.
+- **Napomena (što ne mogu da dokažem odavde)**: stvarna Ollama dostupnost na VPS-u zavisi od tvoje mašine — kod sada auto-detektuje i pinuje model čim se VPS provision-uje/reconnect-uje. Na Render hostu `localhost:11434` je mrtav (očekivano, Ollama je na VPS-u).
+
 ## Zadnji zadatak — Panel self-test za oba panela (urađeno)
 - **Cilj**: automatski dokaz da Panel 1 (ask slot) i Panel 2 (agent slot) rade kao pravi App Builderi — kloniraju sandbox, pišu fajlove i izvršavaju komande — a ne kao pasivni chat.
 - **Implementacija**: novi `server/src/e2e/panel-self-test.test.ts` — offline, za SVAKI slot (`ask` i `agent`) radi: `ensureWorkspace` klonira bare remote → agent upiše `probe-<slot>.txt` → `runWorkspaceCommand` izvrši `node -e` koji piše `probe-out-<slot>.txt` → assert exit 0 + sadržaj fajla. Dodatni test: sandboxovi su izolovani (ask ≠ agent).

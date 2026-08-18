@@ -12,6 +12,7 @@
 // No raw key is ever logged or returned to the client.
 
 import { getDirectProviderManager } from "../../adapters/direct-providers/manager.js";
+import { listOllamaModels, pickOllamaCodingModel, OLLAMA_DEFAULT_BASE_URL } from "../../lib/ollama.js";
 
 export interface OpenCodeModelConfig {
   env: Record<string, string>;
@@ -59,7 +60,36 @@ function environmentKey(providerId: string): string | null {
 
 export function openCodeModelConfig(
   availableProviders: Array<{ providerId: string; key: string | null }>,
+  ollama?: { baseUrl: string; model: string } | null,
 ): OpenCodeModelConfig {
+  // Ollama first: OpenCode talks DIRECTLY to the local Ollama HTTP API (no
+  // FCC, no proxy, no cloud redirect). Ollama needs no API key.
+  if (ollama?.model) {
+    const baseUrl = ollama.baseUrl.replace(/\/+$/, "");
+    const configContent = JSON.stringify(
+      {
+        $schema: "https://opencode.ai/config.json",
+        model: `ollama/${ollama.model}`,
+        small_model: `ollama/${ollama.model}`,
+        provider: {
+          ollama: {
+            options: { baseURL: baseUrl },
+            models: { [ollama.model]: { name: ollama.model } },
+          },
+        },
+      },
+      null,
+      2,
+    );
+    return {
+      env: {},
+      configContent,
+      provider: "ollama",
+      model: ollama.model,
+      reason: `using local Ollama ${ollama.model} at ${baseUrl} (direct, no proxy)`,
+    };
+  }
+
   const env: Record<string, string> = {};
   const set: { providerId: string; model: string }[] = [];
 
@@ -126,6 +156,18 @@ export function openCodeModelConfig(
 export async function buildOpenCodeModelConfig(
   userId: string,
 ): Promise<OpenCodeModelConfig> {
+  // Prefer a reachable local Ollama instance (direct, keyless, no proxy). If
+  // Ollama is down, fall back to the user's stored cloud provider keys.
+  try {
+    const models = await listOllamaModels(OLLAMA_DEFAULT_BASE_URL);
+    const codingModel = pickOllamaCodingModel(models);
+    if (codingModel) {
+      return openCodeModelConfig([], { baseUrl: OLLAMA_DEFAULT_BASE_URL, model: codingModel });
+    }
+  } catch {
+    // Ollama unreachable — continue to cloud providers below.
+  }
+
   const manager = getDirectProviderManager();
   const providers = Object.keys(PROVIDER_ENV);
   const available: Array<{ providerId: string; key: string | null }> = [];

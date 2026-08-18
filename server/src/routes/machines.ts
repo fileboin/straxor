@@ -17,6 +17,8 @@ import {
   isCoolifyInstalled,
   getCoolifyUrlHint,
   installCoolify,
+  detectOllamaOnVps,
+  configureOpenCodeForOllama,
 } from "../runtime/opencode-adapter/index.js";
 import type { ProvisionEvent, CoolifyInstallEvent } from "../runtime/opencode-adapter/index.js";
 import { encrypt, decrypt, isEncrypted } from "../lib/crypto.js";
@@ -434,6 +436,111 @@ router.post("/:id/provision", requireAuth, async (req, res) => {
     try {
       ssh?.close();
     } catch {}
+  }
+});
+
+// GET /api/machines/:id/ollama — live "echo" probe of the VPS-local Ollama
+// (http://localhost:11434/api/tags) + the coding model OpenCode will use.
+router.get("/:id/ollama", requireAuth, async (req, res) => {
+  const userId = req.user!.userId;
+  const id = req.params.id as string;
+  try {
+    const result = await db
+      .select()
+      .from(machines)
+      .where(and(eq(machines.id, id), eq(machines.userId, userId)))
+      .limit(1);
+    if (result.length === 0) {
+      res.status(404).json({ ok: false, error: "Machine not found" });
+      return;
+    }
+
+    const machine = result[0];
+    const password = machine.password
+      ? (isEncrypted(machine.password) ? decrypt(machine.password) : machine.password)
+      : undefined;
+    const privateKey = machine.privateKey
+      ? (isEncrypted(machine.privateKey) ? decrypt(machine.privateKey) : machine.privateKey)
+      : undefined;
+
+    const ssh = await connectSSH({
+      host: machine.host,
+      port: machine.port,
+      username: machine.username,
+      password,
+      privateKey,
+    });
+
+    try {
+      const status = await detectOllamaOnVps(ssh);
+      res.status(status.alive ? 200 : 502).json({ ok: status.alive, ...status });
+    } finally {
+      try { ssh.close(); } catch {}
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(502).json({ ok: false, error: message });
+  }
+});
+
+// POST /api/machines/:id/ollama/activate — select a coding model and write the
+// direct OpenCode→Ollama config on the VPS.
+router.post("/:id/ollama/activate", requireAuth, async (req, res) => {
+  const userId = req.user!.userId;
+  const id = req.params.id as string;
+  const body: any = req.body || {};
+  try {
+    const result = await db
+      .select()
+      .from(machines)
+      .where(and(eq(machines.id, id), eq(machines.userId, userId)))
+      .limit(1);
+    if (result.length === 0) {
+      res.status(404).json({ ok: false, error: "Machine not found" });
+      return;
+    }
+
+    const machine = result[0];
+    const password = machine.password
+      ? (isEncrypted(machine.password) ? decrypt(machine.password) : machine.password)
+      : undefined;
+    const privateKey = machine.privateKey
+      ? (isEncrypted(machine.privateKey) ? decrypt(machine.privateKey) : machine.privateKey)
+      : undefined;
+
+    const ssh = await connectSSH({
+      host: machine.host,
+      port: machine.port,
+      username: machine.username,
+      password,
+      privateKey,
+    });
+
+    try {
+      const status = await detectOllamaOnVps(ssh);
+      const requested = String(body.model || "").trim();
+      let model = requested || status.codingModel;
+      if (!model) {
+        res.status(400).json({ ok: false, error: "No Ollama coding model available on this VPS" });
+        return;
+      }
+      // Prefer an exact/prefixed match from the live tag list.
+      const exact = status.models.find((m) => m === model || m.startsWith(`${model}:`));
+      if (exact) model = exact;
+
+      const wrote = await configureOpenCodeForOllama(ssh, model);
+      if (!wrote) {
+        res.status(500).json({ ok: false, error: "Failed to write OpenCode Ollama config on VPS" });
+        return;
+      }
+
+      res.json({ ok: true, baseUrl: status.baseUrl, model, models: status.models });
+    } finally {
+      try { ssh.close(); } catch {}
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(502).json({ ok: false, error: message });
   }
 });
 
