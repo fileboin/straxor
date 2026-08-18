@@ -3,6 +3,12 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — HTTP request logging (FAZA 12, urađeno)
+- **Cilj**: ROADMAP Phase 2 — „Request/response logging". Server nije imao nikakav request logger, pa je debagovanje produkcije (spori Render deploy-ovi, 5xx) bilo slepo.
+- **Implementacija**: `server/src/lib/http-logger.ts` (novo) — `httpRequestLogger()` Express middleware loguje `[http] METHOD path → status (Nms)` na `res.finish`; `shouldSkipHttpLog` preskače OPTIONS/health/static (`/assets/`, `/uploads/`, `/favicon.ico`); 4xx→`console.warn`, 5xx→`console.error`, ostalo→`console.log`. Uvezan u `index.ts` odmah posle CORS (pre preview proxy-a, pa hvata sve zahteve).
+- **Testovi**: `http-logger.test.ts` (novo, 6 testova) — skip rules (OPTIONS/health/static) + format.
+- **Verifikovano**: server `tsc --noEmit` čist; vitest **173/173** (21 fajlova, +6 novih). Klijent netaknut ovog kruga.
+
 ## Zadnji zadatak — Route-level code splitting (FAZA 11, urađeno)
 - **Cilj**: ROADMAP Phase 2 — bundle optimization. Build je emitovao JEDAN 1.9 MB JS chunk (gzip 544 KB) sa warning-om "chunks larger than 500 kB".
 - **Implementacija**: `App.tsx` — teške rute (`Workspace`, `Admin`, `Dashboard`, `Help`, `DeployManager`, `Knowledge`, `ImageStudio`, `ImageAgent`, `Marketplace`, `Connections`) prebačene na `React.lazy(() => import(...))`; `<Routes>` umotan u `<Suspense fallback={<RouteFallback />}>` (centriran „Učitavanje…" spinner). Auth/male stranice (`Login`, `Register`, `ForgotPassword`, `ResetPassword`, `VerifyEmail`, `GitHubAuthCallback`, `Onboarding`) ostaju eager.

@@ -77,6 +77,7 @@ import { imageAgentRoutes } from "./agents/image-agent/api/routes.js";
 import { verificationRoutes } from "./verification/api/routes.js";
 import appStateRoutes from "./routes/app-state.js";
 import handshakeSelfTestRoutes from "./routes/handshake-self-test.js";
+import { httpRequestLogger } from "./lib/http-logger.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -91,6 +92,9 @@ app.use(cors({
   origin: (origin, cb) => cb(null, origin || true),
   credentials: true,
 }));
+
+// ── Observability: request/response logging ──
+app.use(httpRequestLogger());
 
 // ── Local preview reverse proxy ──
 // Mounted BEFORE express.json() so request bodies stream through untouched,
