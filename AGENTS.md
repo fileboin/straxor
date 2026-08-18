@@ -3,6 +3,14 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — i18n: Usage & Cost panel lokalizovan (FAZA 17, urađeno)
+- **Cilj**: ROADMAP Phase 3 — „i18n support". **Fondacija je već postojala** (`client/src/lib/i18n.ts`: 27 jezika, `t/getLang/setLang/useLang`, fallback na engleski, language switcher u `StatusBar`, rečnik za auth/toolbar/welcome/chat/modeli; koristi se u 17 fajlova). Preostala praznina: novi **Usage & Cost panel (FAZA 16) je bio 100% hardkodiran na srpskom**.
+- **Implementacija**:
+  - `client/src/lib/i18n.ts` — dodato ~22 `usage.*` ključeva (en + sr; ostali jezici automatski padaju na en preko postojećeg fallback-a).
+  - `client/src/components/workspace/UsagePanel.tsx` — uvezani `t` + `useLang`; svi labeli (tabs, totali, daily chart, provider/model sekcije, događaji, cjenovnik, budžeti + forma) sada idu kroz `t(...)`; placeholder-i i dinamički tekstovi (`{n} zahtjeva`, `Alert pri {n}%`) koriste `{n}` interpolaciju.
+- **Verifikovano**: client `tsc --noEmit` — **0 grešaka**; client `npm run build` — **prolazi** (6s). Server netaknut.
+- **Napomena**: React Native mobilna aplikacija je **odložena** — to je poseban projekat (novi Expo/RN toolchain), nije izvodljivo/verifikabilno u ovom Node-only okruženju. Preostala i18n stavka: proširiti pokrivenost na još workspace panela (velika ali mehanička posla).
+
 ## Zadnji zadatak — Persistent analytics + auto-instrumentacija (FAZA 16, urađeno)
 - **Cilj**: ROADMAP Phase 3 — „Analytics dashboard". Usage & Cost UI je već postojao (UsagePanel sa daily bar chart, po provideru/modelu, budžetima), ali je default `custom` adapter bio **in-memory** (svi podaci gubljeni na restartu, na Renderu često) i **ništa nije logovalo** događaje → dashboard uvek prazan.
 - **Implementacija**:

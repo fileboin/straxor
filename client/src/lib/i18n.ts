@@ -271,8 +271,30 @@ const DICT: Record<string, Partial<Record<Lang, string>>> = {
   "models.keyOpenRouterPrefix": { en: "OpenRouter keys start with sk-or-v1-", sr: "OpenRouter ključevi počinju sa sk-or-v1-", de: "OpenRouter-Schlüssel beginnen mit sk-or-v1-", fr: "Les clés OpenRouter commencent par sk-or-v1-", es: "Las claves de OpenRouter empiezan con sk-or-v1-", it: "Le chiavi OpenRouter iniziano con sk-or-v1-", pt: "As chaves OpenRouter começam com sk-or-v1-", nl: "OpenRouter-sleutels beginnen met sk-or-v1-", pl: "Klucze OpenRouter zaczynają się od sk-or-v1-", ru: "Ключи OpenRouter начинаются с sk-or-v1-", uk: "Ключі OpenRouter починаються з sk-or-v1-", zh: "OpenRouter 密钥以 sk-or-v1- 开头", ja: "OpenRouterキーは sk-or-v1- で始まります", ko: "OpenRouter 키는 sk-or-v1- 로 시작합니다", ar: "تبدأ مفاتيح OpenRouter بـ sk-or-v1-", hi: "OpenRouter कुंजियाँ sk-or-v1- से शुरू होती हैं", tr: "OpenRouter anahtarları sk-or-v1- ile başlar", el: "Τα κλειδιά OpenRouter ξεκινούν με sk-or-v1-", sv: "OpenRouter-nycklar börjar med sk-or-v1-", cs: "Klíče OpenRouter začínají na sk-or-v1-", da: "OpenRouter-nøgler starter med sk-or-v1-", fi: "OpenRouter-avaimet alkavat merkkijonolla sk-or-v1-", no: "OpenRouter-nøkler starter med sk-or-v1-", ro: "Cheile OpenRouter încep cu sk-or-v1-", hu: "Az OpenRouter kulcsok sk-or-v1- előtaggal kezdődnek", sk: "Kľúče OpenRouter začínajú na sk-or-v1-", bg: "OpenRouter ключовете започват със sk-or-v1-" },
   "models.keyShow": { en: "Show key", sr: "Prikaži ključ", de: "Schlüssel anzeigen", fr: "Afficher la clé", es: "Mostrar clave", it: "Mostra chiave", pt: "Mostrar chave", nl: "Sleutel tonen", pl: "Pokaż klucz", ru: "Показать ключ", uk: "Показати ключ", zh: "显示密钥", ja: "キーを表示", ko: "키 표시", ar: "إظهار المفتاح", hi: "कुंजी दिखाएँ", tr: "Anahtarı göster", el: "Εμφάνιση κλειδιού", sv: "Visa nyckel", cs: "Zobrazit klíč", da: "Vis nøgle", fi: "Näytä avain", no: "Vis nøkkel", ro: "Afișează cheia", hu: "Kulcs megjelenítése", sk: "Zobraziť kľúč", bg: "Покажи ключ" },
   "models.keyHide": { en: "Hide key", sr: "Sakrij ključ", de: "Schlüssel ausblenden", fr: "Masquer la clé", es: "Ocultar clave", it: "Nascondi chiave", pt: "Ocultar chave", nl: "Sleutel verbergen", pl: "Ukryj klucz", ru: "Скрыть ключ", uk: "Приховати ключ", zh: "隐藏密钥", ja: "キーを隠す", ko: "키 숨기기", ar: "إخفاء المفتاح", hi: "कुंजी छिपाएँ", tr: "Anahtarı gizle", el: "Απόκρυψη κλειδιού", sv: "Dölj nyckel", cs: "Skrýt klíč", da: "Skjul nøgle", fi: "Piilota avain", no: "Skjul nøkkel", ro: "Ascunde cheia", hu: "Kulcs elrejtése", sk: "Skryť kľúč", bg: "Скрий ключ" },
+  // ── Usage & Cost (Phase 3) — en+sr only; other languages fall back to en ──
+  "usage.title": { en: "Usage & Cost", sr: "Usage & Cost" },
+  "usage.tab.overview": { en: "Overview", sr: "Pregled" },
+  "usage.tab.events": { en: "Events", sr: "Događaji" },
+  "usage.tab.pricing": { en: "Pricing", sr: "Cjenovnik" },
+  "usage.tab.budgets": { en: "Budgets", sr: "Budžeti" },
+  "usage.requestsCount": { en: "{n} requests", sr: "{n} zahtjeva" },
+  "usage.totalCost": { en: "Total cost", sr: "Ukupno troškovi" },
+  "usage.totalTokens": { en: "Total tokens", sr: "Ukupno tokena" },
+  "usage.requests": { en: "Requests", sr: "Zahtjeva" },
+  "usage.dailyCost": { en: "Daily cost", sr: "Dnevni troškovi" },
+  "usage.byProvider": { en: "By Provider", sr: "Po Provideru" },
+  "usage.byModel": { en: "By Model", sr: "Po Modelu" },
+  "usage.noData": { en: "No data", sr: "Nema podataka" },
+  "usage.noEvents": { en: "No events in this period", sr: "Nema događaja u ovom periodu" },
+  "usage.pricingIn": { en: "In:", sr: "Ulaz:" },
+  "usage.pricingOut": { en: "Out:", sr: "Izlaz:" },
+  "usage.create": { en: "Create", sr: "Kreiraj" },
+  "usage.newBudget": { en: "+ New budget", sr: "+ Novi budžet" },
+  "usage.budgetName": { en: "Budget name", sr: "Naziv budžeta" },
+  "usage.budgetLimit": { en: "Monthly limit ($)", sr: "Mjesečni limit ($)" },
+  "usage.budgetAlert": { en: "Alert %", sr: "Alert %" },
+  "usage.alertAt": { en: "Alert at {n}%", sr: "Alert pri {n}%" },
 };
-
 export function detectLang(): Lang {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
