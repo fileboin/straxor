@@ -1,7 +1,8 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, Link } from "react-router-dom";
 import { AuthProvider, useAuth, isAdmin } from "./lib/auth.js";
 import { ThemeProvider } from "./lib/theme.js";
+import ErrorBoundary from "./components/ErrorBoundary.js";
 // onboarding gating removed: onboarding is optional and not required to access agents
 import Layout from "./components/Layout.js";
 import Login from "./pages/Login.js";
@@ -30,7 +31,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
   // onboarding is not required to access the app core
-  return <>{children}</>;
+  return (
+    <ErrorBoundary fallback={<RouteCrashFallback />}>{children}</ErrorBoundary>
+  );
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -38,7 +41,9 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
   if (!isAdmin(user)) return <Navigate to="/" replace />;
-  return <>{children}</>;
+  return (
+    <ErrorBoundary fallback={<RouteCrashFallback />}>{children}</ErrorBoundary>
+  );
 }
 
 function OnboardingGuard(_props: { children: React.ReactNode }) {
@@ -53,13 +58,42 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (user) return <Navigate to="/" replace />;
-  return <>{children}</>;
+  return (
+    <ErrorBoundary fallback={<RouteCrashFallback />}>{children}</ErrorBoundary>
+  );
 }
 
 function RouteFallback() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-bg">
       <span className="text-sm text-text-muted animate-pulse">Učitavanje…</span>
+    </div>
+  );
+}
+
+// A crash inside one page (e.g. a failed lazy chunk or a bad API response)
+// must never blank the whole app or look like a logout. Each protected route
+// gets its own boundary with a way back to the workspace.
+function RouteCrashFallback() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-bg p-6 text-center gap-4">
+      <span className="text-4xl">💥</span>
+      <h1 className="text-lg font-semibold text-text">Došlo je do greške u ovoj stranici</h1>
+      <p className="text-sm text-text-muted max-w-md">
+        Tvoja sesija je i dalje aktivna — problem je u prikazu ove stranice, ne u nalogu.
+      </p>
+      <div className="flex items-center gap-2">
+        <Link to="/" className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:opacity-85 transition-opacity">
+          ← Nazad na radni prostor
+        </Link>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 rounded-lg bg-surface-2 border border-border text-text-secondary text-sm font-medium hover:text-text transition-colors"
+        >
+          Pokušaj ponovo
+        </button>
+      </div>
     </div>
   );
 }

@@ -3480,6 +3480,7 @@ export default function Workspace() {
             <SshInput
               projectId={projectId}
               onConnected={handleVpsConnected}
+              onDisconnected={handleVpsDisconnected}
               onStatusChange={setVpsStatus}
               onCancel={() => {
                 setShowSshModal(false);
@@ -3970,7 +3971,7 @@ export default function Workspace() {
 
       {/* Command Palette */}
       <CommandPalette
-        commands={commands}
+        commands={commands.filter((c) => c.id !== "admin" || isAdmin(user))}
         open={showCommandPalette}
         onClose={() => setShowCommandPalette(false)}
       />

@@ -133,7 +133,6 @@ export default function EnginePicker({
 
         <button
           onClick={() => { setOpen(false); onSelectLocal(); }}
-          disabled={!hasRepo}
           className="w-full flex items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
           style={mode === "local" ? { background: "color-mix(in srgb, var(--accent) 10%, transparent)" } : undefined}
           title={hasRepo ? "Pokreni agenta na lokalno kloniranom repou (bez VPS-a)" : "Prvo poveži GitHub repo"}

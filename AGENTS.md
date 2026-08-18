@@ -3,6 +3,20 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — Core fix: Admin ne izbacuje iz sistema + Connect/Engine opcije rade (klijent, urađeno)
+- **Cilj (hitna popravka jezgra)**: (1) Admin dugme više ne sme da "izbaci" korisnika iz sistema; (2) Connect dugme ne sme da prikazuje grešku; (3) sve opcije u Agent/Ask Engine meniju moraju stvarno izvršavati zadatke. Dodatci su zamrznuti.
+- **Uzrok (Admin "kick")**: `HomeCenter` tile „Admin Control Center" i Command Palette akcija su bili vidljivi SVAKOM korisniku; klik → `navigate("/admin")` → `AdminRoute` guard → `<Navigate to="/">` → ceo Workspace se remount-uje (restore/refresh osećaj = "izbacuje iz sistema"). Dodatno, bilo kakva greška u lazy Admin chunku rušila je CEU aplikaciju kroz globalni ErrorBoundary.
+- **Implementacija**:
+  - `HomeCenter.tsx` — admin tile se sada filtrira za ne-admine (`isAdmin(user)`); import `isAdmin`.
+  - `Workspace.tsx` — Command Palette: `commands.filter((c) => c.id !== "admin" || isAdmin(user))` — ne-admini ne vide admin akcije (nema više silent bounce).
+  - `App.tsx` — svaki Protected/Admin/Guest route sada ima SOPSTVENI `ErrorBoundary` (`RouteCrashFallback`: „Došlo je do greške u ovoj stranici — sesija je i dalje aktivna" + „← Nazad na radni prostor" + „Pokušaj ponovo"). Pad jedne stranice (npr. Admin chunk) više nikad ne ruši celu aplikaciju niti izgleda kao logout.
+  - `Admin.tsx` — dashboard render dodatno zaštićen (`dashStats.system && dashStats.featureFlags` gate) protiv parcijalnog API odgovora.
+- **Engine/Connect opcije (mrtve opcije)**:
+  - `EnginePicker.tsx` — „Lokalni engine (repo)" je više NIJE `disabled` bez repo-a: klik uvek radi (`handleSelectLocalEngine` → `prepareRepo` → 404 → „no-repo: bare sandbox", i dalje pun agent).
+  - `SshInput.tsx` — novi `onDisconnected` callback: „Prekini vezu" u SSH modalu sada zaista poziva Workspace-ov `handleVpsDisconnected` (oba panela se odvezuju sa mrtvog VPS-a → sledeći agent turn ne puca sa "machine not found"). Uvezano u `Workspace.tsx`.
+- **Verifikovano**: client `tsc --noEmit` — **0 grešaka**; client `npm run build` — **prolazi** (`index-BRqWcC1D.js`, `Workspace-CkLn-bGA.js`). Server netaknut.
+- **Napomena (granica)**: prava VPS konekcija i dalje zavisi od korisničkih SSH kredencijala; ovaj krug popravlja sve klijent-side uzroke (gating, crash isolation, disconnect unbind) koji su izgledali kao "izbacivanje iz sistema" i "mrtve opcije".
+
 ## Zadnji zadatak — Bus vidljiv + per-panel projekat indikator (klijent, urađeno)
 - **Cilj**: dva panela rade nezavisno (svaki svoj repo/model/sesiju) i povezuju se samo po potrebi kao „bus". Bus mehanizam („→ Traži pomoć drugog panela" / „← Pošalji na review") je POSTOJAO end-to-end (`transferByBus` → `createAgentBusTransfer` → `/api/agent/bus/transfer` + prefill ciljanog panela + auto-execute guard), ali je u UI bio gotovo nevidljiv (`opacity-0` + mali + na dnu poruke), pa korisnik nije znao da postoji.
 - **Implementacija**:

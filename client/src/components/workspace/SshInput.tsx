@@ -7,6 +7,7 @@ interface Props {
   onConnected: (machineId: string) => void;
   onCancel: () => void;
   onStatusChange?: (status: "disconnected" | "connecting" | "provisioning" | "ready" | "error") => void;
+  onDisconnected?: () => void;
 }
 
 export type ProvisionStatus =
@@ -44,7 +45,7 @@ interface SshDiagnostic {
   sshError: string;
 }
 
-export default function SshInput({ onConnected, onCancel, onStatusChange }: Props) {
+export default function SshInput({ onConnected, onCancel, onStatusChange, onDisconnected }: Props) {
   const [host, setHost] = useState("");
   const [port, setPort] = useState("22");
   const [username, setUsername] = useState("root");
@@ -206,11 +207,14 @@ export default function SshInput({ onConnected, onCancel, onStatusChange }: Prop
         const err = await res.json().catch(() => ({ error: "Disconnect failed" }));
         throw new Error((err as any).error || "Disconnect failed");
       }
-      // Success: clear local state and close panel
+      // Success: clear local state and close panel. The workspace must also
+      // unbind both panels from this machine (else they stay pointed at a dead
+      // VPS and the next agent turn fails with "machine not found").
       setExistingMachineId(null);
       setStatus("idle");
       setStatusMessage("");
       onStatusChange?.("disconnected");
+      onDisconnected?.();
       onCancel();
     } catch (err: any) {
       setError(err?.message ?? "Disconnect failed");
