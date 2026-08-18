@@ -3,7 +3,6 @@ import {
   listTeams,
   createTeam,
   getTeam,
-  updateTeam,
   deleteTeam,
   addTeamMember,
   removeTeamMember,

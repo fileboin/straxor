@@ -24,7 +24,6 @@ export default function EnginePicker({
   panelLabel = "Panel",
   onSelectLocal,
   onConnectVps,
-  onDisconnectVps,
   onOpenGitRemote,
   onOpenRuntimeManager,
 }: Props) {

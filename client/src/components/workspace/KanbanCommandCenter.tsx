@@ -24,14 +24,6 @@ const COLUMN_LABELS: Record<KanbanColumn, string> = {
   completed: "Završene",
 };
 
-const COLUMN_COLORS: Record<KanbanColumn, string> = {
-  active: "border-l-green-500",
-  waiting: "border-l-yellow-500",
-  paused: "border-l-blue-500",
-  error: "border-l-red-500",
-  completed: "border-l-gray-500",
-};
-
 const COLUMN_BG: Record<KanbanColumn, string> = {
   active: "bg-green-500/5",
   waiting: "bg-yellow-500/5",

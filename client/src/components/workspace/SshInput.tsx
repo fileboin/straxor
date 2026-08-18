@@ -44,7 +44,7 @@ interface SshDiagnostic {
   sshError: string;
 }
 
-export default function SshInput({ projectId, onConnected, onCancel, onStatusChange }: Props) {
+export default function SshInput({ onConnected, onCancel, onStatusChange }: Props) {
   const [host, setHost] = useState("");
   const [port, setPort] = useState("22");
   const [username, setUsername] = useState("root");
@@ -56,7 +56,6 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
   const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState("");
   const [prefilled, setPrefilled] = useState(false);
-  const [testLoading, setTestLoading] = useState(false);
   const [diagnostic, setDiagnostic] = useState<SshDiagnostic | null>(null);
   const [existingMachineId, setExistingMachineId] = useState<string | null>(null);
 
@@ -93,37 +92,6 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
       .catch(() => {});
     return () => { mounted = false; };
   }, [prefilled]);
-
-  const handleTestSsh = async () => {
-    if (!canSubmit) { setError("Popuni sva polja ispravno."); return; }
-    setTestLoading(true);
-    setDiagnostic(null);
-    setError("");
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/machines/test-ssh", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify({
-          host: cleanHost,
-          port: cleanPort,
-          username: cleanUsername,
-          authType,
-          password: authType === "password" ? password.trim() : undefined,
-          privateKey: authType === "key" ? privateKey.trim() : undefined,
-        }),
-      });
-      const data = await res.json() as SshDiagnostic;
-      setDiagnostic(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Test nije uspio");
-    } finally {
-      setTestLoading(false);
-    }
-  };
 
   const handleConnect = async () => {
     if (!canSubmit) { setError("Popuni sva polja ispravno."); return; }

@@ -3,7 +3,6 @@ import {
   listInfraProviders,
   listInfraConfigs,
   addInfraConfig,
-  updateInfraConfig,
   deleteInfraConfig,
   testInfraConfig,
   TYPE_META,

@@ -35,7 +35,7 @@ const COMPLIANCE_STANDARDS = [
 export default function EnterpriseSecurity({ onClose }: Props) {
   const [tab, setTab] = useState<Tab>("audit");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [, setError] = useState("");
   const [actionMsg, setActionMsg] = useState("");
 
   // Audit

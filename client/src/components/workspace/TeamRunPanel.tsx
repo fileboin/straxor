@@ -290,7 +290,8 @@ export default function TeamRunPanel({
                   const status = job.status as TeamJobStatus;
                   const timeline =
                     "timeline" in job && Array.isArray(job.timeline) ? job.timeline : [];
-                  const jobError = "error" in job ? job.error : undefined;
+                  const jobError =
+                    "error" in job && typeof job.error === "string" ? job.error : undefined;
                   return (
                     <div
                       key={"jobId" in job ? job.jobId : roleId}

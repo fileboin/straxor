@@ -62,7 +62,6 @@ import PluginManager from "../components/workspace/PluginManager.js";
 import Marketplace from "../components/workspace/Marketplace.js";
 import GlobalScalePanel from "../components/workspace/GlobalScalePanel.js";
 import EnterpriseResilience from "../components/workspace/EnterpriseResilience.js";
-import CollaboratorsPanel from "../components/workspace/CollaboratorsPanel.js";
 import OrganizationDashboard from "../components/workspace/OrganizationDashboard.js";
 import type { OrbState } from "thinking-orbs";
 import AdminCenter from "../components/workspace/AdminCenter.js";
@@ -304,7 +303,6 @@ export default function Workspace() {
   const [showMcpMarketplace, setShowMcpMarketplace] = useState(false);
   const [showInfrastructure, setShowInfrastructure] = useState(false);
   const [showTeams, setShowTeams] = useState(false);
-  const [showCollaborators, setShowCollaborators] = useState(false);
   const [showOrganization, setShowOrganization] = useState(false);
   const [showEnterprise, setShowEnterprise] = useState(false);
   const [showPlugins, setShowPlugins] = useState(false);
@@ -2033,7 +2031,7 @@ export default function Workspace() {
         );
       };
 
-      const poll = async (jobId: string, sessionId: string) => {
+      const poll = async (jobId: string, _sessionId: string) => {
         let attempts = 0;
         const timer = window.setInterval(async () => {
           // ~3 minutes (120 x 1.5s) hard cap; a longer silent job is a hang.

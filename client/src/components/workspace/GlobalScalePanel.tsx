@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import {
   scaleApi,
   type ClusterStatus,
-  type RuntimeNode,
   type LoadBalancerConfig,
   type FailoverConfig,
   type ScalingPolicy,
@@ -25,7 +24,6 @@ export default function GlobalScalePanel({ onClose }: Props) {
   const [tab, setTab] = useState<Tab>("overview");
   const [status, setStatus] = useState<ClusterStatus | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [actionMsg, setActionMsg] = useState("");
 
   // Sub-tabs for CRUD

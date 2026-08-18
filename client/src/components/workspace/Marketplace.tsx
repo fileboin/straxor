@@ -19,12 +19,12 @@ const TYPE_ICONS: Record<string, string> = {
 export default function Marketplace({ onClose }: Props) {
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [types, setTypes] = useState<MarketplaceType[]>([]);
-  const [categories, setCategories] = useState<{ category: string; count: number }[]>([]);
+  const [, setCategories] = useState<{ category: string; count: number }[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
   const [filterType, setFilterType] = useState("");
-  const [filterCategory, setFilterCategory] = useState("");
+  const [filterCategory] = useState("");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortMode>("popular");
   const [page, setPage] = useState(0);

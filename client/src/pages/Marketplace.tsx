@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   listPackages, searchPackages, getPackage, getRecommendations,
   getCategories, getReviews, getVersions, getRelatedPackages,
-  publishPackage, addReview, verifyPackage,
-  getCreator, getCreatorAnalytics,
+  publishPackage, verifyPackage,
 } from "../lib/marketplace-core";
 import type { PackageListing, Review, PackageCategory, PackageManifest, PackageVersion } from "../../../server/src/marketplace/core/types.js";
 import { ALL_CATEGORIES, CATEGORY_DISPLAY } from "../../../server/src/marketplace/core/types.js";
@@ -14,7 +13,6 @@ type Tab = "browse" | "category" | "detail" | "publish" | "creator" | "search";
 export default function Marketplace() {
   const { category: categoryParam } = useParams();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
 
   const [tab, setTab] = useState<Tab>("browse");
   const [listings, setListings] = useState<PackageListing[]>([]);

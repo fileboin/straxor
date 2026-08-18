@@ -16,7 +16,6 @@ export default function Help() {
 
   const [tab, setTab] = useState<HelpTab>("tickets");
   const [activeTicket, setActiveTicket] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
 
   const flash = (msg: string) => { setActionMsg(msg); setTimeout(() => setActionMsg(""), 2500); };

@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   listAdapters, listInstances, createInstance, deleteInstance,
-  getConnectionStats, getConnectionCategories, testConnection, executeConnection,
-  updateInstance, getAdapter,
+  getConnectionStats, testConnection, executeConnection,
 } from "../lib/connections";
 import type { AdapterInfo, ConnectionInstance } from "../lib/connections";
 
@@ -19,7 +17,6 @@ const CATEGORIES = [
 ];
 
 export default function Connections() {
-  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("browse");
   const [adapters, setAdapters] = useState<AdapterInfo[]>([]);
   const [instances, setInstances] = useState<ConnectionInstance[]>([]);
