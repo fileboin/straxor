@@ -3,6 +3,15 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — Paneli ne vraćaju greške: verify-prije-binda + automatski pad na lokalni engine (klijent, urađeno)
+- **Cilj**: „Paneli vraćaju greške, a sve je radilo" — uzrok je auto-bind (FAZA 19b): na mount-u su OBA panela vezivana na VPS mašinu samo zato što baza kaže status=ready/opencodeRunning, BEZ provere da je daemon stvarno živ. Kad VPS padne (reboot / opencode umro / SSH nedostupan), paneli ostanu vezani za mrtav engine → svaki turn → „Machine not found / Opencode not running" → reconnect ne uspe → greška u panelu, opet i opet.
+- **Implementacija** (`client/src/pages/Workspace.tsx`):
+  - Mount auto-bind efekat: sada prvo poziva `verifyVpsConnection(ready.id)` (health check + auto-reconnect); samo ako je `vpsStatus === "ready"` poziva `handleVpsConnected`. Ako VPS nije dostupan → paneli OSTAJU na lokalnom OpenCode engine-u + jasna poruka „VPS nije dostupan — paneli rade na lokalnom OpenCode engine-u". Nema više vezivanja na mrtvu mašinu.
+  - `handleVpsConnected`: kad verifikacija posle konekcije ne uspe, oba panela se AUTOMATSKI prebacuju na `local:opencode[:ask]` (umesto da ostanu na mrtvom VPS-u) + poruka „paneli prebačeni na lokalni OpenCode".
+  - `recoverVpsEngine`: ako reconnect ne uspe, paneli se takođe prebacuju na lokalni engine + poruka „VPS nije dostupan — paneli prebačeni na lokalni OpenCode (radi odmah)" — sledeći turn RADI umesto da ponovo prijavi grešku.
+- **Verifikovano**: client `tsc --noEmit` — **0 grešaka**; client `npm run build` — **prolazi**. Server netaknut.
+- **Napomena (granica)**: ako korisnik nema nijedan AI provider ključ u DB i nema Ollamu, lokalni engine nema model (poruka „No API keys configured — save a provider key") — to je konfiguracija, ne regresija; VPS pad je sada bezbedno apsorbovan (pad na lokalni).
+
 ## Zadnji zadatak — Core fix: Admin ne izbacuje iz sistema + Connect/Engine opcije rade (klijent, urađeno)
 - **Cilj (hitna popravka jezgra)**: (1) Admin dugme više ne sme da "izbaci" korisnika iz sistema; (2) Connect dugme ne sme da prikazuje grešku; (3) sve opcije u Agent/Ask Engine meniju moraju stvarno izvršavati zadatke. Dodatci su zamrznuti.
 - **Uzrok (Admin "kick")**: `HomeCenter` tile „Admin Control Center" i Command Palette akcija su bili vidljivi SVAKOM korisniku; klik → `navigate("/admin")` → `AdminRoute` guard → `<Navigate to="/">` → ceo Workspace se remount-uje (restore/refresh osećaj = "izbacuje iz sistema"). Dodatno, bilo kakva greška u lazy Admin chunku rušila je CEU aplikaciju kroz globalni ErrorBoundary.

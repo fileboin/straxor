@@ -408,14 +408,20 @@ export default function Workspace() {
         setAgentEnginePrep({ status: "ready", message: "VPS OpenCode ponovno povezan" });
         return true;
       }
+      // Recovery failed → unbind both panels to the local OpenCode engine so
+      // the next turn WORKS instead of erroring again on the dead VPS.
+      setAskMachineId("local:opencode:ask");
+      setAgentMachineId("local:opencode");
       setVpsStatus("offline");
-      setAskEnginePrep({ status: "error", message: "VPS OpenCode nije dostupan — proveri SSH konfiguraciju" });
-      setAgentEnginePrep({ status: "error", message: "VPS OpenCode nije dostupan — proveri SSH konfiguraciju" });
+      setAskEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode (radi odmah)" });
+      setAgentEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode (radi odmah)" });
       return false;
     } catch {
+      setAskMachineId("local:opencode:ask");
+      setAgentMachineId("local:opencode");
       setVpsStatus("offline");
-      setAskEnginePrep({ status: "error", message: "VPS OpenCode nije dostupan — proveri SSH konfiguraciju" });
-      setAgentEnginePrep({ status: "error", message: "VPS OpenCode nije dostupan — proveri SSH konfiguraciju" });
+      setAskEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode (radi odmah)" });
+      setAgentEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode (radi odmah)" });
       return false;
     }
   }, []);
@@ -2407,13 +2413,22 @@ export default function Workspace() {
           setAskEnginePrep({ status: "ready", message: "VPS OpenCode potvrđen (health OK)" });
           setAgentEnginePrep({ status: "ready", message: "VPS OpenCode potvrđen (health OK)" });
         } else {
+          // VPS daemon unreachable → unbind both panels back to the local
+          // OpenCode engine so agent turns keep working instead of erroring
+          // with "Machine not found / Opencode not running".
+          setAskMachineId("local:opencode:ask");
+          setAgentMachineId("local:opencode");
           setVpsStatus("offline");
-          setAskEnginePrep({ status: "error", message: "VPS OpenCode nije dostupan — otvori Runtime Manager → Reconnect" });
-          setAgentEnginePrep({ status: "error", message: "VPS OpenCode nije dostupan — otvori Runtime Manager → Reconnect" });
+          setAskEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode" });
+          setAgentEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode" });
         }
       })
       .catch(() => {
+        setAskMachineId("local:opencode:ask");
+        setAgentMachineId("local:opencode");
         setVpsStatus("offline");
+        setAskEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode" });
+        setAgentEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode" });
       });
   }, []);
 
@@ -2474,7 +2489,20 @@ export default function Workspace() {
         const machines = await listMachines();
         const ready = machines.find((m) => m.status === "ready" || m.opencodeRunning);
         if (!ready || cancelled) return;
-        handleVpsConnected(ready.id);
+        // Verify the daemon is ACTUALLY alive before binding both panels to it.
+        // A stale DB record (VPS rebooted / opencode died) must never pin the
+        // panels to a dead engine — that made every turn fail with
+        // "Machine not found / Opencode not running" even though the local
+        // OpenCode engine was perfectly fine.
+        const result = await verifyVpsConnection(ready.id);
+        if (cancelled) return;
+        if (result.vpsStatus === "ready") {
+          handleVpsConnected(ready.id);
+        } else {
+          setVpsStatus("offline");
+          setAskEnginePrep({ status: "error", message: "VPS nije dostupan — paneli rade na lokalnom OpenCode engine-u" });
+          setAgentEnginePrep({ status: "error", message: "VPS nije dostupan — paneli rade na lokalnom OpenCode engine-u" });
+        }
       } catch {
         // No saved machines / offline — keep the local OpenCode engine.
       }
