@@ -122,6 +122,42 @@ const apiLimiter = rateLimit({
   message: { error: "Too many requests, please try again later." },
 });
 
+// Expensive/stateful routes get tighter per-IP budgets than the general 500.
+// These count requests (not SSE duration), which is what we want: the number
+// of agent turns / process spawns / preview boots is capped, while a single
+// long-running stream is unaffected.
+const agentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many agent requests, please slow down." },
+});
+
+const chatLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many chat requests, please slow down." },
+});
+
+const terminalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many terminal commands, please slow down." },
+});
+
+const previewLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many preview starts, please slow down." },
+});
+
 app.use(express.json({ limit: "1mb" }));
 
 // ── Security: Input validation middleware ──
@@ -160,10 +196,10 @@ app.use("/api", apiLimiter);
 
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/projects", projectRoutes);
-app.use("/api/chat", chatRoutes);
+app.use("/api/chat", chatLimiter, chatRoutes);
 app.use("/api/machines", machineRoutes);
 app.use("/api/api-keys", apiKeyRoutes);
-app.use("/api/agent", agentRoutes);
+app.use("/api/agent", agentLimiter, agentRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/runtime", runtimeRoutes);
 app.use("/api/envs", envRoutes);
@@ -180,7 +216,7 @@ app.use("/api/browser-verify", browserVerifyRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/search", searchRoutes);
-app.use("/api/preview", previewRoutes);
+app.use("/api/preview", previewLimiter, previewRoutes);
 app.use("/api/database", databaseRoutes);
 app.use("/api/rollback", rollbackRoutes);
 app.use("/api/context", contextRoutes);
@@ -197,7 +233,7 @@ app.use("/api/web-research", webResearchRoutes);
 app.use("/api/acp", acpRoutes);
 app.use("/api/git-remote", gitRemoteRoutes);
 app.use("/api/repos", repoRoutes);
-app.use("/api/terminal", terminalRoutes);
+app.use("/api/terminal", terminalLimiter, terminalRoutes);
 app.use("/api/github", githubConnectRoutes);
 app.use("/api/kanban", kanbanRoutes);
 app.use("/api/mcp-marketplace", mcpMarketplaceRoutes);

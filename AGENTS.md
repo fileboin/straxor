@@ -3,6 +3,11 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — Per-route rate limiting (FAZA 13, urađeno)
+- **Cilj**: ROADMAP Phase 2 — „Rate limiting per route". Postojao je samo globalni `apiLimiter` (500/15min) + `authLimiter` (20/15min); skupe/stateful rute (agent, chat, terminal, preview) nisu imale strožiji limiter.
+- **Implementacija**: `index.ts` — 4 nova `rateLimit` limitera uvezana na route mountove: `agentLimiter` (60/15min), `chatLimiter` (120/15min), `terminalLimiter` (60/15min), `previewLimiter` (30/15min). Broje se zahtevi (ne SSE trajanje) — broj agent turn-ova/procesa/preview boot-ova je ograničen, pojedinačni dugi stream nije pogođen.
+- **Verifikovano**: server `tsc --noEmit` čist, vitest **173/173**. Klijent netaknut.
+
 ## Zadnji zadatak — HTTP request logging (FAZA 12, urađeno)
 - **Cilj**: ROADMAP Phase 2 — „Request/response logging". Server nije imao nikakav request logger, pa je debagovanje produkcije (spori Render deploy-ovi, 5xx) bilo slepo.
 - **Implementacija**: `server/src/lib/http-logger.ts` (novo) — `httpRequestLogger()` Express middleware loguje `[http] METHOD path → status (Nms)` na `res.finish`; `shouldSkipHttpLog` preskače OPTIONS/health/static (`/assets/`, `/uploads/`, `/favicon.ico`); 4xx→`console.warn`, 5xx→`console.error`, ostalo→`console.log`. Uvezan u `index.ts` odmah posle CORS (pre preview proxy-a, pa hvata sve zahteve).
