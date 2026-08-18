@@ -3,10 +3,12 @@ import {
   approveTeamTask,
   fetchTeamTask,
   startTeamRun,
+  type TeamApproveResult,
   type TeamJobStatus,
   type TeamRunResult,
   type TeamTaskDetail,
 } from "../../lib/team.js";
+import { getRepoDiff, type RepoDiffResult } from "../../lib/repos.js";
 
 const TEAM_ROLES: { id: string; name: string; icon: string }[] = [
   { id: "coding", name: "Coding", icon: "💻" },
@@ -71,7 +73,17 @@ export default function TeamRunPanel({
   const [detail, setDetail] = useState<TeamTaskDetail | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Closed loop (approve → commit → push): the diff of the active repo's
+  // sandbox shown for approval, its fingerprint, and the approval outcome.
+  const [diff, setDiff] = useState<RepoDiffResult | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [commitMsg, setCommitMsg] = useState("Straxor Agent — team run");
+  const [approveBusy, setApproveBusy] = useState(false);
+  const [approveResult, setApproveResult] = useState<TeamApproveResult | null>(null);
   const timerRef = useRef<number | null>(null);
+  // Guards the one-shot sandbox diff fetch (a plain state check would go stale
+  // inside the poll closure and refetch on every tick).
+  const diffRequestedRef = useRef(false);
 
   useEffect(() => {
     if (open && defaultPrompt && !prompt) setPrompt(defaultPrompt);
@@ -85,6 +97,19 @@ export default function TeamRunPanel({
       try {
         const d = await fetchTeamTask(result.taskId);
         setDetail(d);
+        // Once the team drains, fetch the sandbox diff so the user can review
+        // the combined changes before approving (closed loop).
+        if (d.task.status === "WAITING_APPROVAL" && !diffRequestedRef.current) {
+          diffRequestedRef.current = true;
+          setDiffLoading(true);
+          try {
+            setDiff(await getRepoDiff());
+          } catch {
+            setDiff(null); // no active repo — approval works without commit
+          } finally {
+            setDiffLoading(false);
+          }
+        }
         const terminal = ["VERIFIED", "FAILED", "CANCELLED"].includes(d.task.status);
         if (terminal) {
           setBusy(false);
@@ -135,16 +160,40 @@ export default function TeamRunPanel({
     }
   };
 
-  const approve = async () => {
+  const approve = async (push: boolean) => {
     if (!result) return;
+    setApproveBusy(true);
+    setError(null);
     try {
-      await approveTeamTask(result.taskId);
+      const r = await approveTeamTask(result.taskId, {
+        push,
+        commitMessage: commitMsg.trim() || "Straxor Agent — team run",
+        diffHash: diff?.hash,
+      });
+      setApproveResult(r);
       setDetail((prev) =>
-        prev ? { ...prev, task: { ...prev.task, status: "VERIFIED" } } : prev
+        prev
+          ? {
+              ...prev,
+              task: {
+                ...prev.task,
+                status: "VERIFIED",
+                commitHash: r.hash || prev.task.commitHash,
+              },
+            }
+          : prev
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Odobravanje nije uspjelo");
+      const message = err instanceof Error ? err.message : "Odobravanje nije uspjelo";
+      setError(message);
+      // The sandbox changed since the diff was shown — refetch so the user
+      // reviews and approves the CURRENT diff.
+      if (message.includes("Diff se promijenio")) {
+        diffRequestedRef.current = false;
+        setDiff(null);
+      }
     }
+    setApproveBusy(false);
   };
 
   const jobs = detail?.jobs ?? result?.jobs ?? [];
@@ -266,6 +315,83 @@ export default function TeamRunPanel({
                 })}
               </div>
 
+              {isWaitingApproval && (
+                <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-2.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-yellow-400">
+                      Zatvoreni ciklus — pregled promjena
+                    </span>
+                    {diffLoading && (
+                      <span className="text-[10px] text-text-muted animate-pulse">
+                        Učitava diff…
+                      </span>
+                    )}
+                  </div>
+
+                  {diff ? (
+                    <>
+                      <div className="text-[10px] text-text-muted">
+                        {diff.repo} · diff hash:{" "}
+                        <span className="font-mono text-yellow-300/80">
+                          {diff.hash.slice(0, 16)}…
+                        </span>
+                        {diff.stat && (
+                          <div className="mt-0.5 font-mono whitespace-pre-wrap text-[9px]">
+                            {diff.stat}
+                          </div>
+                        )}
+                      </div>
+                      {diff.diff ? (
+                        <pre className="max-h-32 overflow-auto text-[9px] leading-relaxed bg-black/40 border border-yellow-500/20 rounded p-2 whitespace-pre-wrap">
+                          {diff.diff.slice(0, 4000)}
+                          {diff.diff.length > 4000 ? "\n… (skraćeno)" : ""}
+                        </pre>
+                      ) : (
+                        <div className="text-[10px] text-text-muted">
+                          Nema promjena u sandboxu — odobravanje bez commit-a.
+                        </div>
+                      )}
+                      <input
+                        className="w-full rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-[11px] text-text placeholder:text-text-muted/50 focus:outline-none focus:border-accent"
+                        placeholder="Commit poruka"
+                        value={commitMsg}
+                        onChange={(e) => setCommitMsg(e.target.value)}
+                      />
+                    </>
+                  ) : (
+                    !diffLoading && (
+                      <div className="text-[10px] text-text-muted">
+                        (Nema povezanog repoa — tim se odobrava bez commit-a.)
+                      </div>
+                    )
+                  )}
+
+                  {approveResult && (
+                    <div className="text-[10px] space-y-0.5">
+                      {approveResult.committed ? (
+                        <div className="text-green-400">
+                          ✓ Commit-ano:{" "}
+                          <span className="font-mono">{approveResult.hash}</span>
+                          {approveResult.pushed ? " · push-ano na GitHub" : ""}
+                        </div>
+                      ) : (
+                        <div className="text-text-muted">Nema promjena za commit.</div>
+                      )}
+                      {approveResult.pushed && (
+                        <div className="text-green-400/80">
+                          ↑ {approveResult.pushOutput.slice(0, 120)}
+                        </div>
+                      )}
+                      {!approveResult.pushed && approveResult.error && (
+                        <div className="text-amber-400">
+                          Push nije uspio: {approveResult.error.slice(0, 200)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {error && (
                 <div className="px-3 py-2 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-[11px]">
                   {error}
@@ -277,12 +403,24 @@ export default function TeamRunPanel({
 
         <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border shrink-0">
           {isWaitingApproval && (
-            <button
-              onClick={approve}
-              className="px-3 h-8 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 text-[11px] font-medium transition-colors"
-            >
-              ✓ Odobri rad tima
-            </button>
+            <>
+              <button
+                onClick={() => approve(true)}
+                disabled={approveBusy}
+                className="px-3 h-8 rounded-lg bg-green-600/30 text-green-300 text-[11px] font-semibold hover:bg-green-600/50 disabled:opacity-50 transition-colors"
+                title="Odobri, commit i push na GitHub"
+              >
+                {approveBusy ? "…" : "✓ Odobri + push"}
+              </button>
+              <button
+                onClick={() => approve(false)}
+                disabled={approveBusy}
+                className="px-3 h-8 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 text-[11px] font-medium transition-colors"
+                title="Odobri i commit bez push-a"
+              >
+                ✓ Odobri i commit
+              </button>
+            </>
           )}
           {!result && (
             <button

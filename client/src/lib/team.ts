@@ -31,12 +31,27 @@ export interface TeamTask {
   title: string;
   prompt: string;
   status: string;
+  repo?: string | null;
+  branch?: string | null;
+  commitHash?: string | null;
   error?: string | null;
 }
 
 export interface TeamTaskDetail {
   task: TeamTask;
   jobs: TeamJob[];
+}
+
+export interface TeamApproveResult {
+  ok: boolean;
+  status: string;
+  committed: boolean;
+  hash: string;
+  pushed: boolean;
+  pushOutput: string;
+  diffChanged?: boolean;
+  empty?: boolean;
+  error?: string | null;
 }
 
 export async function startTeamRun(input: {
@@ -52,9 +67,11 @@ export async function fetchTeamTask(taskId: string): Promise<TeamTaskDetail> {
 }
 
 export async function approveTeamTask(
-  taskId: string
-): Promise<{ ok: boolean; status: string }> {
-  return api<{ ok: boolean; status: string }>(`/agent/team/${taskId}/approve`, {
+  taskId: string,
+  opts?: { push?: boolean; commitMessage?: string; diffHash?: string }
+): Promise<TeamApproveResult> {
+  return api<TeamApproveResult>(`/agent/team/${taskId}/approve`, {
     method: "POST",
+    body: opts ?? {},
   });
 }

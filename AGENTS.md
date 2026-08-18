@@ -3,6 +3,13 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — Team → Closed Loop (FAZA 7d, urađeno)
+- **Cilj**: timski run se završavao na WAITING_APPROVAL → VERIFIED, a izmjene koje je tim napravio u sandboxu su ostajale ne-commit-ane. Sada odobravanje zatvara cijeli MVP lanac: GitHub → Tim → Diff → Approve → Commit → Push.
+- **Implementacija**:
+  - `POST /api/agent/team/:taskId/approve` (`agent.ts`) sada prima `{ push?, commitMessage?, diffHash? }` (push default true). Verifikuje da je task u WAITING_APPROVAL (inače 400), resolvuje aktivni repo (isti način kao `/api/repos/*`), `ensureWorkspace` → `approveAndCommitWorkspace(message, diffHash)` (stale-diff gate: 409 ako se sandbox promijenio od prikaza) → `pushWorkspace`. Perzistira `commitHash` na task (best-effort). Bez aktivnog repoa / offline DB → task se i dalje VERIFIED-uje bez commit-a (graceful). Push greška → commit je siguran lokalno, vraća `pushed:false` + `error`.
+  - Klijent: `team.ts` — `approveTeamTask(taskId, { push, commitMessage, diffHash })` + `TeamApproveResult` + `commitHash` u `TeamTask`. `TeamRunPanel.tsx` — na WAITING_APPROVAL jednom fetch-uje sandbox diff (`getRepoDiff`), prikazuje stat + hash + skraćeni diff + commit poruku, i dva dugmeta "✓ Odobri + push" / "✓ Odobri i commit"; poslije prikazuje commit hash + push status (ili upozorenje ako push nije uspio). 409 → refetch diff-a.
+- **Verifikovano**: novi `server/src/routes/agent-team-loop.test.ts` (5 E2E, offline bare remote): happy path commit+push + task VERIFIED sa commitHash + remote HEAD == local HEAD + commit poruka na remote-u; stale diffHash → 409 + ništa ne stiže na remote; approve prije WAITING_APPROVAL → 400; bez aktivnog repoa → committed:false ali VERIFIED; push:false → commit lokalno bez push-a. Server `tsc --noEmit` čist, vitest **164/164**, client build prolazi.
+
 ## Zadnji zadatak — Agent Memory (FAZA 7b, urađeno)
 - **Cilj (audit FAZA 7b)**: background agent job-ovi su bili isključivo in-memory (`backgroundJobs` Map u `agent.ts`) → gubili su se na restart servera.
 - **Implementacija**:
@@ -97,5 +104,5 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
 
 ## Next Move
 1. **FAZA 6 pravi token (korisnik)**: korisnik unese pravi GitHub token kroz UI (⚙ PanelMenu → "GitHub token" → "+ Dodaj token") → `POST /api/repos/push` → 200/OK → screenshot.
-2. **Team fan-out E2E verifikacija (UI)**: pokrenuti tim kroz UI na aktivnom repou i potvrditi per-role progres + WAITING_APPROVAL → approve.
+2. **Team → Closed Loop E2E verifikacija (UI)**: pokrenuti tim kroz UI na aktivnom repou, potvrditi per-role progres → WAITING_APPROVAL → diff pregled → "✓ Odobri + push" → commit hash + push status.
 3. **drizzle-orm**: već na `^0.45.2` (HIGH GHSA-gpj5-g38j-94v9 rešen) — TODO #2 zatvoren.

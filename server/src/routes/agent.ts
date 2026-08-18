@@ -1,12 +1,20 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { getAdapters } from "../adapters/registry.js";
+import { getGitRemoteToken } from "../adapters/git/remote/registry.js";
+import type { GitPlatformId } from "../adapters/git/remote/adapter.js";
 import { requireAuth } from "../middleware/auth.js";
 import { resolveAttachments, type AttachmentRef } from "../lib/attachments.js";
 import { isLocalMachineId, slotFromMachineId } from "../runtime/local/engine.js";
 import { withSharedWorkspace } from "../runtime/local/shared-workspace.js";
+import {
+  approveAndCommitWorkspace,
+  diffWorkspace,
+  ensureWorkspace,
+  pushWorkspace,
+} from "../runtime/local/workspace.js";
 import { db } from "../db/index.js";
-import { agentBusEvents } from "../db/schema.js";
+import { agentBusEvents, repoConnections } from "../db/schema.js";
 import { and, desc, eq } from "drizzle-orm";
 import {
   createAgentJob,
@@ -18,7 +26,7 @@ import {
   type AgentJobStatus,
   type AgentJobTimelineEntry,
 } from "../lib/agent-jobs.js";
-import { createTask, getTask, transitionTaskStatus } from "../lib/tasks.js";
+import { createTask, getTask, transitionTaskStatus, setTaskFields } from "../lib/tasks.js";
 import {
   buildRoleSystem,
   normalizeTeamRoles,
@@ -1235,18 +1243,136 @@ router.get("/team/:taskId", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/agent/team/:taskId/approve — accept the team run (closes loop).
+// POST /api/agent/team/:taskId/approve — accept the team run and close the
+// loop: commit the combined sandbox changes to the active repo and (by
+// default) push them to the remote. The approval is bound to the diff the UI
+// showed (`diffHash`); if the sandbox changed since, the commit is refused so
+// unapproved edits can never reach the repository. When no repo is connected
+// (or the DB is unavailable) the task is still VERIFIED — the run itself was
+// accepted, just without a commit.
 router.post("/team/:taskId/approve", async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   const taskId = req.params.taskId as string;
+  const push = req.body?.push !== false;
+  const diffHash =
+    typeof req.body?.diffHash === "string" && req.body.diffHash
+      ? (req.body.diffHash as string)
+      : undefined;
+  const commitMessage =
+    typeof req.body?.commitMessage === "string" && req.body.commitMessage.trim()
+      ? (req.body.commitMessage as string).trim().slice(0, 200)
+      : "Straxor Agent — team run";
+
   try {
     const task = await getTask(userId, taskId);
     if (!task) {
       res.status(404).json({ error: "Team task not found" });
       return;
     }
+    if (task.status !== "WAITING_APPROVAL") {
+      res.status(400).json({ error: "Task nije u stanju WAITING_APPROVAL", status: task.status });
+      return;
+    }
+
+    // Resolve the active repo the same way /api/repos/* does. Best-effort: a
+    // missing/unmigrated table (or offline DB) must never block approval of
+    // the run itself — without a repo there is simply nothing to commit.
+    let conn: typeof repoConnections.$inferSelect | null = null;
+    try {
+      const rows = await db
+        .select()
+        .from(repoConnections)
+        .where(and(eq(repoConnections.userId, userId), eq(repoConnections.isActive, true)))
+        .limit(1);
+      conn = rows[0] ?? null;
+    } catch (err) {
+      console.log(
+        `[agent:team] approve ${taskId} — repo resolution skipped: ${err instanceof Error ? err.message : err}`
+      );
+    }
+
+    const result: {
+      committed: boolean;
+      hash: string;
+      pushed: boolean;
+      pushOutput: string;
+      diffChanged: boolean;
+      empty: boolean;
+      error?: string | null;
+    } = {
+      committed: false,
+      hash: "",
+      pushed: false,
+      pushOutput: "",
+      diffChanged: false,
+      empty: false,
+      error: null,
+    };
+
+    if (conn) {
+      const token = await getGitRemoteToken(userId, conn.platform as GitPlatformId).catch(() => undefined);
+      try {
+        await ensureWorkspace({
+          userId,
+          platform: conn.platform,
+          owner: conn.owner,
+          name: conn.name,
+          fullName: conn.fullName,
+          cloneUrl: conn.cloneUrl,
+          defaultBranch: conn.defaultBranch,
+          token,
+        });
+        const approved = await approveAndCommitWorkspace(
+          userId,
+          conn.owner,
+          conn.name,
+          commitMessage,
+          diffHash,
+        );
+        result.committed = approved.committed;
+        result.hash = approved.hash;
+        result.diffChanged = approved.diffChanged;
+        result.empty = approved.empty;
+
+        if (approved.diffChanged) {
+          // Sandbox changed since the diff was shown — refuse the commit and
+          // let the user re-review (task stays WAITING_APPROVAL).
+          res.status(409).json({
+            error: "Diff se promijenio od prikaza — ponovo pregledaj i odobri novi diff",
+            ...result,
+          });
+          return;
+        }
+
+        if (approved.committed) {
+          try {
+            await setTaskFields(userId, taskId, { commitHash: approved.hash });
+          } catch {}
+          if (push) {
+            try {
+              result.pushOutput = await pushWorkspace(
+                userId,
+                conn.owner,
+                conn.name,
+                conn.defaultBranch,
+              );
+              result.pushed = true;
+            } catch (pushErr) {
+              // The commit is safe locally; surface the push problem so the UI
+              // can tell the user to push from the Git panel.
+              result.error = pushErr instanceof Error ? pushErr.message : "Push nije uspio";
+            }
+          }
+        }
+      } catch (commitErr) {
+        const message = commitErr instanceof Error ? commitErr.message : "Commit nije uspio";
+        res.status(500).json({ error: message, ...result });
+        return;
+      }
+    }
+
     await transitionTaskStatus(userId, taskId, "VERIFIED");
-    res.json({ ok: true, status: "VERIFIED" });
+    res.json({ ok: true, status: "VERIFIED", ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({ error: message });
