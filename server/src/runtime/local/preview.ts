@@ -17,6 +17,7 @@ import {
 } from "../../lib/terminal.js";
 import { getRepoWorkspaceDir } from "./workspace.js";
 import { buildPreviewUrl } from "./preview-proxy.js";
+import { dispatchWebhook } from "../../lib/webhooks.js";
 
 export type LocalPreviewState = "starting" | "running" | "crashed" | "stopped" | "error";
 
@@ -54,6 +55,7 @@ interface PreviewEntry {
   stopRequested: boolean;
   healthTimer: NodeJS.Timeout | null;
   unsub: (() => void) | null;
+  userId: string;
 }
 
 const MAX_LOGS = 300;
@@ -183,6 +185,21 @@ function baseInfo(key: string, command: string): LocalPreviewInfo {
   };
 }
 
+/** Phase 3 webhooks — notify external integrations of preview lifecycle. */
+function dispatchPreviewEvent(
+  userId: string,
+  event: "preview.started" | "preview.stopped",
+  info: LocalPreviewInfo
+): void {
+  void dispatchWebhook(userId, event, {
+    previewId: info.previewId,
+    state: info.state,
+    port: info.port,
+    url: info.url,
+    command: info.command,
+  });
+}
+
 export async function startPreview(input: LocalPreviewStartInput): Promise<LocalPreviewInfo> {
   const cfg = getConfig();
   const key = previewKey(input.userId, input.owner, input.name, input.taskId);
@@ -203,7 +220,7 @@ export async function startPreview(input: LocalPreviewStartInput): Promise<Local
     const info = baseInfo(key, "");
     info.state = "error";
     info.lastError = "No dev command found — add a dev/start/preview script to package.json or pass an explicit command";
-    previews.set(key, { info, logs: [], detectedPort: null, stopRequested: false, healthTimer: null, unsub: null });
+    previews.set(key, { info, logs: [], detectedPort: null, stopRequested: false, healthTimer: null, unsub: null, userId: input.userId });
     return info;
   }
 
@@ -217,6 +234,7 @@ export async function startPreview(input: LocalPreviewStartInput): Promise<Local
     stopRequested: false,
     healthTimer: null,
     unsub: null,
+    userId: input.userId,
   };
   entry.info.port = assignedPort;
   entry.info.internalUrl = `http://localhost:${assignedPort}`;
@@ -264,6 +282,7 @@ export async function startPreview(input: LocalPreviewStartInput): Promise<Local
             entry.info.state = "crashed";
             entry.info.lastError = `Preview process exited (code ${event.exitCode ?? "null"}, signal ${event.signal ?? "none"})`;
           }
+          dispatchPreviewEvent(entry.userId, "preview.stopped", entry.info);
         }
       }
     });
@@ -283,6 +302,7 @@ export async function startPreview(input: LocalPreviewStartInput): Promise<Local
         entry.info.health = (await httpHealth(port)) ? "ok" : "unreachable";
         syncProxyUrl(entry);
         clearInterval(entry.healthTimer!);
+        dispatchPreviewEvent(entry.userId, "preview.started", entry.info);
       } else if (Date.now() > deadline) {
         entry.info.state = "error";
         entry.info.health = "unreachable";
@@ -307,6 +327,7 @@ export async function stopPreview(key: string): Promise<LocalPreviewInfo | null>
   if (entry.healthTimer) clearInterval(entry.healthTimer);
   if (entry.info.processId) cancelTerminalProcess(entry.info.processId, "SIGTERM");
   entry.info.state = "stopped";
+  dispatchPreviewEvent(entry.userId, "preview.stopped", entry.info);
   return entry.info;
 }
 

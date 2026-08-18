@@ -36,6 +36,7 @@ import {
 } from "../lib/team-roles.js";
 import { randomUUID } from "node:crypto";
 import path from "path";
+import { dispatchWebhook } from "../lib/webhooks.js";
 
 type AgentBusAction = "help" | "review" | "warn";
 type PanelSlot = "ask" | "agent";
@@ -1100,6 +1101,18 @@ async function persistJob(job: BackgroundJob, opts?: { final?: boolean }): Promi
   try {
     if (opts?.final) {
       await finishAgentJob(job.userId, job.id, job.status, job.error ?? null, job.timeline);
+      // Phase 3 webhooks — notify external integrations of agent-run outcomes.
+      void dispatchWebhook(
+        job.userId,
+        job.status === "error" ? "agent.run.failed" : "agent.run.completed",
+        {
+          jobId: job.id,
+          taskId: job.taskId ?? null,
+          sessionId: job.sessionId,
+          status: job.status,
+          error: job.error ?? null,
+        }
+      );
     } else {
       await updateAgentJob(job.userId, job.id, { timeline: job.timeline });
     }
@@ -1377,6 +1390,14 @@ router.post("/team/:taskId/approve", async (req: Request, res: Response) => {
     }
 
     await transitionTaskStatus(userId, taskId, "VERIFIED");
+    void dispatchWebhook(userId, "team.task.approved", {
+      taskId,
+      status: "VERIFIED",
+      committed: result.committed,
+      commitHash: result.hash || null,
+      pushed: result.pushed,
+      error: result.error ?? null,
+    });
     res.json({ ok: true, status: "VERIFIED", ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -1534,6 +1555,12 @@ async function runTeamVerification(userId: string, taskId: string): Promise<void
   try {
     await transitionTaskStatus(userId, taskId, "WAITING_APPROVAL");
   } catch {}
+  void dispatchWebhook(userId, "team.task.verified", {
+    taskId,
+    status: "WAITING_APPROVAL",
+    repo: `${conn.owner}/${conn.name}`,
+    verify: result,
+  });
 }
 
 export default router;

@@ -14,6 +14,7 @@ import {
   registerProcess,
   type ProcessRecord,
 } from "./process-registry.js";
+import { dispatchWebhook } from "./webhooks.js";
 
 export class TerminalBusyError extends Error {
   constructor(scope: string) {
@@ -81,6 +82,25 @@ function capBuffer(entry: TerminalEntry, maxBytes: number): void {
     entry.stdout = "";
     entry.stderr = entry.stderr.slice(rest);
   }
+}
+
+/** Phase 3 webhooks — notify external integrations when a process exits. */
+function dispatchTerminalExit(
+  processId: string,
+  status: string,
+  exitCode: number | null,
+  signal: string | null
+): void {
+  const rec = getProcess(processId);
+  if (!rec?.userId) return;
+  void dispatchWebhook(rec.userId, "terminal.process.exited", {
+    processId: rec.id,
+    taskId: rec.taskId,
+    command: rec.command,
+    status,
+    exitCode,
+    signal,
+  });
 }
 
 export function startTerminalProcess(input: TerminalStartInput): TerminalStartResult {
@@ -153,6 +173,7 @@ export function startTerminalProcess(input: TerminalStartInput): TerminalStartRe
       signal,
       status,
     } satisfies TerminalEvent);
+    dispatchTerminalExit(rec.id, status, exitCode, signal);
   };
 
   // "close" fires after stdout/stderr streams are fully drained, so buffered
@@ -203,6 +224,7 @@ export function cancelTerminalProcess(processId: string, signal: NodeJS.Signals 
     signal,
     status: "cancelled",
   } satisfies TerminalEvent);
+  dispatchTerminalExit(processId, "cancelled", null, signal);
   // Escalate to SIGKILL if the graceful signal is ignored.
   setTimeout(() => {
     try {

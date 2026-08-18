@@ -3,6 +3,15 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — Webhook dispatch uvezan u stvarne događaje (FAZA 15b, urađeno)
+- **Cilj**: FAZA 15 je napravila webhook CRUD/dispatch infrastrukturu, ali `dispatchWebhook` nije nigde bio pozvan — webhook-ovi nisu mogli ništa da isporuče. Sada su uvezani u stvarne lifecycle događaje.
+- **Implementacija**:
+  - `server/src/routes/agent.ts` — `agent.run.completed` / `agent.run.failed` u `persistJob` (finalni write-through background joba); `team.task.verified` u `runTeamVerification` kad build+test prođu (→ WAITING_APPROVAL); `team.task.approved` u approve ruti (→ VERIFIED, sa commitHash/pushed/committed).
+  - `server/src/runtime/local/preview.ts` — `preview.started` kad dev server postane healthy (`state=running`), `preview.stopped` na eksplicitnom stop-u, crash-u i timeout-u (novo `userId` polje u `PreviewEntry` + `dispatchPreviewEvent` helper).
+  - `server/src/lib/terminal.ts` — `terminal.process.exited` u `settle` (finished/failed/timeout) i `cancelTerminalProcess` (cancelled); userId se čita iz ProcessRegistry (`getProcess`).
+  - `deploy.completed/failed` nisu uvezani — server nema deploy pipeline (deploy ide kroz Render eksterno).
+- **Verifikovano**: server `tsc --noEmit` čist; vitest **187/187** (23 fajla). Klijent netaknut.
+
 ## Zadnji zadatak — Webhook sistem (FAZA 15, urađeno)
 - **Cilj**: ROADMAP Phase 3 — „Webhook system" (eksterne integracije). Nije postojao outbound webhook mehanizam.
 - **Implementacija**:
