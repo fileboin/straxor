@@ -3,6 +3,11 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — Panel self-test za oba panela (urađeno)
+- **Cilj**: automatski dokaz da Panel 1 (ask slot) i Panel 2 (agent slot) rade kao pravi App Builderi — kloniraju sandbox, pišu fajlove i izvršavaju komande — a ne kao pasivni chat.
+- **Implementacija**: novi `server/src/e2e/panel-self-test.test.ts` — offline, za SVAKI slot (`ask` i `agent`) radi: `ensureWorkspace` klonira bare remote → agent upiše `probe-<slot>.txt` → `runWorkspaceCommand` izvrši `node -e` koji piše `probe-out-<slot>.txt` → assert exit 0 + sadržaj fajla. Dodatni test: sandboxovi su izolovani (ask ≠ agent).
+- **Verifikovano**: `panel-self-test.test.ts` — **3/3**; vitest ukupno **197/197** (25 fajlova); server `tsc --noEmit` — **čist**. Produkcija `/api/health` — `{"status":"ok","db":"connected"}`.
+
 ## Zadnji zadatak — FORCE VPS + auto-reconnect (FAZA 19b, urađeno)
 - **Cilj**: oba panela moraju se automatski vezati na aktivan VPS i sinhronizovati sa GitHub repom; na grešku engine-a ne sme se prikazivati timeout, već se mora automatski pokrenuti SSH/server reconnect.
 - **Implementacija** (`client/src/pages/Workspace.tsx`):
