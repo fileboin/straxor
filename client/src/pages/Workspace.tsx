@@ -3183,6 +3183,7 @@ export default function Workspace() {
                 onSelectLocal={() => handleSelectLocalEngine("ask")}
                 prepStatus={askEnginePrep.status}
                 prepMessage={askEnginePrep.message}
+                vpsStatus={vpsStatus}
                 onConnectVps={() => openSshModalForPanel("ask")}
                 onDisconnectVps={() => handleVpsDisconnected()}
                 onOpenGitRemote={() => { setGitRemoteSlot("ask"); setShowGitRemote(true); }}
@@ -3324,6 +3325,7 @@ export default function Workspace() {
                 onSelectLocal={() => handleSelectLocalEngine("agent")}
                 prepStatus={agentEnginePrep.status}
                 prepMessage={agentEnginePrep.message}
+                vpsStatus={vpsStatus}
                 onConnectVps={() => openSshModalForPanel("agent")}
                 onDisconnectVps={() => handleVpsDisconnected()}
                 onOpenGitRemote={() => { setGitRemoteSlot("agent"); setShowGitRemote(true); }}

@@ -14,6 +14,9 @@ interface Props {
   // Per-panel preparation feedback from the local/VPS engine selection.
   prepStatus?: "idle" | "preparing" | "ready" | "error" | "no-repo";
   prepMessage?: string;
+  // Explicit connection state so each panel shows "Status: Ready" or
+  // "Status: Disconnected" instead of silently doing nothing.
+  vpsStatus?: "disconnected" | "connecting" | "provisioning" | "ready" | "error" | "reconnecting" | "offline";
 }
 
 const isLocal = (id: string | null) => !!id && id.startsWith("local:");
@@ -25,6 +28,40 @@ const PREP_LABELS: Record<string, string> = {
   ready: "Spreman",
   error: "Greška",
   "no-repo": "Bez repo-a",
+};
+
+// Per-panel connection status: "Status: Ready" when the engine is usable
+// (local OpenCode bound, or a verified VPS), otherwise "Status: Disconnected".
+function connectionStatus(mode: "local" | "vps" | "none", vpsStatus: Props["vpsStatus"]): {
+  label: string;
+  tone: "ok" | "warn" | "bad" | "idle";
+} {
+  if (mode === "local") {
+    return { label: "Status: Ready (lokalno)", tone: "ok" };
+  }
+  if (mode === "vps") {
+    switch (vpsStatus) {
+      case "ready":
+        return { label: "Status: Ready (VPS)", tone: "ok" };
+      case "connecting":
+      case "provisioning":
+      case "reconnecting":
+        return { label: "Status: Spajanje…", tone: "warn" };
+      case "error":
+      case "offline":
+        return { label: "Status: Greška / Nije spojen na VPS", tone: "bad" };
+      default:
+        return { label: "Status: Disconnected", tone: "bad" };
+    }
+  }
+  return { label: "Status: Disconnected", tone: "bad" };
+}
+
+const STATUS_TONES: Record<string, { text: string; border: string; bg: string }> = {
+  ok: { text: "#34d399", border: "rgba(52,211,153,0.35)", bg: "rgba(52,211,153,0.08)" },
+  warn: { text: "#fbbf24", border: "rgba(251,191,36,0.35)", bg: "rgba(251,191,36,0.08)" },
+  bad: { text: "#f87171", border: "rgba(248,113,113,0.35)", bg: "rgba(248,113,113,0.08)" },
+  idle: { text: "var(--text-muted)", border: "var(--border)", bg: "var(--surface-2)" },
 };
 
 export default function EnginePicker({
@@ -39,6 +76,7 @@ export default function EnginePicker({
   onOpenRuntimeManager,
   prepStatus = "idle",
   prepMessage = "",
+  vpsStatus = "disconnected",
 }: Props) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -129,6 +167,18 @@ export default function EnginePicker({
         <div className="px-3 py-2 border-b border-border" style={{ background: "var(--surface-2)" }}>
           <div className="text-[10px] font-semibold" style={{ color: "var(--text)" }}>{panelLabel} engine</div>
           <div className="text-[9px] mt-0.5" style={{ color: "var(--text-muted)" }}>Gdje ovaj panel izvršava zadatke</div>
+          {(() => {
+            const cs = connectionStatus(mode, vpsStatus);
+            const tone = STATUS_TONES[cs.tone];
+            return (
+              <div
+                className="mt-1.5 px-2 py-1 rounded-md text-[9px] font-semibold"
+                style={{ color: tone.text, border: `1px solid ${tone.border}`, background: tone.bg }}
+              >
+                {cs.label}
+              </div>
+            );
+          })()}
         </div>
 
         <button
@@ -223,6 +273,18 @@ export default function EnginePicker({
         className={`h-7 px-2 rounded-md text-[10px] font-medium border transition-colors flex items-center gap-1 ${modeColor}`}
       >
         {modeLabel}
+        {(() => {
+          const cs = connectionStatus(mode, vpsStatus);
+          const tone = STATUS_TONES[cs.tone];
+          return (
+            <span
+              className="hidden sm:inline-flex items-center gap-1 text-[8px] font-semibold px-1.5 py-0.5 rounded"
+              style={{ color: tone.text, border: `1px solid ${tone.border}`, background: tone.bg }}
+            >
+              {cs.label.replace("Status: ", "")}
+            </span>
+          );
+        })()}
         {prepStatus === "preparing" && <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />}
         <span className="text-[8px] opacity-70">{open ? "▴" : "▾"}</span>
       </button>
