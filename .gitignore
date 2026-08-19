@@ -8,3 +8,6 @@ server/.straxor-workspaces/
 *.log
 .DS_Store
 verification-screenshots/
+
+# ShipStudio metadata
+.shipstudio/
