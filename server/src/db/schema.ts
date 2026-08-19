@@ -7,8 +7,106 @@ import {
   boolean,
   timestamp,
   jsonb,
+  doublePrecision,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+
+// ── Foundation: Persistent Task State (Iteration 0) ──
+// Lifecycle: QUEUED → RUNNING → VERIFYING → WAITING_APPROVAL → VERIFIED
+// (or FAILED/CANCELLED). Transitions are validated in src/lib/task-state.ts so
+// an agent can never mark its own work VERIFIED out of order.
+
+export const tasks = pgTable("tasks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  repo: varchar("repo", { length: 255 }),
+  title: varchar("title", { length: 500 }).notNull(),
+  prompt: text("prompt").notNull().default(""),
+  branch: varchar("branch", { length: 255 }),
+  status: varchar("status", { length: 20 }).notNull().default("QUEUED"),
+  workspaceDir: text("workspace_dir"),
+  commitHash: varchar("commit_hash", { length: 255 }),
+  diff: text("diff"),
+  error: text("error"),
+  /** FAZA 8 — structured build+test result captured during VERIFYING. */
+  verify: jsonb("verify"),
+  retries: integer("retries").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
+  user: one(users, { fields: [tasks.userId], references: [users.id] }),
+  project: one(projects, { fields: [tasks.projectId], references: [projects.id] }),
+  processRuns: many(processRuns),
+}));
+
+// ── Foundation: Persistent Process Runs (Iteration 0) ──
+// Mirrors the in-memory ProcessRegistry so process history survives restarts.
+
+export const processRuns = pgTable("process_runs", {
+  id: uuid("id").primaryKey(),
+  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  pid: integer("pid"),
+  command: text("command").notNull(),
+  args: text("args"),
+  cwd: text("cwd"),
+  status: varchar("status", { length: 20 }).notNull().default("running"),
+  exitCode: integer("exit_code"),
+  signal: varchar("signal", { length: 20 }),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  endedAt: timestamp("ended_at"),
+  stdoutBytes: integer("stdout_bytes").notNull().default(0),
+  stderrBytes: integer("stderr_bytes").notNull().default(0),
+  error: text("error"),
+});
+
+export const processRunsRelations = relations(processRuns, ({ one }) => ({
+  task: one(tasks, { fields: [processRuns.taskId], references: [tasks.id] }),
+  user: one(users, { fields: [processRuns.userId], references: [users.id] }),
+}));
+
+// ── Agent Memory: Persistent Background Jobs (FAZA 7b) ──
+// The /api/agent/background flow keeps an in-memory map for the hot path, but
+// every job is also written through to this table so its progress and final
+// result survive a server restart. Running rows left behind by a restart are
+// reconciled to "error (interrupted)" on the next boot.
+
+export type AgentJobStatus = "queued" | "running" | "done" | "error";
+
+export interface AgentJobTimelineEntry {
+  t: string; // message type forwarded to client (text/tool_call/tool_result/error)
+  content?: string;
+  toolId?: string;
+  toolName?: string;
+  toolStatus?: "running" | "completed" | "error";
+}
+
+export const agentJobs = pgTable("agent_jobs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  machineId: varchar("machine_id", { length: 255 }).notNull(),
+  sessionId: varchar("session_id", { length: 255 }).notNull(),
+  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  label: varchar("label", { length: 50 }),
+  status: varchar("status", { length: 20 }).notNull().default("running"),
+  error: text("error"),
+  finished: boolean("finished").notNull().default(false),
+  timeline: jsonb("timeline").$type<AgentJobTimelineEntry[]>().notNull().default([]),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const agentJobsRelations = relations(agentJobs, ({ one }) => ({
+  user: one(users, { fields: [agentJobs.userId], references: [users.id] }),
+  task: one(tasks, { fields: [agentJobs.taskId], references: [tasks.id] }),
+}));
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -1419,4 +1517,69 @@ export const userAppState = pgTable("user_app_state", {
 
 export const userAppStateRelations = relations(userAppState, ({ one }) => ({
   user: one(users, { fields: [userAppState.userId], references: [users.id] }),
+}));
+
+// ── Webhooks (Phase 3) ──
+
+export const webhooks = pgTable("webhooks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  url: varchar("url", { length: 2000 }).notNull(),
+  secret: varchar("secret", { length: 500 }),
+  events: jsonb("events").$type<string[]>().notNull().default([]),
+  active: boolean("active").notNull().default(true),
+  lastDeliveryAt: timestamp("last_delivery_at"),
+  lastDeliveryStatus: varchar("last_delivery_status", { length: 20 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const webhooksRelations = relations(webhooks, ({ one }) => ({
+  user: one(users, { fields: [webhooks.userId], references: [users.id] }),
+}));
+
+// ── Usage analytics (Phase 3) — persistent events + budgets ──
+
+export const usageEvents = pgTable("usage_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  projectId: uuid("project_id"),
+  machineId: varchar("machine_id", { length: 255 }),
+  provider: varchar("provider", { length: 100 }).notNull(),
+  model: varchar("model", { length: 255 }).notNull(),
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  totalTokens: integer("total_tokens").notNull().default(0),
+  costUsd: doublePrecision("cost_usd").notNull().default(0),
+  latencyMs: integer("latency_ms"),
+  success: boolean("success").notNull().default(true),
+  errorMessage: text("error_message"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const usageEventsRelations = relations(usageEvents, ({ one }) => ({
+  user: one(users, { fields: [usageEvents.userId], references: [users.id] }),
+}));
+
+export const usageBudgets = pgTable("usage_budgets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  monthlyLimitUsd: doublePrecision("monthly_limit_usd").notNull().default(0),
+  currentSpendUsd: doublePrecision("current_spend_usd").notNull().default(0),
+  alertThresholdPercent: integer("alert_threshold_percent").notNull().default(80),
+  isHardLimit: boolean("is_hard_limit").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const usageBudgetsRelations = relations(usageBudgets, ({ one }) => ({
+  user: one(users, { fields: [usageBudgets.userId], references: [users.id] }),
 }));

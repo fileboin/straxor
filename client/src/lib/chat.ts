@@ -61,6 +61,8 @@ export async function streamChat(
     return;
   }
 
+  let userAbort = false;
+  let finishDone: () => void = () => {};
   try {
     const token = localStorage.getItem("token");
     // Watchdog: if no data arrives within IDLE_MS the connection is considered
@@ -70,7 +72,7 @@ export async function streamChat(
     const TOTAL_MS = 600_000;
     const controller = new AbortController();
     // Surface the user's Stop/Abort as a request abort too.
-    let userAbort = false;
+    userAbort = false;
     const onExtAbort = () => {
       userAbort = true;
       controller.abort();
@@ -98,7 +100,7 @@ export async function streamChat(
       cleanup();
       callbacks.onError(message);
     };
-    const finishDone = () => {
+    finishDone = () => {
       if (finished) return;
       finished = true;
       cleanup();

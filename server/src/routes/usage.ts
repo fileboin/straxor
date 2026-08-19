@@ -7,20 +7,20 @@ import type { UsageAdapter } from "../adapters/usage/adapter.js";
 
 const router = Router();
 
-function getAdapter(): UsageAdapter {
+function getAdapter(userId?: string): UsageAdapter {
   const backend = process.env.USAGE_BACKEND || "custom";
   switch (backend) {
     case "openmeter": return createOpenMeterAdapter();
     case "lago": return createLagoAdapter();
-    default: return createCustomUsageAdapter();
+    default: return createCustomUsageAdapter(userId);
   }
 }
 
 // POST /api/usage/events — log a usage event
 router.post("/events", requireAuth, async (req, res) => {
   try {
-    const adapter = getAdapter();
-    const userId = (req as any).userId as string;
+    const adapter = getAdapter(req.userId);
+    const userId = req.userId!;
     const event = await adapter.logEvent({
       timestamp: new Date().toISOString(),
       userId,
@@ -46,7 +46,7 @@ router.post("/events", requireAuth, async (req, res) => {
 // GET /api/usage/events — list events
 router.get("/events", requireAuth, async (req, res) => {
   try {
-    const adapter = getAdapter();
+    const adapter = getAdapter(req.userId);
     const events = await adapter.getEvents({
       from: req.query.from as string,
       to: req.query.to as string,
@@ -65,7 +65,7 @@ router.get("/events", requireAuth, async (req, res) => {
 // GET /api/usage/aggregate — aggregated usage
 router.get("/aggregate", requireAuth, async (req, res) => {
   try {
-    const adapter = getAdapter();
+    const adapter = getAdapter(req.userId);
     const agg = await adapter.getAggregate({
       dimension: (req.query.dimension as any) || "provider",
       from: req.query.from as string,
@@ -82,7 +82,7 @@ router.get("/aggregate", requireAuth, async (req, res) => {
 // GET /api/usage/summary — full cost summary
 router.get("/summary", requireAuth, async (req, res) => {
   try {
-    const adapter = getAdapter();
+    const adapter = getAdapter(req.userId);
     const summary = await adapter.getCostSummary({
       from: req.query.from as string,
       to: req.query.to as string,
@@ -94,9 +94,9 @@ router.get("/summary", requireAuth, async (req, res) => {
 });
 
 // GET /api/usage/pricing — model pricing table
-router.get("/pricing", requireAuth, async (_req, res) => {
+router.get("/pricing", requireAuth, async (req, res) => {
   try {
-    const adapter = getAdapter();
+    const adapter = getAdapter(req.userId);
     const pricing = await adapter.getPricing();
     res.json(pricing);
   } catch (err: any) {
@@ -107,7 +107,7 @@ router.get("/pricing", requireAuth, async (_req, res) => {
 // POST /api/usage/estimate — estimate cost for a prompt
 router.post("/estimate", requireAuth, async (req, res) => {
   try {
-    const adapter = getAdapter();
+    const adapter = getAdapter(req.userId);
     const { provider, model, inputTokens, outputTokens } = req.body;
     const cost = await adapter.estimateCost(provider, model, inputTokens || 0, outputTokens || 0);
     res.json({ costUsd: cost });
@@ -117,9 +117,9 @@ router.post("/estimate", requireAuth, async (req, res) => {
 });
 
 // GET /api/usage/budgets — list budgets
-router.get("/budgets", requireAuth, async (_req, res) => {
+router.get("/budgets", requireAuth, async (req, res) => {
   try {
-    const adapter = getAdapter();
+    const adapter = getAdapter(req.userId);
     const budgets = await adapter.listBudgets();
     res.json(budgets);
   } catch (err: any) {
@@ -130,7 +130,7 @@ router.get("/budgets", requireAuth, async (_req, res) => {
 // POST /api/usage/budgets — create budget
 router.post("/budgets", requireAuth, async (req, res) => {
   try {
-    const adapter = getAdapter();
+    const adapter = getAdapter(req.userId);
     const budget = await adapter.createBudget({
       name: req.body.name,
       monthlyLimitUsd: req.body.monthlyLimitUsd,
@@ -146,7 +146,7 @@ router.post("/budgets", requireAuth, async (req, res) => {
 // DELETE /api/usage/budgets/:id
 router.delete("/budgets/:id", requireAuth, async (req, res) => {
   try {
-    const adapter = getAdapter();
+    const adapter = getAdapter(req.userId);
     await adapter.deleteBudget(String(req.params.id));
     res.json({ ok: true });
   } catch (err: any) {
@@ -155,9 +155,9 @@ router.delete("/budgets/:id", requireAuth, async (req, res) => {
 });
 
 // GET /api/usage/periods — billing periods
-router.get("/periods", requireAuth, async (_req, res) => {
+router.get("/periods", requireAuth, async (req, res) => {
   try {
-    const adapter = getAdapter();
+    const adapter = getAdapter(req.userId);
     const periods = await adapter.listPeriods();
     res.json(periods);
   } catch (err: any) {
@@ -171,7 +171,7 @@ router.get("/backend", requireAuth, (_req, res) => {
   const urls: Record<string, string> = {
     openmeter: process.env.OPENMETER_URL || "https://api.openmeter.io",
     lago: process.env.LAGO_URL || "https://api.getlago.com",
-    custom: "in-memory",
+    custom: "postgres (local)",
   };
   res.json({ backend, url: urls[backend] || "unknown" });
 });

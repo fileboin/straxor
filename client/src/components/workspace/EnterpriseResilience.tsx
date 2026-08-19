@@ -19,7 +19,6 @@ const VAULT_TYPES = ["api_key", "ssh_key", "credential", "config", "token", "cer
 export default function EnterpriseResilience({ onClose }: Props) {
   const [tab, setTab] = useState<Tab>("overview");
   const [status, setStatus] = useState<ResilienceStatus | null>(null);
-  const [loading, setLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
 
   // Vault

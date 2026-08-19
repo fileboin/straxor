@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { t, useLang } from "../../lib/i18n.js";
 import {
   getCostSummary, listUsageEvents, listPricing, listBudgets, createBudget, deleteBudget, getBackend,
   formatCost, formatTokens, formatLatency,
@@ -13,6 +14,7 @@ interface Props {
 type Tab = "overview" | "events" | "pricing" | "budgets";
 
 export default function UsagePanel({ onClose }: Props) {
+  useLang();
   const [tab, setTab] = useState<Tab>("overview");
   const [summary, setSummary] = useState<CostSummary | null>(null);
   const [events, setEvents] = useState<UsageEvent[]>([]);
@@ -81,10 +83,10 @@ export default function UsagePanel({ onClose }: Props) {
   const maxDayCost = summary ? Math.max(...summary.byDay.map((d) => d.totalCostUsd), 0.01) : 1;
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
-    { id: "overview", label: "Pregled", icon: "📊" },
-    { id: "events", label: "Događaji", icon: "📋" },
-    { id: "pricing", label: "Cjenovnik", icon: "💲" },
-    { id: "budgets", label: "Budžeti", icon: "🎯" },
+    { id: "overview", label: t("usage.tab.overview"), icon: "📊" },
+    { id: "events", label: t("usage.tab.events"), icon: "📋" },
+    { id: "pricing", label: t("usage.tab.pricing"), icon: "💲" },
+    { id: "budgets", label: t("usage.tab.budgets"), icon: "🎯" },
   ];
 
   return (
@@ -94,7 +96,7 @@ export default function UsagePanel({ onClose }: Props) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-sm">📊</span>
-            <span className="text-[13px] font-semibold text-text">Usage & Cost</span>
+            <span className="text-[13px] font-semibold text-text">{t("usage.title")}</span>
             {backend && (
               <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface-3 text-text-muted">
                 {BACKEND_ICONS[backend.backend]} {BACKEND_LABELS[backend.backend]}
@@ -130,28 +132,28 @@ export default function UsagePanel({ onClose }: Props) {
           <span className="text-[10px] text-text-muted">—</span>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="bg-surface-3 border border-border rounded px-2 py-1 text-[10px] text-text" />
           <span className="text-[9px] text-text-muted ml-auto">
-            {summary ? `${summary.totalRequests} zahtjeva` : ""}
+            {summary ? t("usage.requestsCount", { n: summary.totalRequests }) : ""}
           </span>
         </div>
 
         {/* Content */}
         <div className="flex-1 min-h-0 overflow-y-auto">
           {loading ? (
-            <div className="flex items-center justify-center h-32 text-[11px] text-text-muted">Učitavanje...</div>
+            <div className="flex items-center justify-center h-32 text-[11px] text-text-muted">{t("common.loading")}</div>
           ) : tab === "overview" && summary ? (
             <div className="p-4 space-y-4">
               {/* Total stats */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="p-3 rounded-xl border border-border bg-surface-2/30">
-                  <div className="text-[9px] text-text-muted mb-1">Ukupno troškovi</div>
+                  <div className="text-[9px] text-text-muted mb-1">{t("usage.totalCost")}</div>
                   <div className="text-[18px] font-bold text-accent">{formatCost(summary.totalCostUsd)}</div>
                 </div>
                 <div className="p-3 rounded-xl border border-border bg-surface-2/30">
-                  <div className="text-[9px] text-text-muted mb-1">Ukupno tokena</div>
+                  <div className="text-[9px] text-text-muted mb-1">{t("usage.totalTokens")}</div>
                   <div className="text-[18px] font-bold text-text">{formatTokens(summary.totalTokens)}</div>
                 </div>
                 <div className="p-3 rounded-xl border border-border bg-surface-2/30">
-                  <div className="text-[9px] text-text-muted mb-1">Zahtjeva</div>
+                  <div className="text-[9px] text-text-muted mb-1">{t("usage.requests")}</div>
                   <div className="text-[18px] font-bold text-text">{summary.totalRequests}</div>
                 </div>
               </div>
@@ -159,7 +161,7 @@ export default function UsagePanel({ onClose }: Props) {
               {/* Daily chart */}
               {summary.byDay.length > 0 && (
                 <div className="p-3 rounded-xl border border-border bg-surface-2/30">
-                  <div className="text-[10px] font-medium text-text mb-2">Dnevni troškovi</div>
+                  <div className="text-[10px] font-medium text-text mb-2">{t("usage.dailyCost")}</div>
                   <div className="flex items-end gap-1 h-20">
                     {summary.byDay.map((d) => (
                       <button
@@ -189,9 +191,9 @@ export default function UsagePanel({ onClose }: Props) {
 
               {/* By Provider */}
               <div className="rounded-xl border border-border bg-surface-2/30 overflow-hidden">
-                <div className="px-3 py-2 border-b border-border/50 text-[10px] font-medium text-text">Po Provideru</div>
+                <div className="px-3 py-2 border-b border-border/50 text-[10px] font-medium text-text">{t("usage.byProvider")}</div>
                 {summary.byProvider.length === 0 ? (
-                  <div className="px-3 py-4 text-center text-[10px] text-text-muted">Nema podataka</div>
+                  <div className="px-3 py-4 text-center text-[10px] text-text-muted">{t("usage.noData")}</div>
                 ) : (
                   summary.byProvider.map((p) => (
                     <div key={p.label} className="flex items-center justify-between px-3 py-2 border-b border-border/30 last:border-0">
@@ -213,9 +215,9 @@ export default function UsagePanel({ onClose }: Props) {
 
               {/* By Model */}
               <div className="rounded-xl border border-border bg-surface-2/30 overflow-hidden">
-                <div className="px-3 py-2 border-b border-border/50 text-[10px] font-medium text-text">Po Modelu</div>
+                <div className="px-3 py-2 border-b border-border/50 text-[10px] font-medium text-text">{t("usage.byModel")}</div>
                 {summary.byModel.length === 0 ? (
-                  <div className="px-3 py-4 text-center text-[10px] text-text-muted">Nema podataka</div>
+                  <div className="px-3 py-4 text-center text-[10px] text-text-muted">{t("usage.noData")}</div>
                 ) : (
                   summary.byModel.map((m) => (
                     <div key={m.label} className="flex items-center justify-between px-3 py-2 border-b border-border/30 last:border-0">
@@ -235,7 +237,7 @@ export default function UsagePanel({ onClose }: Props) {
               {/* Budget alerts */}
               {budgets.length > 0 && (
                 <div className="rounded-xl border border-border bg-surface-2/30 overflow-hidden">
-                  <div className="px-3 py-2 border-b border-border/50 text-[10px] font-medium text-text">Budžeti</div>
+                  <div className="px-3 py-2 border-b border-border/50 text-[10px] font-medium text-text">{t("usage.tab.budgets")}</div>
                   {budgets.map((b) => {
                     const pct = b.monthlyLimitUsd > 0 ? (b.currentSpendUsd / b.monthlyLimitUsd) * 100 : 0;
                     const isOver = pct >= 100;
@@ -263,7 +265,7 @@ export default function UsagePanel({ onClose }: Props) {
           ) : tab === "events" ? (
             <div className="p-3">
               {events.length === 0 ? (
-                <div className="text-center text-[11px] text-text-muted py-8">Nema događaja u ovom periodu</div>
+                <div className="text-center text-[11px] text-text-muted py-8">{t("usage.noEvents")}</div>
               ) : (
                 <div className="space-y-1">
                   {events.map((e) => (
@@ -306,8 +308,8 @@ export default function UsagePanel({ onClose }: Props) {
                       </div>
                     </div>
                     <div className="flex items-center gap-3 text-[10px]">
-                      <span className="text-text-muted">In: <span className="text-text font-medium">${p.inputCostPer1M}</span>/1M</span>
-                      <span className="text-text-muted">Out: <span className="text-text font-medium">${p.outputCostPer1M}</span>/1M</span>
+                      <span className="text-text-muted">{t("usage.pricingIn")} <span className="text-text font-medium">${p.inputCostPer1M}</span>/1M</span>
+                      <span className="text-text-muted">{t("usage.pricingOut")} <span className="text-text font-medium">${p.outputCostPer1M}</span>/1M</span>
                     </div>
                   </div>
                 ))}
@@ -344,7 +346,7 @@ export default function UsagePanel({ onClose }: Props) {
                       />
                     </div>
                     <div className="flex items-center justify-between mt-1.5">
-                      <span className="text-[8px] text-text-muted">Alert pri {b.alertThresholdPercent}%</span>
+                      <span className="text-[8px] text-text-muted">{t("usage.alertAt", { n: b.alertThresholdPercent })}</span>
                     </div>
                   </div>
                 );
@@ -357,7 +359,7 @@ export default function UsagePanel({ onClose }: Props) {
                     type="text"
                     value={budgetName}
                     onChange={(e) => setBudgetName(e.target.value)}
-                    placeholder="Naziv budžeta"
+                    placeholder={t("usage.budgetName")}
                     className="w-full bg-surface-3 border border-border rounded-lg px-2.5 py-1.5 text-[11px] text-text placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50"
                   />
                   <div className="flex gap-2">
@@ -365,20 +367,20 @@ export default function UsagePanel({ onClose }: Props) {
                       type="number"
                       value={budgetLimit}
                       onChange={(e) => setBudgetLimit(e.target.value)}
-                      placeholder="Mjesečni limit ($)"
+                      placeholder={t("usage.budgetLimit")}
                       className="flex-1 bg-surface-3 border border-border rounded-lg px-2.5 py-1.5 text-[11px] text-text placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50"
                     />
                     <input
                       type="number"
                       value={budgetThreshold}
                       onChange={(e) => setBudgetThreshold(e.target.value)}
-                      placeholder="Alert %"
+                      placeholder={t("usage.budgetAlert")}
                       className="w-20 bg-surface-3 border border-border rounded-lg px-2.5 py-1.5 text-[11px] text-text placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50"
                     />
                   </div>
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => setShowBudgetForm(false)} className="text-[10px] text-text-muted hover:text-text px-2 py-1 rounded">Otkaži</button>
-                    <button onClick={handleCreateBudget} className="text-[10px] text-white bg-accent hover:bg-accent-light px-3 py-1 rounded-lg transition-colors">Kreiraj</button>
+                    <button onClick={() => setShowBudgetForm(false)} className="text-[10px] text-text-muted hover:text-text px-2 py-1 rounded">{t("common.cancel")}</button>
+                    <button onClick={handleCreateBudget} className="text-[10px] text-white bg-accent hover:bg-accent-light px-3 py-1 rounded-lg transition-colors">{t("usage.create")}</button>
                   </div>
                 </div>
               ) : (
@@ -386,7 +388,7 @@ export default function UsagePanel({ onClose }: Props) {
                   onClick={() => setShowBudgetForm(true)}
                   className="w-full py-2 text-[11px] font-medium rounded-xl border border-dashed border-border hover:border-accent/50 text-text-muted hover:text-accent transition-colors"
                 >
-                  + Novi budžet
+                  {t("usage.newBudget")}
                 </button>
               )}
             </div>

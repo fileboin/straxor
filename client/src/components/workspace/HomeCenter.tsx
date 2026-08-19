@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useTheme } from "../../lib/theme.js";
-import { useAuth } from "../../lib/auth.js";
+import { useAuth, isAdmin } from "../../lib/auth.js";
 import {
   HOME_TILES, getHomeStats,
   type HomeTile, type HomeCenterStats,
@@ -51,7 +51,11 @@ export default function HomeCenter({ onClose, onNavigate }: Props) {
     getHomeStats().then(setStats).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
+  // Admin Control Center is only reachable by admins — hiding it for regular
+  // users prevents the "click Admin → bounced back to start" dead end (the
+  // route guard redirects non-admins to "/", which used to feel like a logout).
   const filtered = HOME_TILES.filter((t) => {
+    if (t.action === "admin" && !isAdmin(user)) return false;
     if (category !== "all" && t.category !== category) return false;
     if (search) {
       const q = search.toLowerCase();

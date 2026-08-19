@@ -97,6 +97,8 @@ interface Props {
   headerStatus?: React.ReactNode;
   copyLabel?: string;
   onCopyTo?: (content: string) => void;
+  /** Active project (repo) this panel is working on — shown in the header. */
+  repoLabel?: string;
   prefill?: string;
   draftInput?: string;
   draftAttachments?: Attachment[];
@@ -282,6 +284,7 @@ function ChatPanel({
   headerStatus,
   copyLabel,
   onCopyTo,
+  repoLabel,
   prefill,
   draftInput,
   draftAttachments,
@@ -932,6 +935,20 @@ function ChatPanel({
         </div>
         <div className="flex items-center justify-between gap-2 min-w-0 flex-wrap">
           <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+            {repoLabel ? (
+              <span
+                className="inline-flex items-center gap-1 px-1.5 h-6 rounded-md border border-border bg-surface text-[10px] font-medium text-text-secondary max-w-[180px] truncate"
+                title={repoLabel}
+              >
+                <span className="shrink-0">📁</span>
+                <span className="truncate">{repoLabel}</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-1.5 h-6 rounded-md border border-dashed border-border text-[10px] text-text-muted">
+                <span className="shrink-0">📁</span>
+                <span>{t("chat.noProject")}</span>
+              </span>
+            )}
             {headerLeft}
             {headerStatus}
           </div>
@@ -1087,14 +1104,15 @@ function ChatPanel({
                 )}
               </div>
             )}
-            {/* Copy to other panel button — only on assistant messages */}
+            {/* Bus — send this answer to the other panel (always visible, accent) */}
             {msg.role === "assistant" && onCopyTo && copyLabel && msg.content && (
               <button
                 onClick={() => onCopyTo(msg.content)}
-                className="absolute -bottom-3 left-0 opacity-0 group-hover:opacity-100 px-2 py-0.5 text-[10px] font-medium rounded-md border border-border bg-surface text-text-muted hover:text-text hover:border-border-light transition-all shadow-sm"
+                className="absolute -top-2.5 right-2 flex items-center gap-1 px-2 py-1 text-[10px] font-semibold rounded-lg border border-accent/40 bg-surface text-accent hover:bg-accent/10 hover:border-accent/70 transition-all shadow-md"
                 title={copyLabel}
               >
-                {copyLabel}
+                <span className="text-[11px] leading-none">⇄</span>
+                <span className="hidden sm:inline">{copyLabel}</span>
               </button>
             )}
           </div>

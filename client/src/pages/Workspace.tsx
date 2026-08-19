@@ -21,15 +21,15 @@ import { routeChat, orchestrateChat, type OrchestrateModel } from "../lib/orches
 import { streamAgentMessage, fetchTodos, fetchDiff, approveChanges, rejectChanges, sendSteerInstruction, startAgentBackground, fetchBackgroundStatus, type BackgroundTimelineEntry } from "../lib/agent.js";
 import { createAgentBusTransfer, listAgentBusEvents, updateAgentBusEventStatus, type AgentBusEnvelope } from "../lib/agent-bus.js";
 import { runAgentTurn } from "../lib/agent-turn.js";
-import { listRepoConnections, type RepoConnection } from "../lib/repos.js";
+import { listRepoConnections, prepareRepo, type RepoConnection } from "../lib/repos.js";
 import { fetchProjects } from "../lib/projects.js";
 import { fetchPermissions, type PermissionConfig } from "../lib/permissions.js";
 import { type AgentRole, getRoleById, fetchPrompts, type SavedPrompt } from "../lib/roles.js";
 import { verifyVpsConnection } from "../lib/runtime-manager.js";
+import { listMachines } from "../lib/machines.js";
 import { t, useLang } from "../lib/i18n.js";
 import { checkBeforeInstall, type ScanVerdict } from "../lib/security.js";
 import RoleSelector from "../components/workspace/RoleSelector.js";
-import ChatAgentToggle from "../components/workspace/ChatAgentToggle.js";
 import PromptLibrary from "../components/workspace/PromptLibrary.js";
 import SecurityScanResult from "../components/workspace/SecurityScanResult.js";
 import ExportPanel from "../components/workspace/ExportPanel.js";
@@ -62,12 +62,12 @@ import PluginManager from "../components/workspace/PluginManager.js";
 import Marketplace from "../components/workspace/Marketplace.js";
 import GlobalScalePanel from "../components/workspace/GlobalScalePanel.js";
 import EnterpriseResilience from "../components/workspace/EnterpriseResilience.js";
-import CollaboratorsPanel from "../components/workspace/CollaboratorsPanel.js";
 import OrganizationDashboard from "../components/workspace/OrganizationDashboard.js";
 import type { OrbState } from "thinking-orbs";
 import AdminCenter from "../components/workspace/AdminCenter.js";
 import VerificationPanel from "../components/workspace/VerificationPanel.js";
 import BusHistoryPanel from "../components/workspace/BusHistoryPanel.js";
+import TeamRunPanel from "../components/workspace/TeamRunPanel.js";
 import PwaDiagnosticsPanel from "../components/workspace/PwaDiagnosticsPanel.js";
 import HandshakeSelfTestPanel, { type HandshakeSelfTestResult } from "../components/workspace/HandshakeSelfTestPanel.js";
 import type { VerificationResult } from "../lib/verify.js";
@@ -256,13 +256,8 @@ export default function Workspace() {
   const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([]);
   const [mobileTab, setMobileTab] = useState<"ask" | "agent">("ask");
   const [askPanelMode] = useState<"agent" | "chat">("agent");
-  const [agentPanelMode, setAgentPanelMode] = useState<"agent" | "chat">(() => {
-    try {
-      return localStorage.getItem("straxor.agent.mode") === "chat" ? "chat" : "agent";
-    } catch {
-      return "agent";
-    }
-  });
+  // FAZA 18 — Panel 2 (Agent) je uvek OpenCode agent, nikad pasivni chat.
+  const [agentPanelMode] = useState<"agent" | "chat">("agent");
 
   const [askStreamingId, setAskStreamingId] = useState<string | null>(null);
   const [agentStreamingId, setAgentStreamingId] = useState<string | null>(null);
@@ -303,7 +298,6 @@ export default function Workspace() {
   const [showMcpMarketplace, setShowMcpMarketplace] = useState(false);
   const [showInfrastructure, setShowInfrastructure] = useState(false);
   const [showTeams, setShowTeams] = useState(false);
-  const [showCollaborators, setShowCollaborators] = useState(false);
   const [showOrganization, setShowOrganization] = useState(false);
   const [showEnterprise, setShowEnterprise] = useState(false);
   const [showPlugins, setShowPlugins] = useState(false);
@@ -337,6 +331,7 @@ export default function Workspace() {
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
   const [activePromptIds, setActivePromptIds] = useState<Set<string>>(new Set());
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
+  const [showTeamRun, setShowTeamRun] = useState(false);
 
   // Security scan state
   const [securityVerdict, setSecurityVerdict] = useState<ScanVerdict | null>(null);
@@ -346,14 +341,14 @@ export default function Workspace() {
   // Agent session state
   const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
   const [agentMachineId, setAgentMachineId] = useState<string | null>(() => {
-    try { return localStorage.getItem("straxor.machine.agent"); } catch { return null; }
+    try { return localStorage.getItem("straxor.machine.agent") || "local:opencode"; } catch { return "local:opencode"; }
   });
 
   // Ask panel session state (Ask is a full independent agent on the local
   // engine with its own slot/repo, parallel to Agent).
   const [askSessionId, setAskSessionId] = useState<string | null>(null);
   const [askMachineId, setAskMachineId] = useState<string | null>(() => {
-    try { return localStorage.getItem("straxor.machine.ask"); } catch { return null; }
+    try { return localStorage.getItem("straxor.machine.ask") || "local:opencode:ask"; } catch { return "local:opencode:ask"; }
   });
   const askDirectFallbackRef = useRef(false);
   const askAbortRef = useRef<AbortController | null>(null);
@@ -387,6 +382,50 @@ export default function Workspace() {
   // agent runs on the LOCAL engine inside the cloned repo (no VPS needed).
   const [activeRepo, setActiveRepo] = useState<RepoConnection | null>(null);
   const [askActiveRepo, setAskActiveRepo] = useState<RepoConnection | null>(null);
+
+  // Per-panel engine preparation feedback. Selecting "Lokalni engine (repo)"
+  // or "VPS mašina" now performs real backend work (workspace prepare + engine
+  // health), and this state drives the EnginePicker status line so the option
+  // visibly does something instead of silently flipping a machineId string.
+  type EnginePrepStatus = "idle" | "preparing" | "ready" | "error" | "no-repo";
+  const [askEnginePrep, setAskEnginePrep] = useState<{ status: EnginePrepStatus; message: string }>({ status: "idle", message: "" });
+  const [agentEnginePrep, setAgentEnginePrep] = useState<{ status: EnginePrepStatus; message: string }>({ status: "idle", message: "" });
+
+  // Auto-reconnect a VPS engine when an agent turn reports the daemon is not
+  // running / machine not found. Returns true when the engine recovered so the
+  // caller can surface "ponovno povezan" instead of a timeout. Local: ids are
+  // never reconnected this way — the local engine self-spawns on demand.
+  const recoverVpsEngine = useCallback(async (machineId: string): Promise<boolean> => {
+    if (!machineId || machineId.startsWith("local:")) return false;
+    setVpsStatus("reconnecting");
+    setAskEnginePrep({ status: "preparing", message: "Automatski ponovno povezujem VPS OpenCode…" });
+    setAgentEnginePrep({ status: "preparing", message: "Automatski ponovno povezujem VPS OpenCode…" });
+    try {
+      const result = await verifyVpsConnection(machineId);
+      if (result.vpsStatus === "ready") {
+        setVpsStatus("ready");
+        setAskEnginePrep({ status: "ready", message: "VPS OpenCode ponovno povezan" });
+        setAgentEnginePrep({ status: "ready", message: "VPS OpenCode ponovno povezan" });
+        return true;
+      }
+      // Recovery failed → unbind both panels to the local OpenCode engine so
+      // the next turn WORKS instead of erroring again on the dead VPS.
+      setAskMachineId("local:opencode:ask");
+      setAgentMachineId("local:opencode");
+      setVpsStatus("offline");
+      setAskEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode (radi odmah)" });
+      setAgentEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode (radi odmah)" });
+      return false;
+    } catch {
+      setAskMachineId("local:opencode:ask");
+      setAgentMachineId("local:opencode");
+      setVpsStatus("offline");
+      setAskEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode (radi odmah)" });
+      setAgentEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode (radi odmah)" });
+      return false;
+    }
+  }, []);
+
 
   const loadActiveRepo = useCallback(async () => {
     try {
@@ -506,22 +545,21 @@ export default function Workspace() {
     typeof window !== "undefined" &&
     ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
 
-  // When an active repo exists, point the agent at the local engine (so it can
-  // run opencode/tools/git push) UNLESS we are on a remote host (Render/phone),
-  // where there is no local runtime — in that case force local:opencode so the
-  // localEngineOnRemote guard turns the panel into plain AI chat. We must NOT
-  // keep a stale VPS machineId from a restored session here, otherwise the
-  // agent panel would hang on a VPS that doesn't exist on this host.
-  // When a GitHub repo is active and no explicit VPS machine is selected for a
-  // panel, bind that panel to its slot-specific local OpenCode runtime.
+  // FAZA 18 — the agent panel is ALWAYS an OpenCode agent. When an active repo
+  // exists it binds to its slot-specific local OpenCode runtime (which is also
+  // spawnable on Render via the opencode-ai server dependency). An explicitly
+  // selected VPS machineId (non-"local:") is always respected and never
+  // overridden. There is no plain-chat downgrade anymore.
   useEffect(() => {
     if (agentMachineId && !agentMachineId.startsWith("local:")) return;
     if (activeRepo) {
       setAgentMachineId("local:opencode");
       console.log("[machine-debug] agent activeRepo=", activeRepo.fullName, "-> local:opencode", isLocalHost ? "(localhost)" : "(remote)");
     } else {
-      setAgentMachineId((prev) => (prev && prev.startsWith("local:") ? null : prev));
-      console.log("[machine-debug] agent no activeRepo -> clearing local");
+      // FAZA 18 — bez aktivnog repoa agent i dalje radi na lokalnom OpenCode
+      // (bare sandbox); nikad se ne degradira u pasivni chat.
+      setAgentMachineId((prev) => (prev && prev.startsWith("local:") ? prev : "local:opencode"));
+      console.log("[machine-debug] agent no activeRepo -> keeping local:opencode");
     }
   }, [activeRepo, isLocalHost, agentMachineId]);
 
@@ -531,8 +569,9 @@ export default function Workspace() {
       setAskMachineId("local:opencode:ask");
       console.log("[machine-debug] ask activeRepo=", askActiveRepo.fullName, "-> local:opencode:ask");
     } else {
-      setAskMachineId((prev) => (prev && prev.startsWith("local:") ? null : prev));
-      console.log("[machine-debug] ask no activeRepo -> clearing local");
+      // FAZA 18 — bez aktivnog repoa ask i dalje radi na lokalnom OpenCode.
+      setAskMachineId((prev) => (prev && prev.startsWith("local:") ? prev : "local:opencode:ask"));
+      console.log("[machine-debug] ask no activeRepo -> keeping local:opencode:ask");
     }
   }, [askActiveRepo, askMachineId]);
 
@@ -688,7 +727,6 @@ export default function Workspace() {
         if (typeof s.askPanelAccent === "string") setAskPanelAccent(s.askPanelAccent);
         if (typeof s.agentPanelAccent === "string") setAgentPanelAccent(s.agentPanelAccent);
         if (s.mobileTab === "ask" || s.mobileTab === "agent") setMobileTab(s.mobileTab);
-        if (s.agentPanelMode === "agent" || s.agentPanelMode === "chat") setAgentPanelMode(s.agentPanelMode);
         if (typeof s.dbSessionId === "string") setDbSessionId(s.dbSessionId);
         if (typeof s.askSessionId === "string") setAskSessionId(s.askSessionId);
         if (typeof s.agentSessionId === "string") setAgentSessionId(s.agentSessionId);
@@ -1572,6 +1610,26 @@ export default function Workspace() {
               // On error: do NOT automatically re-run handleAskSend (would loop).
               onErrorFallback: (error) => {
                 if (!isMine()) return;
+                // VPS daemon gone → auto-reconnect instead of reporting a
+                // timeout. The local engine self-spawns, so only non-local ids
+                // reach recoverVpsEngine.
+                const engineDown = /machine not found|opencode not running|no engine|nema alat|failed to create session/i.test(error);
+                if (engineDown) {
+                  recoverVpsEngine(askAgentMachineId).then((ok) => {
+                    if (!ok && isMine()) {
+                      setAskMessages((prev) =>
+                        prev.map((m) =>
+                          m.id === assistantMsg.id
+                            ? { ...m, content: m.content + `\n\n[Greška: ${error}]` }
+                            : m
+                        )
+                      );
+                    }
+                  });
+                  setAskStreamingId(null);
+                  setAskLoading(false);
+                  return;
+                }
                 setAskMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMsg.id
@@ -1812,11 +1870,10 @@ export default function Workspace() {
     const myGenAgent = ++agentGenRef.current;
     const isMineAgent = () => agentGenRef.current === myGenAgent;
 
-    // On a remote host (Render / phone) there is no local opencode runtime, so
-    // the Agent panel must run as plain AI chat (exactly like the Ask panel).
-    // The local `opencode` engine is only used when served from localhost.
-    const localEngineOnRemote = !!agentMachineId?.startsWith("local:") && !isLocalHost;
-    if (agentPanelMode === "chat" || !agentMachineId || localEngineOnRemote || agentDirectFallbackRef.current) {
+    // FAZA 18 — Panel 2 je uvek OpenCode agent (VPS ili lokalni runtime).
+    // Pasivni chat fallback se NIKAD ne koristi; lokalni opencode je spawnabilan
+    // i na Renderu (opencode-ai je server dependency).
+    if (agentDirectFallbackRef.current) {
       // FAZA 5: parallel multi-model execution when 2+ models selected.
       if (agentOrchestratedModels.length >= 2 && (!attachments || attachments.length === 0)) {
         const systemParts: string[] = [];
@@ -1951,6 +2008,23 @@ export default function Workspace() {
         },
         onError: (error) => {
           if (!isMineAgent()) return;
+          const engineDown = /machine not found|opencode not running|no engine|nema alat|failed to create session/i.test(error);
+          if (engineDown) {
+            recoverVpsEngine(agentMachineId || "").then((ok) => {
+              if (!ok && isMineAgent()) {
+                setAgentMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsg.id
+                      ? { ...m, content: `[Greška: ${error}]` }
+                      : m
+                  )
+                );
+              }
+            });
+            setAgentStreamingId(null);
+            setAgentLoading(false);
+            return;
+          }
           setAgentMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsg.id
@@ -1973,7 +2047,7 @@ export default function Workspace() {
         const PROJECT_ID = projectId || "straxor-landing";
         const sess = await createSession(
           PROJECT_ID,
-          agentMachineId,
+          agentMachineId || "local:opencode",
           msg.slice(0, 100),
           { provider: agentProvider, model: agentModel, thinking: agentThinking, role: agentRole, machineId: agentMachineId, sessionId: agentSessionId },
           { provider: askProvider, model: askModel, thinking: askThinking, role: askRole, machineId: askMachineId, sessionId: askSessionId }
@@ -1998,10 +2072,8 @@ export default function Workspace() {
     for (const p of activePrompts) {
       systemParts.push(`[${p.name}]\n${p.content}`);
     }
-    const fullMsg =
-      systemParts.length > 0
-        ? `${systemParts.join("\n\n")}\n\n---\n\n${msg}`
-        : msg;
+    const system = systemParts.join("\n\n");
+    const fullMsg = msg;
 
     // FAZA 6: background execution — fire-and-forget server-side run + polling.
     if (agentBackground) {
@@ -2033,7 +2105,7 @@ export default function Workspace() {
         );
       };
 
-      const poll = async (jobId: string, sessionId: string) => {
+      const poll = async (jobId: string, _sessionId: string) => {
         let attempts = 0;
         const timer = window.setInterval(async () => {
           // ~3 minutes (120 x 1.5s) hard cap; a longer silent job is a hang.
@@ -2073,7 +2145,7 @@ export default function Workspace() {
       };
 
       try {
-        const started = await startAgentBackground(agentMachineId, fullMsg, agentSessionId, attachments);
+        const started = await startAgentBackground(agentMachineId || "local:opencode", fullMsg, agentSessionId, attachments, system);
         setAgentSessionId(started.sessionId);
         statusRef.timeline = [];
         await poll(started.jobId, started.sessionId);
@@ -2090,7 +2162,7 @@ export default function Workspace() {
       return;
     }
 
-    streamAgentMessage(agentMachineId, fullMsg, agentSessionId, {
+    streamAgentMessage(agentMachineId || "local:opencode", fullMsg, agentSessionId, {
       onSession: (sessionId) => {
         setAgentSessionId(sessionId);
       },
@@ -2246,15 +2318,7 @@ export default function Workspace() {
         }
       },
       onError: (error) => {
-        // If a *local* engine (local:opencode) couldn't start — e.g. opencode isn't
-        // installed, the GitHub token can't be decrypted, or there are no API keys —
-        // silently switch this panel to plain AI chat instead of leaving it silent.
-        if (agentMachineId?.startsWith("local:") && !agentDirectFallbackRef.current) {
-          agentDirectFallbackRef.current = true;
-          if (isMineAgent()) setAgentLoading(false);
-          handleAgentSend(msg, attachments);
-          return;
-        }
+        // FAZA 18 — grešku prikazujemo direktno; NIKAD ne prelazimo u pasivni chat.
         if (!isMineAgent()) return;
         setAgentMessages((prev) =>
           prev.map((m) =>
@@ -2267,7 +2331,7 @@ export default function Workspace() {
         setAgentLoading(false);
         agentAbortRef.current = null;
       },
-    }, attachments, agentCtl.signal);
+    }, attachments, system, agentCtl.signal);
   }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch, agentOrchestratedModels, availableModels, agentBackground, agentPanelMode, transferByBus]);
 
   useEffect(() => {
@@ -2322,28 +2386,129 @@ export default function Workspace() {
 
   // ONE shared VPS engine is the central brain for BOTH panels. Connecting a
   // VPS binds the same machineId to both panels (no per-panel VPS split, no
-  // local redirect once a VPS engine is live). Each panel's Chat|OpenCode
-  // toggle then decides whether that panel runs as a full agent or plain chat.
+  // local redirect once a VPS engine is live). Both panels run as full agents
+  // against that engine — there is no plain-chat mode.
   const handleVpsConnected = useCallback((machineId: string) => {
     setAskMachineId(machineId);
     setAgentMachineId(machineId);
     setAskSessionId(null);
     setAgentSessionId(null);
+    setAskEnginePrep({ status: "ready", message: "VPS mašina povezana — OpenCode radi preko SSH" });
+    setAgentEnginePrep({ status: "ready", message: "VPS mašina povezana — OpenCode radi preko SSH" });
     // Restore stable "ready" on connect (regression 0810539 downgraded this to
     // a false "offline" when a transient health-check timed out, even though
     // the VPS engine was alive). The daemon is still lazily health-checked on
     // restore; a busy health probe must never block the connected state.
     setVpsStatus("ready");
     setShowSshModal(false);
+
+    // Safety net: verify the daemon is actually reachable and auto-reconnect
+    // if opencode isn't running. Without this the first agent turn can fail
+    // with "Machine not found / Opencode not running" (= "nema alat") even
+    // though the user just provisioned the VPS. Never downgrades to chat.
+    verifyVpsConnection(machineId)
+      .then((result) => {
+        if (result.vpsStatus === "ready") {
+          setVpsStatus("ready");
+          setAskEnginePrep({ status: "ready", message: "VPS OpenCode potvrđen (health OK)" });
+          setAgentEnginePrep({ status: "ready", message: "VPS OpenCode potvrđen (health OK)" });
+        } else {
+          // VPS daemon unreachable → unbind both panels back to the local
+          // OpenCode engine so agent turns keep working instead of erroring
+          // with "Machine not found / Opencode not running".
+          setAskMachineId("local:opencode:ask");
+          setAgentMachineId("local:opencode");
+          setVpsStatus("offline");
+          setAskEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode" });
+          setAgentEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode" });
+        }
+      })
+      .catch(() => {
+        setAskMachineId("local:opencode:ask");
+        setAgentMachineId("local:opencode");
+        setVpsStatus("offline");
+        setAskEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode" });
+        setAgentEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode" });
+      });
   }, []);
 
+  // Select "Lokalni engine (repo)" — real backend work, not just a string swap.
+  // 1) bind the panel to its own local OpenCode slot,
+  // 2) clone/pull the active repo into the sandbox via POST /api/repos/prepare,
+  // 3) surface the result in the EnginePicker so the option visibly executes.
+  const handleSelectLocalEngine = useCallback((panel: "ask" | "agent") => {
+    const setMachineId = panel === "ask" ? setAskMachineId : setAgentMachineId;
+    const setSessionId = panel === "ask" ? setAskSessionId : setAgentSessionId;
+    const setPrep = panel === "ask" ? setAskEnginePrep : setAgentEnginePrep;
+    const machineId = panel === "ask" ? "local:opencode:ask" : "local:opencode";
+
+    setMachineId(machineId);
+    setSessionId(null);
+    setPrep({ status: "preparing", message: "Pripremam lokalni workspace + repo sandbox…" });
+
+    prepareRepo()
+      .then((info) => {
+        if (!info.connected || !info.repo) {
+          setPrep({ status: "no-repo", message: "Nema aktivnog repo-a — lokalni OpenCode radi u bare sandboxu" });
+        } else if (info.cloned === false) {
+          setPrep({ status: "preparing", message: `Kloniran ${info.repo}…` });
+        } else {
+          setPrep({ status: "ready", message: `Spreman — ${info.repo} (${info.branch || "default"}) u sandboxu` });
+        }
+        loadActiveRepo();
+      })
+      .catch((err) => {
+        // 404 = no active repo (bare sandbox, still a full agent). Other errors
+        // are surfaced but never downgrade the panel to plain chat.
+        const msg = err instanceof Error ? err.message : "Greška pri pripremi workspace-a";
+        if (/no active repo|404/i.test(msg)) {
+          setPrep({ status: "no-repo", message: "Nema aktivnog repo-a — lokalni OpenCode radi u bare sandboxu" });
+        } else {
+          setPrep({ status: "error", message: msg });
+        }
+      });
+  }, [loadActiveRepo]);
+
   const handleVpsDisconnected = useCallback(() => {
-    setAskMachineId((prev) => (prev && !prev.startsWith("local:") ? null : prev));
-    setAgentMachineId((prev) => (prev && !prev.startsWith("local:") ? null : prev));
+    setAskMachineId((prev) => (prev && !prev.startsWith("local:") ? "local:opencode:ask" : prev));
+    setAgentMachineId((prev) => (prev && !prev.startsWith("local:") ? "local:opencode" : prev));
     setAskSessionId(null);
     setAgentSessionId(null);
+    setAskEnginePrep({ status: "idle", message: "" });
+    setAgentEnginePrep({ status: "idle", message: "" });
     setVpsStatus("disconnected");
   }, []);
+
+  // FORCE VPS: auto-bind both panels to an already-provisioned VPS on load.
+  // If a ready/opencode-running machine exists, both panels connect to it and
+  // the daemon is verified + auto-reconnected. Otherwise panels stay local.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const machines = await listMachines();
+        const ready = machines.find((m) => m.status === "ready" || m.opencodeRunning);
+        if (!ready || cancelled) return;
+        // Verify the daemon is ACTUALLY alive before binding both panels to it.
+        // A stale DB record (VPS rebooted / opencode died) must never pin the
+        // panels to a dead engine — that made every turn fail with
+        // "Machine not found / Opencode not running" even though the local
+        // OpenCode engine was perfectly fine.
+        const result = await verifyVpsConnection(ready.id);
+        if (cancelled) return;
+        if (result.vpsStatus === "ready") {
+          handleVpsConnected(ready.id);
+        } else {
+          setVpsStatus("offline");
+          setAskEnginePrep({ status: "error", message: "VPS nije dostupan — paneli rade na lokalnom OpenCode engine-u" });
+          setAgentEnginePrep({ status: "error", message: "VPS nije dostupan — paneli rade na lokalnom OpenCode engine-u" });
+        }
+      } catch {
+        // No saved machines / offline — keep the local OpenCode engine.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [handleVpsConnected]);
 
   const toggleAskExpand = useCallback(() => {
     setPanelMode((prev) => (prev === "ask-full" ? "split" : "ask-full"));
@@ -3065,6 +3230,7 @@ export default function Workspace() {
             onRoleChange={setAskRole}
             copyLabel={`→ ${t("chat.send.help")}`}
             onCopyTo={sendToAgentForHelp}
+            repoLabel={askActiveRepo?.fullName ?? undefined}
             prefill={askPrefill}
             draftInput={askDraftInput}
             draftAttachments={askDraftAttachments}
@@ -3103,7 +3269,9 @@ export default function Workspace() {
                 hasRepo={!!askActiveRepo}
                 repoName={askActiveRepo?.fullName}
                 panelLabel="Ask"
-                onSelectLocal={() => setAskMachineId("local:opencode:ask")}
+                onSelectLocal={() => handleSelectLocalEngine("ask")}
+                prepStatus={askEnginePrep.status}
+                prepMessage={askEnginePrep.message}
                 onConnectVps={() => openSshModalForPanel("ask")}
                 onDisconnectVps={() => handleVpsDisconnected()}
                 onOpenGitRemote={() => { setGitRemoteSlot("ask"); setShowGitRemote(true); }}
@@ -3192,6 +3360,7 @@ export default function Workspace() {
             onRoleChange={setAgentRole}
             copyLabel={`← ${t("chat.send.review")}`}
             onCopyTo={sendToAskForReview}
+            repoLabel={activeRepo?.fullName ?? undefined}
             prefill={agentPrefill}
             draftInput={agentDraftInput}
             draftAttachments={agentDraftAttachments}
@@ -3216,13 +3385,15 @@ export default function Workspace() {
             })()}
             headerLeft={
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTeamRun(true)}
+                  className="px-2.5 h-7 rounded-md border border-accent/40 bg-accent/10 text-[10px] font-semibold text-accent hover:bg-accent/20 transition-colors"
+                  title="Pokreni tim agenta (više uloga sekvencijalno)"
+                >
+                  👥 Tim
+                </button>
                 <RoleSelector role={agentRole} onChange={setAgentRole} />
-                <ChatAgentToggle
-                  mode={agentPanelMode}
-                  onChange={setAgentPanelMode}
-                  side="right"
-                  noEngine={!agentMachineId || (!!agentMachineId?.startsWith("local:") && !isLocalHost)}
-                />
                 <button
                   type="button"
                   onClick={() => setShowBusHistory(true)}
@@ -3239,7 +3410,9 @@ export default function Workspace() {
                 hasRepo={!!activeRepo}
                 repoName={activeRepo?.fullName}
                 panelLabel="Agent"
-                onSelectLocal={() => setAgentMachineId("local:opencode")}
+                onSelectLocal={() => handleSelectLocalEngine("agent")}
+                prepStatus={agentEnginePrep.status}
+                prepMessage={agentEnginePrep.message}
                 onConnectVps={() => openSshModalForPanel("agent")}
                 onDisconnectVps={() => handleVpsDisconnected()}
                 onOpenGitRemote={() => { setGitRemoteSlot("agent"); setShowGitRemote(true); }}
@@ -3287,7 +3460,12 @@ export default function Workspace() {
         </div>
       </div>
 
-      <BottomBar machineId={agentMachineId || null} />
+      <BottomBar
+        machineId={agentMachineId || null}
+        owner={activeRepo?.owner || null}
+        name={activeRepo?.name || null}
+        taskId={dbSessionId || null}
+      />
 
       {/* Mobile bottom navigation — single-panel switching */}
       <div className="fixed bottom-0 inset-x-0 z-40 md:hidden border-t border-border bg-surface">
@@ -3592,7 +3770,7 @@ export default function Workspace() {
         <GitRemotePanel
           slot={gitRemoteSlot}
           onClose={() => setShowGitRemote(false)}
-          onRepoChanged={() => loadActiveRepo()}
+          onRepoChanged={() => { loadActiveRepo(); if (gitRemoteSlot === "ask" || gitRemoteSlot === "agent") handleSelectLocalEngine(gitRemoteSlot); }}
         />
       )}
 
@@ -3793,6 +3971,12 @@ export default function Workspace() {
         />
       )}
 
+      <TeamRunPanel
+        open={showTeamRun}
+        onClose={() => setShowTeamRun(false)}
+        machineId={agentMachineId}
+        defaultPrompt={agentDraftInput || agentPrefill}
+      />
       <BusHistoryPanel
         open={showBusHistory}
         events={agentBusEvents}
@@ -3814,7 +3998,7 @@ export default function Workspace() {
 
       {/* Command Palette */}
       <CommandPalette
-        commands={commands}
+        commands={commands.filter((c) => c.id !== "admin" || isAdmin(user))}
         open={showCommandPalette}
         onClose={() => setShowCommandPalette(false)}
       />

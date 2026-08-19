@@ -16,7 +16,7 @@ interface Props {
   machineId?: string | null;
 }
 
-export default function McpMarketplace({ onClose, machineId }: Props) {
+export default function McpMarketplace({ onClose }: Props) {
   const [servers, setServers] = useState<McpServer[]>([]);
   const [presets, setPresets] = useState<McpPreset[]>([]);
   const [loading, setLoading] = useState(true);

@@ -2,7 +2,19 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { getAdapters } from "../adapters/registry.js";
 import { createVPSPreviewAdapter } from "../adapters/preview/vps.js";
-import type { PreviewTarget, DeviceSize } from "../adapters/preview/adapter.js";
+import type { PreviewTarget } from "../adapters/preview/adapter.js";
+import {
+  detectLocalFramework,
+  getPreviewInfo,
+  getPreviewLogs,
+  previewKey,
+  refreshPreviewStatus,
+  restartPreview,
+  startPreview,
+  stopPreview,
+} from "../runtime/local/preview.js";
+import { getRepoWorkspaceDir } from "../runtime/local/workspace.js";
+import { issuePreviewCookie } from "../runtime/local/preview-proxy.js";
 
 const router = Router();
 
@@ -12,11 +24,31 @@ function getPreview(userId: string) {
   return createVPSPreviewAdapter(exec);
 }
 
-// POST /api/preview/start — start preview
+// POST /api/preview/start — start preview (target: "vps" | "local")
 router.post("/start", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
-    const { machineId, target, port, rootPath, framework, buildCommand, devCommand, envVars } = req.body;
+    const userId = req.user?.userId ?? req.userId;
+    const { machineId, target, port, rootPath, framework, buildCommand, devCommand, envVars, owner, name, taskId, args } = req.body;
+
+    if ((target as PreviewTarget) === "local") {
+      if (!owner || !name) {
+        return res.status(400).json({ error: "owner and name are required for a local preview" });
+      }
+      const info = await startPreview({
+        userId,
+        owner,
+        name,
+        taskId: taskId ?? null,
+        command: typeof devCommand === "string" ? devCommand : undefined,
+        args: Array.isArray(args) ? args : undefined,
+        port: typeof port === "number" ? port : undefined,
+        env: envVars,
+      });
+      // Cookie lets the same-origin iframe (and every sub-request) reach the
+      // proxy without exposing a token in the URL.
+      issuePreviewCookie(res, info.previewId);
+      return res.json(info);
+    }
 
     if (!machineId) return res.status(400).json({ error: "machineId required" });
 
@@ -42,8 +74,17 @@ router.post("/start", requireAuth, async (req: any, res) => {
 // POST /api/preview/stop — stop preview
 router.post("/stop", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
-    const { machineId } = req.body;
+    const userId = req.user?.userId ?? req.userId;
+    const { machineId, target, owner, name, taskId } = req.body;
+
+    if ((target as PreviewTarget) === "local") {
+      if (!owner || !name) {
+        return res.status(400).json({ error: "owner and name are required for a local preview" });
+      }
+      const info = await stopPreview(previewKey(userId, owner, name, taskId ?? null));
+      return res.json({ success: !!info, state: info?.state ?? null });
+    }
+
     if (!machineId) return res.status(400).json({ error: "machineId required" });
 
     const preview = getPreview(userId);
@@ -55,11 +96,48 @@ router.post("/stop", requireAuth, async (req: any, res) => {
   }
 });
 
+// POST /api/preview/restart — restart preview
+router.post("/restart", requireAuth, async (req: any, res) => {
+  try {
+    const userId = req.user?.userId ?? req.userId;
+    const { owner, name, taskId, devCommand, args, port, envVars } = req.body;
+    if (!owner || !name) {
+      return res.status(400).json({ error: "owner and name are required for a local preview" });
+    }
+    const info = await restartPreview({
+      userId,
+      owner,
+      name,
+      taskId: taskId ?? null,
+      command: typeof devCommand === "string" ? devCommand : undefined,
+      args: Array.isArray(args) ? args : undefined,
+      port: typeof port === "number" ? port : undefined,
+      env: envVars,
+    });
+    issuePreviewCookie(res, info.previewId);
+    res.json(info);
+  } catch (error: any) {
+    console.error("Preview restart error:", error);
+    res.status(500).json({ error: error.message || "Failed to restart preview" });
+  }
+});
+
 // GET /api/preview/status — get preview status
 router.get("/status", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
-    const { machineId } = req.query;
+    const userId = req.user?.userId ?? req.userId;
+    const { machineId, target, owner, name, taskId } = req.query;
+
+    if ((target as PreviewTarget) === "local") {
+      if (!owner || !name) {
+        return res.status(400).json({ error: "owner and name are required for a local preview" });
+      }
+      const info = await refreshPreviewStatus(previewKey(userId, owner, name, taskId ?? null));
+      if (!info) return res.status(404).json({ error: "No local preview for this task" });
+      issuePreviewCookie(res, info.previewId);
+      return res.json(info);
+    }
+
     if (!machineId) return res.status(400).json({ error: "machineId required" });
 
     const preview = getPreview(userId);
@@ -74,8 +152,17 @@ router.get("/status", requireAuth, async (req: any, res) => {
 // GET /api/preview/logs — get preview logs
 router.get("/logs", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
-    const { machineId, limit } = req.query;
+    const userId = req.user?.userId ?? req.userId;
+    const { machineId, target, owner, name, taskId, limit } = req.query;
+
+    if ((target as PreviewTarget) === "local") {
+      if (!owner || !name) {
+        return res.status(400).json({ error: "owner and name are required for a local preview" });
+      }
+      const lines = getPreviewLogs(previewKey(userId, owner, name, taskId ?? null), limit ? parseInt(limit, 10) : undefined);
+      return res.json(lines.map((line, i) => ({ timestamp: Date.now() - (lines.length - i), level: "stdout", message: line })));
+    }
+
     if (!machineId) return res.status(400).json({ error: "machineId required" });
 
     const preview = getPreview(userId);
@@ -90,8 +177,18 @@ router.get("/logs", requireAuth, async (req: any, res) => {
 // GET /api/preview/framework — detect framework
 router.get("/framework", requireAuth, async (req: any, res) => {
   try {
-    const userId = req.userId;
-    const { machineId, rootPath } = req.query;
+    const userId = req.user?.userId ?? req.userId;
+    const { machineId, target, owner, name, rootPath } = req.query;
+
+    if ((target as PreviewTarget) === "local") {
+      if (!owner || !name) {
+        return res.status(400).json({ error: "owner and name are required for a local preview" });
+      }
+      const cwd = getRepoWorkspaceDir(userId, owner, name);
+      const framework = await detectLocalFramework(cwd);
+      return res.json({ framework });
+    }
+
     if (!machineId) return res.status(400).json({ error: "machineId required" });
 
     const preview = getPreview(userId);
@@ -99,7 +196,7 @@ router.get("/framework", requireAuth, async (req: any, res) => {
     res.json({ framework });
   } catch (error: any) {
     console.error("Framework detection error:", error);
-    res.status(500).json({ error: "Failed to detect framework" });
+    res.status(500).json({ error: error.message || "Failed to detect framework" });
   }
 });
 

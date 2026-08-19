@@ -24,14 +24,6 @@ const COLUMN_LABELS: Record<KanbanColumn, string> = {
   completed: "Završene",
 };
 
-const COLUMN_COLORS: Record<KanbanColumn, string> = {
-  active: "border-l-green-500",
-  waiting: "border-l-yellow-500",
-  paused: "border-l-blue-500",
-  error: "border-l-red-500",
-  completed: "border-l-gray-500",
-};
-
 const COLUMN_BG: Record<KanbanColumn, string> = {
   active: "bg-green-500/5",
   waiting: "bg-yellow-500/5",
@@ -442,7 +434,7 @@ function CardItem({
         )}
         {card.type === "session" && typeof card.metadata.todoCount === "number" && (
           <span className="text-[9px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded">
-            📋 {card.metadata.completedTodos}/{card.metadata.todoCount}
+            📋 {card.metadata.completedTodos as number}/{card.metadata.todoCount}
           </span>
         )}
       </div>
@@ -481,7 +473,7 @@ function CardItem({
             ⚙ Runtime
           </button>
         )}
-        {card.type === "session" && card.metadata.machineId && (
+        {card.type === "session" && !!card.metadata.machineId && (
           <button
             onClick={() => onNavigate(card.id, card.metadata.machineId as string)}
             className="text-[9px] px-2 py-1 rounded-lg border border-border bg-surface-2 text-text-muted hover:text-green-400 hover:border-green-500/30 transition-colors ml-auto"

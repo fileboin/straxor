@@ -1,4 +1,5 @@
 import type { SSHClient } from "./ssh.js";
+import { pickOllamaCodingModel, type OllamaModel } from "../../lib/ollama.js";
 
 export type ProvisionStatus =
   | "connecting"
@@ -34,6 +35,112 @@ function summarizeLog(output: string): string {
     .filter(Boolean)
     .slice(-6)
     .join(" | ");
+}
+
+// ── Ollama (VPS-local LLM) ──
+// OpenCode is wired DIRECTLY to a local Ollama instance on the VPS over HTTP.
+// No FCC, no external proxy, no model rewriting. Ollama's HTTP API is probed
+// through the SSH channel (the Render host cannot reach the VPS's localhost).
+
+export const OLLAMA_VPS_DEFAULT_BASE_URL = "http://localhost:11434";
+
+export interface OllamaVpsStatus {
+  alive: boolean;
+  baseUrl: string;
+  modelCount: number;
+  codingModel: string | null;
+  models: string[];
+  error?: string;
+}
+
+export async function listOllamaModelsOnVps(
+  ssh: SSHClient,
+  baseUrl = OLLAMA_VPS_DEFAULT_BASE_URL,
+  timeoutSeconds = 4,
+): Promise<OllamaModel[]> {
+  const { stdout } = await ssh.exec(
+    `curl -s -m ${timeoutSeconds} "${baseUrl}/api/tags" 2>/dev/null || true`
+  );
+  if (!stdout.trim()) return [];
+  try {
+    const data = JSON.parse(stdout) as {
+      models?: Array<{ name?: string; model?: string; size?: number }>;
+    };
+    return (data.models || [])
+      .map((m) => ({
+        name: m.name || m.model || "",
+        model: m.name || m.model || "",
+        size: m.size,
+      }))
+      .filter((m) => m.name && !/embed/i.test(m.name));
+  } catch {
+    return [];
+  }
+}
+
+export async function detectOllamaOnVps(
+  ssh: SSHClient,
+  baseUrl = OLLAMA_VPS_DEFAULT_BASE_URL,
+): Promise<OllamaVpsStatus> {
+  try {
+    const models = await listOllamaModelsOnVps(ssh, baseUrl);
+    if (models.length === 0) {
+      const { stdout } = await ssh.exec(
+        `curl -s -m 4 "${baseUrl}/api/version" 2>/dev/null || true`
+      );
+      const reachable = stdout.trim().length > 0;
+      return {
+        alive: false,
+        baseUrl,
+        modelCount: 0,
+        codingModel: null,
+        models: [],
+        error: reachable ? "Ollama reachable but no models installed" : "Ollama unreachable on VPS",
+      };
+    }
+    const names = models.map((m) => m.name);
+    return {
+      alive: true,
+      baseUrl,
+      modelCount: names.length,
+      codingModel: pickOllamaCodingModel(models),
+      models: names,
+    };
+  } catch (err) {
+    return {
+      alive: false,
+      baseUrl,
+      modelCount: 0,
+      codingModel: null,
+      models: [],
+      error: err instanceof Error ? err.message : "Ollama unreachable on VPS",
+    };
+  }
+}
+
+// Writes an OpenCode config that pins `ollama/<model>` at the given base URL.
+// base64 is used so the JSON survives any shell quoting over SSH.
+export async function configureOpenCodeForOllama(
+  ssh: SSHClient,
+  model: string,
+  baseUrl = OLLAMA_VPS_DEFAULT_BASE_URL,
+): Promise<boolean> {
+  const config = {
+    $schema: "https://opencode.ai/config.json",
+    model: `ollama/${model}`,
+    small_model: `ollama/${model}`,
+    provider: {
+      ollama: {
+        options: { baseURL: baseUrl },
+        models: { [model]: { name: model } },
+      },
+    },
+  };
+  const b64 = Buffer.from(JSON.stringify(config, null, 2), "utf8").toString("base64");
+  const { code } = await ssh.exec(
+    `mkdir -p "$HOME/.config/opencode" && echo '${b64}' | base64 -d > "$HOME/.config/opencode/opencode.json"`
+  );
+  return code === 0;
 }
 
 export async function detectOS(ssh: SSHClient): Promise<string> {
@@ -156,9 +263,25 @@ export async function startOpenCodeServe(
     throw new Error("OpenCode CLI nije pronađen nakon instalacije");
   }
 
+  // Directly bind OpenCode to a local Ollama instance on the VPS (no FCC, no
+  // proxy). Ollama is preferred but optional: if it isn't installed the engine
+  // keeps its previous config and provisioning still succeeds.
+  let ollamaModel: string | null = null;
+  try {
+    const ollama = await detectOllamaOnVps(ssh);
+    if (ollama.alive && ollama.codingModel) {
+      await configureOpenCodeForOllama(ssh, ollama.codingModel);
+      ollamaModel = ollama.codingModel;
+    }
+  } catch {
+    // Ollama probe must never block OpenCode provisioning.
+  }
+
+  const ollamaPrefix = ollamaModel ? `[opencode-model] using local Ollama ${ollamaModel} (direct, no proxy) — ` : "";
   const { code, stderr } = await ssh.exec(
     `nohup sh -lc '${withNodeEnv(`exec opencode serve --port ${port}`).replace(/'/g, `'\\''`)}' ` +
-    `> /tmp/opencode-serve.log 2>&1 < /dev/null &`
+    `> /tmp/opencode-serve.log 2>&1 < /dev/null & ` +
+    `sh -c 'echo "${ollamaPrefix}listening on :${port}" >> /tmp/opencode-serve.log'`
   );
 
   if (code !== 0) {

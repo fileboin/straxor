@@ -120,9 +120,12 @@ function TabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
 
 interface BottomBarProps {
   machineId?: string | null;
+  owner?: string | null;
+  name?: string | null;
+  taskId?: string | null;
 }
 
-export default function BottomBar({ machineId }: BottomBarProps) {
+export default function BottomBar({ machineId, owner, name, taskId }: BottomBarProps) {
   const [tab, setTab] = useState<Tab>("terminal");
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -158,7 +161,7 @@ export default function BottomBar({ machineId }: BottomBarProps) {
             {tab === "files" && <div className="h-full"><EditorContainer machineId={machineId || null} /></div>}
             {tab === "logs" && <LogViewer />}
             {tab === "console" && <ConsolePanel />}
-            {tab === "preview" && <div className="h-full"><PreviewPanel machineId={machineId || null} /></div>}
+            {tab === "preview" && <div className="h-full"><PreviewPanel machineId={machineId || null} owner={owner || null} name={name || null} taskId={taskId || null} /></div>}
             {tab === "database" && <div className="h-full"><DatabasePanel machineId={machineId || null} /></div>}
           </div>
         )}
@@ -208,7 +211,7 @@ export default function BottomBar({ machineId }: BottomBarProps) {
               {tab === "files" && <div className="h-full"><EditorContainer machineId={machineId || null} /></div>}
               {tab === "logs" && <LogViewer />}
               {tab === "console" && <ConsolePanel />}
-            {tab === "preview" && <div className="h-full"><PreviewPanel machineId={machineId || null} /></div>}
+            {tab === "preview" && <div className="h-full"><PreviewPanel machineId={machineId || null} owner={owner || null} name={name || null} taskId={taskId || null} /></div>}
             {tab === "database" && <div className="h-full"><DatabasePanel machineId={machineId || null} /></div>}
             </div>
           </div>

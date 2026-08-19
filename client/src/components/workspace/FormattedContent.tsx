@@ -9,11 +9,6 @@ import { memo } from "react";
  * plain paragraphs so every block is a clean, readable "kocka".
  */
 
-interface Fence {
-  lang: string;
-  code: string;
-}
-
 function parseFences(content: string): Array<{ kind: "text" | "code"; lang?: string; code?: string; text?: string }> {
   const parts: Array<{ kind: "text" | "code"; lang?: string; code?: string; text?: string }> = [];
   const fenceRe = /```([^\n`]*)\n([\s\S]*?)```/g;

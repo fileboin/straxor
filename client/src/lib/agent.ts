@@ -33,6 +33,8 @@ export async function streamAgentMessage(
   system?: string,
   externalSignal?: AbortSignal
 ): Promise<void> {
+  let userAbort = false;
+  let finishDone: () => void = () => {};
   try {
     const token = localStorage.getItem("token");
     // Idle watchdog: fires only when the agent produces NO real output
@@ -42,7 +44,7 @@ export async function streamAgentMessage(
     const IDLE_MS = 15_000;
     const TOTAL_MS = 120_000;
     const controller = new AbortController();
-    let userAbort = false;
+    userAbort = false;
     const onExtAbort = () => {
       userAbort = true;
       controller.abort();
@@ -79,7 +81,7 @@ export async function streamAgentMessage(
       cleanup();
       callbacks.onError(message);
     };
-    const finishDone = () => {
+    finishDone = () => {
       if (finished) return;
       finished = true;
       cleanup();

@@ -1,5 +1,3 @@
-import React from "react";
-
 export function DeploymentDetailPanel({ deployment, onClose }: { deployment: any; onClose?: () => void }): JSX.Element | null {
   if (!deployment) return null;
   const id = deployment.id?.slice ? deployment.id.slice(0, 8) : String(deployment.id).slice(0, 8);

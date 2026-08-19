@@ -3,7 +3,6 @@ import {
   listInfraProviders,
   listInfraConfigs,
   addInfraConfig,
-  updateInfraConfig,
   deleteInfraConfig,
   testInfraConfig,
   TYPE_META,
@@ -350,7 +349,7 @@ function AddInfraModal({
     if (provider) {
       for (const f of provider.configFields) {
         if (f.type === "select" && f.options && f.options.length > 0) {
-          setConfig((prev) => ({ ...prev, [f.key]: f.options[0].value }));
+          setConfig((prev) => ({ ...prev, [f.key]: f.options![0].value }));
         }
       }
     }
@@ -425,7 +424,7 @@ function AddInfraModal({
           )}
 
           {/* Config fields */}
-          {provider?.configFields.length > 0 && (
+          {provider && provider.configFields.length > 0 && (
             <div className="border-t border-border pt-3">
               <label className="text-[10px] text-text-muted block mb-2 font-medium">Konfiguracija</label>
               {provider.configFields.map((field) => (
@@ -458,7 +457,7 @@ function AddInfraModal({
           )}
 
           {/* Credential fields */}
-          {provider?.credentialFields.length > 0 && (
+          {provider && provider.credentialFields.length > 0 && (
             <div className="border-t border-border pt-3">
               <label className="text-[10px] text-text-muted block mb-2 font-medium">Kredencijali (enkriptovani)</label>
               {provider.credentialFields.map((field) => (

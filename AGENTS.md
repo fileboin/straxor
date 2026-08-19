@@ -3,6 +3,198 @@
 ## Objective
 Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom snagom na repo-u BEZ VPS-a), VPS = opciona opcija iz "+" menija. Faze: (1) trajna šifrovana GitHub konekcija + aktivni repo, (2) lokalni workspace modul (clone/pull/git config), (3) lokalni engine runner + pluggable transport, (4) agent radi bez VPS-a, (5) per-panel engine picker; zatim finalni test + screenshot. **NAJNOVIJI**: uklonjen sistemski spam iz Panela 1 (uloga → pravi system prompt, ne u vidljivu poruku).
 
+## Zadnji zadatak — Paneli ne vraćaju greške: verify-prije-binda + automatski pad na lokalni engine (klijent, urađeno)
+- **Cilj**: „Paneli vraćaju greške, a sve je radilo" — uzrok je auto-bind (FAZA 19b): na mount-u su OBA panela vezivana na VPS mašinu samo zato što baza kaže status=ready/opencodeRunning, BEZ provere da je daemon stvarno živ. Kad VPS padne (reboot / opencode umro / SSH nedostupan), paneli ostanu vezani za mrtav engine → svaki turn → „Machine not found / Opencode not running" → reconnect ne uspe → greška u panelu, opet i opet.
+- **Implementacija** (`client/src/pages/Workspace.tsx`):
+  - Mount auto-bind efekat: sada prvo poziva `verifyVpsConnection(ready.id)` (health check + auto-reconnect); samo ako je `vpsStatus === "ready"` poziva `handleVpsConnected`. Ako VPS nije dostupan → paneli OSTAJU na lokalnom OpenCode engine-u + jasna poruka „VPS nije dostupan — paneli rade na lokalnom OpenCode engine-u". Nema više vezivanja na mrtvu mašinu.
+  - `handleVpsConnected`: kad verifikacija posle konekcije ne uspe, oba panela se AUTOMATSKI prebacuju na `local:opencode[:ask]` (umesto da ostanu na mrtvom VPS-u) + poruka „paneli prebačeni na lokalni OpenCode".
+  - `recoverVpsEngine`: ako reconnect ne uspe, paneli se takođe prebacuju na lokalni engine + poruka „VPS nije dostupan — paneli prebačeni na lokalni OpenCode (radi odmah)" — sledeći turn RADI umesto da ponovo prijavi grešku.
+- **Verifikovano**: client `tsc --noEmit` — **0 grešaka**; client `npm run build` — **prolazi**. Server netaknut.
+- **Napomena (granica)**: ako korisnik nema nijedan AI provider ključ u DB i nema Ollamu, lokalni engine nema model (poruka „No API keys configured — save a provider key") — to je konfiguracija, ne regresija; VPS pad je sada bezbedno apsorbovan (pad na lokalni).
+
+## Zadnji zadatak — Core fix: Admin ne izbacuje iz sistema + Connect/Engine opcije rade (klijent, urađeno)
+- **Cilj (hitna popravka jezgra)**: (1) Admin dugme više ne sme da "izbaci" korisnika iz sistema; (2) Connect dugme ne sme da prikazuje grešku; (3) sve opcije u Agent/Ask Engine meniju moraju stvarno izvršavati zadatke. Dodatci su zamrznuti.
+- **Uzrok (Admin "kick")**: `HomeCenter` tile „Admin Control Center" i Command Palette akcija su bili vidljivi SVAKOM korisniku; klik → `navigate("/admin")` → `AdminRoute` guard → `<Navigate to="/">` → ceo Workspace se remount-uje (restore/refresh osećaj = "izbacuje iz sistema"). Dodatno, bilo kakva greška u lazy Admin chunku rušila je CEU aplikaciju kroz globalni ErrorBoundary.
+- **Implementacija**:
+  - `HomeCenter.tsx` — admin tile se sada filtrira za ne-admine (`isAdmin(user)`); import `isAdmin`.
+  - `Workspace.tsx` — Command Palette: `commands.filter((c) => c.id !== "admin" || isAdmin(user))` — ne-admini ne vide admin akcije (nema više silent bounce).
+  - `App.tsx` — svaki Protected/Admin/Guest route sada ima SOPSTVENI `ErrorBoundary` (`RouteCrashFallback`: „Došlo je do greške u ovoj stranici — sesija je i dalje aktivna" + „← Nazad na radni prostor" + „Pokušaj ponovo"). Pad jedne stranice (npr. Admin chunk) više nikad ne ruši celu aplikaciju niti izgleda kao logout.
+  - `Admin.tsx` — dashboard render dodatno zaštićen (`dashStats.system && dashStats.featureFlags` gate) protiv parcijalnog API odgovora.
+- **Engine/Connect opcije (mrtve opcije)**:
+  - `EnginePicker.tsx` — „Lokalni engine (repo)" je više NIJE `disabled` bez repo-a: klik uvek radi (`handleSelectLocalEngine` → `prepareRepo` → 404 → „no-repo: bare sandbox", i dalje pun agent).
+  - `SshInput.tsx` — novi `onDisconnected` callback: „Prekini vezu" u SSH modalu sada zaista poziva Workspace-ov `handleVpsDisconnected` (oba panela se odvezuju sa mrtvog VPS-a → sledeći agent turn ne puca sa "machine not found"). Uvezano u `Workspace.tsx`.
+- **Verifikovano**: client `tsc --noEmit` — **0 grešaka**; client `npm run build` — **prolazi** (`index-BRqWcC1D.js`, `Workspace-CkLn-bGA.js`). Server netaknut.
+- **Napomena (granica)**: prava VPS konekcija i dalje zavisi od korisničkih SSH kredencijala; ovaj krug popravlja sve klijent-side uzroke (gating, crash isolation, disconnect unbind) koji su izgledali kao "izbacivanje iz sistema" i "mrtve opcije".
+
+## Zadnji zadatak — Bus vidljiv + per-panel projekat indikator (klijent, urađeno)
+- **Cilj**: dva panela rade nezavisno (svaki svoj repo/model/sesiju) i povezuju se samo po potrebi kao „bus". Bus mehanizam („→ Traži pomoć drugog panela" / „← Pošalji na review") je POSTOJAO end-to-end (`transferByBus` → `createAgentBusTransfer` → `/api/agent/bus/transfer` + prefill ciljanog panela + auto-execute guard), ali je u UI bio gotovo nevidljiv (`opacity-0` + mali + na dnu poruke), pa korisnik nije znao da postoji.
+- **Implementacija**:
+  - `ChatPanel.tsx` — bus dugme na assistant porukama sada je **uvek vidljivo** (accent, ⇄ ikona, gornji desni ugao balona, labela na sm/većim ekranima). Novi prop `repoLabel?: string` → chip „📁 <repo>" u headeru (row 2) ili isprekidani „📁 bez projekta" kad panel nema aktivan repo — svaki panel jasno pokazuje na kom projektu radi.
+  - `Workspace.tsx` — oba panela prosleđuju `repoLabel` (ask → `askActiveRepo.fullName`, agent → `activeRepo.fullName`).
+  - `lib/i18n.ts` — novi ključ `chat.noProject` (en/sr + ostali fallback).
+- **Verifikovano**: client `tsc --noEmit` — **0 grešaka**; client `npm run build` — **prolazi** (`index-C2qGlPlL.js`, `Workspace-BtSAsqwi.js`). Server netaknut.
+
+## Zadnji zadatak — OpenCode ↔ Ollama direktna veza (VPS, urađeno)
+- **Cilj**: OpenCode u oba panela mora da komunicira DIREKTNO sa lokalnom Ollama instancom na VPS-u (`http://localhost:11434`), bez FCC-a, bez spoljnih proksija i bez prepisivanja modela. FCC ostaje kao opt-in runtime u Runtime Manageru (nije u OpenCode putanji).
+- **Implementacija**:
+  - `server/src/lib/ollama.ts` (novo) — čisti helperi: `listOllamaModels` (`/api/tags`), `pickOllamaCodingModel` (deepseek-coder → qwen-coder → qwen2.5-coder → qwen3-coder → codellama → codegemma → deepseek-coder-v2, pa fallback na prvi model), `ollamaEchoTest` (live provera). `OLLAMA_BASE_URL` env override, default `http://localhost:11434`.
+  - `server/src/runtime/local/opencode-model.ts` — `buildOpenCodeModelConfig()` sada PREFERIRA dostupnu lokalnu Ollamu (keyless, direktno, bez proksija); ako Ollama nije dostupna pada na korisničke cloud ključeve. `openCodeModelConfig` za Ollamu piše `model: ollama/<model>` + `provider.ollama.options.baseURL` u `OPENCODE_CONFIG_CONTENT`.
+  - `server/src/runtime/opencode-adapter/provisioner.ts` — VPS-side integracija: `listOllamaModelsOnVps` / `detectOllamaOnVps` (SSH `curl` na VPS-ov `localhost:11434/api/tags`) i `configureOpenCodeForOllama` (base64-safe upis `~/.config/opencode/opencode.json`). `startOpenCodeServe` sada PRE spawn-a detektuje Ollamu na VPS-u i, ako postoji coding model, automatski pinuje OpenCode na `ollama/<model>` direktno (ne blokira provision ako Ollama nije instalirana).
+  - `server/src/routes/machines.ts` — `GET /api/machines/:id/ollama` (live echo test + lista modela + selektovan coding model preko SSH) i `POST /api/machines/:id/ollama/activate` (eksplicitan izbor modela → piše OpenCode config na VPS-u).
+  - `server/src/routes/models.ts` — `GET /api/models/ollama/tags` i `GET /api/models/ollama/test` (echo test na Render-ovom localhost-u — korisno za self-host, na VPS-u se koristi machine-scoped ruta).
+- **FCC provera**: `grep free-claude|FCC` u `adapters/runtime/opencode.ts` i `routes/agent.ts` → **0 pogodaka**; OpenCode putanja (`createBoundAdapter`) ne prolazi kroz FCC.
+- **Verifikovano**: server `tsc --noEmit` — **čist**; vitest — **203/203** (26 fajlova, novi `ollama.test.ts` + postojeći `opencode-model.test.ts`). Klijent netaknut.
+- **Napomena (što ne mogu da dokažem odavde)**: stvarna Ollama dostupnost na VPS-u zavisi od tvoje mašine — kod sada auto-detektuje i pinuje model čim se VPS provision-uje/reconnect-uje. Na Render hostu `localhost:11434` je mrtav (očekivano, Ollama je na VPS-u).
+
+## Zadnji zadatak — Panel self-test za oba panela (urađeno)
+- **Cilj**: automatski dokaz da Panel 1 (ask slot) i Panel 2 (agent slot) rade kao pravi App Builderi — kloniraju sandbox, pišu fajlove i izvršavaju komande — a ne kao pasivni chat.
+- **Implementacija**: novi `server/src/e2e/panel-self-test.test.ts` — offline, za SVAKI slot (`ask` i `agent`) radi: `ensureWorkspace` klonira bare remote → agent upiše `probe-<slot>.txt` → `runWorkspaceCommand` izvrši `node -e` koji piše `probe-out-<slot>.txt` → assert exit 0 + sadržaj fajla. Dodatni test: sandboxovi su izolovani (ask ≠ agent).
+- **Verifikovano**: `panel-self-test.test.ts` — **3/3**; vitest ukupno **197/197** (25 fajlova); server `tsc --noEmit` — **čist**. Produkcija `/api/health` — `{"status":"ok","db":"connected"}`.
+
+## Zadnji zadatak — FORCE VPS + auto-reconnect (FAZA 19b, urađeno)
+- **Cilj**: oba panela moraju se automatski vezati na aktivan VPS i sinhronizovati sa GitHub repom; na grešku engine-a ne sme se prikazivati timeout, već se mora automatski pokrenuti SSH/server reconnect.
+- **Implementacija** (`client/src/pages/Workspace.tsx`):
+  - `recoverVpsEngine(machineId)` (novo) — za ne-local VPS id poziva `verifyVpsConnection` (health + auto-reconnect preko `/runtimes/opencode/reconnect`), ažurira per-panel prep status i vraća `true` kad se engine oporavi.
+  - Auto-bind na mount: `useEffect` čita `listMachines()`, nalazi mašinu `status=ready`/`opencodeRunning` i poziva `handleVpsConnected(id)` — oba panela se odmah spoje na postojeći VPS (ako ga nema, ostaju na lokalnom OpenCode-u).
+  - Error handleri u `handleAskSend` (onErrorFallback) i `handleAgentSend` (onError): prepoznaju `machine not found / opencode not running / failed to create session` → umesto prikaza greške/timeout-a pozivaju `recoverVpsEngine` i prikazuju "Automatski ponovno povezujem…"; greška se ispisuje tek ako reconnect ne uspe.
+- **Verifikovano**: client `tsc --noEmit` — **0 grešaka**; client `npm run build` — **prolazi** (`index-3xBwgGtm.js`, `Workspace-BD2BM8En.js`). Server netaknut.
+
+## Zadnji zadatak — EnginePicker: prava pozadinska logika za svaku opciju (FAZA 19, urađeno)
+- **Cilj (hitna ispravka)**: izborni meni za engine ("Lokalni engine (repo)", "VPS mašina", "GitHub repo", "Runtime Manager") je vizuelno postojao, ali opcije nisu radile pravi posao — "Lokalni engine" je bio goli `setMachineId` bez ikakve pripreme, VPS konekcija nije verifikovala/reconnect-ovala engine (prvi agent turn → "Machine not found / Opencode not running" = "nema alat"), a "Prekini VPS vezu" (`onDisconnectVps`) je bio mrtav prop koji se nikad nije renderovao.
+- **Implementacija**:
+  - `client/src/lib/repos.ts` — novi `prepareRepo()` (POST `/api/repos/prepare` = clone/pull aktivnog repo-a u sandbox) + `getRepoWorkspace()` (GET `/api/repos/workspace` = status sandboxa bez mutacije).
+  - `client/src/pages/Workspace.tsx` — per-panel `askEnginePrep`/`agentEnginePrep` stanje (`idle|preparing|ready|error|no-repo` + poruka); novi `handleSelectLocalEngine(panel)` koji: vezuje panel na `local:opencode[:ask]`, resetuje session, poziva `prepareRepo()` i prikazuje rezultat (repo spreman / kloniran / nema repo-a → bare sandbox / greška — NIKAD ne degradira u chat). `handleVpsConnected` sada pored postavljanja machineId poziva `verifyVpsConnection(machineId)` (health check + auto-reconnect) i ažurira status/poruku; `handleVpsDisconnected` čisti prep status.
+  - `client/src/components/workspace/EnginePicker.tsx` — novi `prepStatus`/`prepMessage` propovi (status linija u meniju + pulsirajuća tačka u headeru tokom pripreme); `onDisconnectVps` je sada zaista uvezan i renderuje "Prekini VPS vezu → lokalni engine" kad je mod VPS.
+  - Oba panela (Ask/Agent) uvezana na `handleSelectLocalEngine` + svoje `prepStatus`/`prepMessage`. "GitHub repo" opcija (`GitRemotePanel.onRepoChanged`) sada, pored `loadActiveRepo()`, automatski poziva `handleSelectLocalEngine(slot)` — aktiviranje repo-a odmah klonira sandbox.
+- **VPS/SSH**: `SshInput` → provision → `onConnected(machineId)` → `handleVpsConnected` (deljeni machineId za OBA panela) → `verifyVpsConnection` potvrdi da opencode zaista radi, a ako ne radi automatski pokrene `/api/runtimes/opencode/reconnect`. Lokalni engine + GitHub: `prepareRepo()` garantuje stabilan clone/pull sandbox pre prvog agent turn-a.
+- **Verifikovano**: client `tsc --noEmit` — **0 grešaka**; client `npm run build` — **prolazi** (novi entry `index-BiG-e8F6.js`, Workspace chunk `Workspace-CxuwfegT.js`); server `tsc --noEmit` — **čist**; vitest — **194/194**.
+
+## Zadnji zadatak — Oba panela uvek OpenCode agent (FAZA 18, urađeno)
+- **Cilj (hitna ispravka arhitekture)**: I Panel 1 (Ask) i Panel 2 (Agent) moraju biti aktivni OpenCode agenti (alati, workspace, komande, git), NIKAD pasivni tekstualni chat. Panel 2 je do sada imao trostruki downgrade na plain chat: `agentPanelMode==="chat"` (toggle), `!agentMachineId`, i `localEngineOnRemote` (local: engine na Renderu) — plus `onError` auto-fallback. Panel 2 je na Renderu prikazivao i `noEngine` crvenu tačku (netočno).
+- **Implementacija** (`client/src/pages/Workspace.tsx`):
+  - `agentPanelMode` je sada konstanta `"agent"` (uklonjen setter + restore + `ChatAgentToggle` iz Agent headera i import).
+  - `agentMachineId`/`askMachineId` default na `local:opencode` / `local:opencode:ask` (init + auto-set efekat više ne čiste na null; `handleVpsDisconnected` vraća na local umesto null).
+  - Uklonjen `localEngineOnRemote` downgrade + `onError` auto-fallback → greške se prikazuju direktno, nikad prelazak u chat.
+  - `streamAgentMessage`/`startAgentBackground`/`createSession` u agent putanji koriste `agentMachineId || "local:opencode"` (nikad null).
+  - Ask panel je već bio agent-only (učvršćen default local slot); njegov mrtvi chat fallback je i dalje neaktivan (`askDirectFallbackRef` nikad ne postaje true).
+- **VPS**: eksplicitno izabran VPS machineId (EnginePicker → SSH) se i dalje poštuje za oba panela i nikad se ne prepisuje; lokalni OpenCode (`opencode-ai` server dependency) je uvek dostupan fallback runtime na Renderu.
+- **Verifikovano**: client `tsc --noEmit` — **0 grešaka**; client `npm run build` — **prolazi**. Server netaknut.
+
+## Zadnji zadatak — i18n: Usage & Cost panel lokalizovan (FAZA 17, urađeno)
+- **Cilj**: ROADMAP Phase 3 — „i18n support". **Fondacija je već postojala** (`client/src/lib/i18n.ts`: 27 jezika, `t/getLang/setLang/useLang`, fallback na engleski, language switcher u `StatusBar`, rečnik za auth/toolbar/welcome/chat/modeli; koristi se u 17 fajlova). Preostala praznina: novi **Usage & Cost panel (FAZA 16) je bio 100% hardkodiran na srpskom**.
+- **Implementacija**:
+  - `client/src/lib/i18n.ts` — dodato ~22 `usage.*` ključeva (en + sr; ostali jezici automatski padaju na en preko postojećeg fallback-a).
+  - `client/src/components/workspace/UsagePanel.tsx` — uvezani `t` + `useLang`; svi labeli (tabs, totali, daily chart, provider/model sekcije, događaji, cjenovnik, budžeti + forma) sada idu kroz `t(...)`; placeholder-i i dinamički tekstovi (`{n} zahtjeva`, `Alert pri {n}%`) koriste `{n}` interpolaciju.
+- **Verifikovano**: client `tsc --noEmit` — **0 grešaka**; client `npm run build` — **prolazi** (6s). Server netaknut.
+- **Napomena**: React Native mobilna aplikacija je **odložena** — to je poseban projekat (novi Expo/RN toolchain), nije izvodljivo/verifikabilno u ovom Node-only okruženju. Preostala i18n stavka: proširiti pokrivenost na još workspace panela (velika ali mehanička posla).
+
+## Zadnji zadatak — Persistent analytics + auto-instrumentacija (FAZA 16, urađeno)
+- **Cilj**: ROADMAP Phase 3 — „Analytics dashboard". Usage & Cost UI je već postojao (UsagePanel sa daily bar chart, po provideru/modelu, budžetima), ali je default `custom` adapter bio **in-memory** (svi podaci gubljeni na restartu, na Renderu često) i **ništa nije logovalo** događaje → dashboard uvek prazan.
+- **Implementacija**:
+  - Migracija `0015_usage.sql` + journal entry + tabele `usage_events` i `usage_budgets` u `schema.ts` (per-user FK, timestamp, provider/model, tokens, `cost_usd double precision`, latency, success, metadata).
+  - `server/src/lib/usage-store.ts` (novo) — DB CRUD (`insertUsageEvent/listUsageEvents/listUsageBudgets/createUsageBudget/deleteUsageBudget`, best-effort) + čisti helperi `estimateTokenCount` (~4 char/token), `estimateUsageCost` (preko `pricing.ts`) i `aggregateUsageEvents` (provider/model/project/machine/day/hour).
+  - `adapters/usage/custom.ts` prepisan na **DB-backed per-user** adapter (`createCustomUsageAdapter(userId)`) sa in-memory fallback-om za nemigrirane/offline slučajeve; `routes/usage.ts` prosleđuje `req.userId` u `getAdapter` (popravljeno i `(req as any).userId` → `req.userId`; `/pricing`, `/budgets`, `/periods` sada koriste `req` umesto `_req`).
+  - **Auto-instrumentacija** u `routes/chat.ts` (`POST /api/chat`): po završetku stream-a upisuje usage event (estimirani input/output tokeni iz teksta, cena iz pricing tabele, latency, success/error) — best-effort, ne blokira SSE. Dashboard sada sam popunjava podatke.
+- **Testovi**: `usage-store.test.ts` (novo, 7 testova) — token estimation, cost za poznati/nepoznati model, agregacija po provideru/modelu/danu sa sortiranjem.
+- **Verifikovano**: server `tsc --noEmit` čist; vitest **194/194** (24 fajla, +7 novih). Klijent netaknut.
+- **Napomena**: agent turn (opencode) i `/orchestrate` još nisu instrumentirani — sledeći korak ako treba precizniji token/cost tracking za agenta.
+
+## Zadnji zadatak — Webhook dispatch uvezan u stvarne događaje (FAZA 15b, urađeno)
+- **Cilj**: FAZA 15 je napravila webhook CRUD/dispatch infrastrukturu, ali `dispatchWebhook` nije nigde bio pozvan — webhook-ovi nisu mogli ništa da isporuče. Sada su uvezani u stvarne lifecycle događaje.
+- **Implementacija**:
+  - `server/src/routes/agent.ts` — `agent.run.completed` / `agent.run.failed` u `persistJob` (finalni write-through background joba); `team.task.verified` u `runTeamVerification` kad build+test prođu (→ WAITING_APPROVAL); `team.task.approved` u approve ruti (→ VERIFIED, sa commitHash/pushed/committed).
+  - `server/src/runtime/local/preview.ts` — `preview.started` kad dev server postane healthy (`state=running`), `preview.stopped` na eksplicitnom stop-u, crash-u i timeout-u (novo `userId` polje u `PreviewEntry` + `dispatchPreviewEvent` helper).
+  - `server/src/lib/terminal.ts` — `terminal.process.exited` u `settle` (finished/failed/timeout) i `cancelTerminalProcess` (cancelled); userId se čita iz ProcessRegistry (`getProcess`).
+  - `deploy.completed/failed` nisu uvezani — server nema deploy pipeline (deploy ide kroz Render eksterno).
+- **Verifikovano**: server `tsc --noEmit` čist; vitest **187/187** (23 fajla). Klijent netaknut.
+
+## Zadnji zadatak — Webhook sistem (FAZA 15, urađeno)
+- **Cilj**: ROADMAP Phase 3 — „Webhook system" (eksterne integracije). Nije postojao outbound webhook mehanizam.
+- **Implementacija**:
+  - Migracija `0014_webhooks.sql` + journal entry + `webhooks` tabela u `schema.ts` (id, userId FK, url, secret, events jsonb, active, lastDeliveryAt/Status, timestamps).
+  - `server/src/lib/webhooks.ts` (novo) — `WEBHOOK_EVENTS` (agent.run.completed/failed, team.task.verified/approved, terminal.process.exited, preview.started/stopped, deploy.completed/failed), `signWebhookPayload` (HMAC-SHA256), `webhookMatchesEvent` (podrška `*`), `normalizeWebhookUrl`, CRUD (`createWebhook/listWebhooks/getWebhook/updateWebhook/deleteWebhook`), `dispatchWebhook` (best-effort POST sa `X-Straxor-*` headerima + 5s timeout + perzistencija delivery statusa), `deliverTestEvent`.
+  - `server/src/routes/webhooks.ts` (novo) — `GET/POST /api/webhooks`, `PATCH/DELETE /api/webhooks/:id`, `POST /api/webhooks/:id/test` (test ping). Uvezano u `index.ts`.
+- **Testovi**: `webhooks.test.ts` (novo, 9 testova) — HMAC determinističnost + promena secret/payload, event matching (`*`/exact/non-match), URL validacija.
+- **Verifikovano**: server `tsc --noEmit` čist; vitest **187/187** (23 fajla, +9 novih). Klijent netaknut.
+
+## Zadnji zadatak — Swagger/OpenAPI dokumentacija (FAZA 14, urađeno)
+- **Cilj**: ROADMAP Phase 2 — „API documentation (Swagger/OpenAPI)". Nije postojala nikakva API dokumentacija.
+- **Implementacija**: `server/src/openapi/spec.ts` (novo) — ručno pisana OpenAPI 3.0 spec (info, `bearerAuth` security scheme, sheme Error/Health/AuthResult/TeamTask/TeamApproveResult/RepoDiff) + ~25 ključnih endpointa (health, auth, chat+route, agent send/background/team/approve, repos connect/diff/push, terminal start/stream/cancel, preview start/stop, git-remote repos). `server/src/routes/docs.ts` (novo) — `GET /api/docs` (Swagger UI preko CDN-a, bez novih npm zavisnosti) + `GET /api/docs/openapi.json` (raw spec). Uvezano u `index.ts` pre SPA fallback-a.
+- **Testovi**: `spec.test.ts` (novo, 5 testova) — openapi verzija, servers base `/api`, MVP endpointi prisutni, bearerAuth scheme.
+- **Verifikovano**: server `tsc --noEmit` čist; vitest **178/178** (22 fajlova, +5 novih). Klijent netaknut.
+
+## Zadnji zadatak — Per-route rate limiting (FAZA 13, urađeno)
+- **Cilj**: ROADMAP Phase 2 — „Rate limiting per route". Postojao je samo globalni `apiLimiter` (500/15min) + `authLimiter` (20/15min); skupe/stateful rute (agent, chat, terminal, preview) nisu imale strožiji limiter.
+- **Implementacija**: `index.ts` — 4 nova `rateLimit` limitera uvezana na route mountove: `agentLimiter` (60/15min), `chatLimiter` (120/15min), `terminalLimiter` (60/15min), `previewLimiter` (30/15min). Broje se zahtevi (ne SSE trajanje) — broj agent turn-ova/procesa/preview boot-ova je ograničen, pojedinačni dugi stream nije pogođen.
+- **Verifikovano**: server `tsc --noEmit` čist, vitest **173/173**. Klijent netaknut.
+
+## Zadnji zadatak — HTTP request logging (FAZA 12, urađeno)
+- **Cilj**: ROADMAP Phase 2 — „Request/response logging". Server nije imao nikakav request logger, pa je debagovanje produkcije (spori Render deploy-ovi, 5xx) bilo slepo.
+- **Implementacija**: `server/src/lib/http-logger.ts` (novo) — `httpRequestLogger()` Express middleware loguje `[http] METHOD path → status (Nms)` na `res.finish`; `shouldSkipHttpLog` preskače OPTIONS/health/static (`/assets/`, `/uploads/`, `/favicon.ico`); 4xx→`console.warn`, 5xx→`console.error`, ostalo→`console.log`. Uvezan u `index.ts` odmah posle CORS (pre preview proxy-a, pa hvata sve zahteve).
+- **Testovi**: `http-logger.test.ts` (novo, 6 testova) — skip rules (OPTIONS/health/static) + format.
+- **Verifikovano**: server `tsc --noEmit` čist; vitest **173/173** (21 fajlova, +6 novih). Klijent netaknut ovog kruga.
+
+## Zadnji zadatak — Route-level code splitting (FAZA 11, urađeno)
+- **Cilj**: ROADMAP Phase 2 — bundle optimization. Build je emitovao JEDAN 1.9 MB JS chunk (gzip 544 KB) sa warning-om "chunks larger than 500 kB".
+- **Implementacija**: `App.tsx` — teške rute (`Workspace`, `Admin`, `Dashboard`, `Help`, `DeployManager`, `Knowledge`, `ImageStudio`, `ImageAgent`, `Marketplace`, `Connections`) prebačene na `React.lazy(() => import(...))`; `<Routes>` umotan u `<Suspense fallback={<RouteFallback />}>` (centriran „Učitavanje…" spinner). Auth/male stranice (`Login`, `Register`, `ForgotPassword`, `ResetPassword`, `VerifyEmail`, `GitHubAuthCallback`, `Onboarding`) ostaju eager.
+- **Rezultat**: initial bundle **1.9 MB → 367 KB (gzip 127 KB)**; Workspace chunk 1.4 MB (gzip 387 KB) se učitava tek posle logina; +12 per-route chunkova (Dashboard 9.5 KB, Admin 72 KB, Marketplace 14 KB…).
+- **Verifikovano**: `client tsc --noEmit` **0 grešaka**; `npm run build` prolazi (16 modula); jedini preostali warning je „sessions.ts dynamically+statically imported" (bezopasno — modul ostaje u Workspace chunku).
+
+## Zadnji zadatak — Client hardening: `tsc --noEmit` čist (FAZA 10, urađeno)
+- **Cilj**: TODO.md (hardening) — `client tsc --noEmit` imao je **97 grešaka** (95 TS6133 unused + 2 TS2322). Sada je **0**.
+- **Implementacija**:
+  - `TeamRunPanel.tsx` — 2 TS2322: `jobError` iz union tipa (`TeamJob | {role,...}`) renderovan kao `unknown`/`{}`; sada `"error" in job && typeof job.error === "string" ? job.error : undefined` (string | undefined).
+  - `DeployManager.tsx` — bio gutted stub (`<main><div /></main>`) sa 63 mrtvih importa/state-a/loadera; prepisan u minimalnu čistu verziju koja zadržava isti render (header + sidebar + prazan main).
+  - Uklonjeni unused importi/deklaracije u: `App.tsx` (OnboardingGuard `children`→`_props`), `DeploymentDetailPanel.tsx` (React), `EnginePicker.tsx` (`onDisconnectVps`), `EnterpriseResilience.tsx` (`loading/setLoading`), `EnterpriseSecurity.tsx` (`error`), `GlobalScalePanel.tsx` (`RuntimeNode`, `error/setError`), `InfrastructurePanel.tsx` (`updateInfraConfig`), `KanbanCommandCenter.tsx` (`COLUMN_COLORS`), `Marketplace.tsx` (`categories`, `setFilterCategory`), `McpMarketplace.tsx` (`machineId`), `SshInput.tsx` (`projectId`, mrtvi `testLoading`/`handleTestSsh`), `TeamPanel.tsx` (`updateTeam`), `Connections.tsx` (`getConnectionCategories`/`updateInstance`/`getAdapter`/`navigate`/`useNavigate`), `Help.tsx` (`loading/setLoading`), `Marketplace.tsx` pages (`addReview`/`getCreator`/`getCreatorAnalytics`/`navigate`), `Workspace.tsx` (`CollaboratorsPanel`, `showCollaborators`, `sessionId`→`_sessionId`).
+- **Verifikovano**: `client npx tsc --noEmit` — **0 grešaka** (bio 97); `client npm run build` prolazi (226 modula); server `tsc --noEmit` čist; vitest **167/167**.
+
+## Zadnji zadatak — Team → Closed Loop (FAZA 7d, urađeno)
+- **Cilj**: timski run se završavao na WAITING_APPROVAL → VERIFIED, a izmjene koje je tim napravio u sandboxu su ostajale ne-commit-ane. Sada odobravanje zatvara cijeli MVP lanac: GitHub → Tim → Diff → Approve → Commit → Push.
+- **Implementacija**:
+  - `POST /api/agent/team/:taskId/approve` (`agent.ts`) sada prima `{ push?, commitMessage?, diffHash? }` (push default true). Verifikuje da je task u WAITING_APPROVAL (inače 400), resolvuje aktivni repo (isti način kao `/api/repos/*`), `ensureWorkspace` → `approveAndCommitWorkspace(message, diffHash)` (stale-diff gate: 409 ako se sandbox promijenio od prikaza) → `pushWorkspace`. Perzistira `commitHash` na task (best-effort). Bez aktivnog repoa / offline DB → task se i dalje VERIFIED-uje bez commit-a (graceful). Push greška → commit je siguran lokalno, vraća `pushed:false` + `error`.
+  - Klijent: `team.ts` — `approveTeamTask(taskId, { push, commitMessage, diffHash })` + `TeamApproveResult` + `commitHash` u `TeamTask`. `TeamRunPanel.tsx` — na WAITING_APPROVAL jednom fetch-uje sandbox diff (`getRepoDiff`), prikazuje stat + hash + skraćeni diff + commit poruku, i dva dugmeta "✓ Odobri + push" / "✓ Odobri i commit"; poslije prikazuje commit hash + push status (ili upozorenje ako push nije uspio). 409 → refetch diff-a.
+- **Verifikovano**: novi `server/src/routes/agent-team-loop.test.ts` (5 E2E, offline bare remote): happy path commit+push + task VERIFIED sa commitHash + remote HEAD == local HEAD + commit poruka na remote-u; stale diffHash → 409 + ništa ne stiže na remote; approve prije WAITING_APPROVAL → 400; bez aktivnog repoa → committed:false ali VERIFIED; push:false → commit lokalno bez push-a. Server `tsc --noEmit` čist, vitest **164/164**, client build prolazi.
+
+## Zadnji zadatak — Finalni full-chain E2E test (FAZA 9, urađeno)
+- **Cilj**: plan (Objective) kaže "zatim **finalni test + screenshot**" — postojali su pojedinačni E2E testovi po iteracijama, ali ne i JEDAN test koji provlači ceo MVP lanac kroz realne module.
+- **Implementacija**: `server/src/e2e/full-chain.test.ts` (novo) — jedan tok, offline bare remote: (1) `ensureWorkspace` klonira (GitHub → Workspace), (2) agentova izmena = prava source promena (edit + novi test), (3) `runWorkspaceCommand` npm install kroz TerminalManager (Terminal/Process), (4) `startPreview` boot-uje pravi dev server + port detection + health (localhost/127.0.0.1) + same-origin proxy URL + stop (Live Preview), (5) `verifyWorkspace` build+test strukturisano (Verification), (6) `diffWorkspace` diff + SHA-256 fingerprint (Diff), (7) stale fingerprint → odbijen, trenutni → commit (Approval), (8) `pushWorkspace` → remote HEAD == local HEAD + agentov fajl na remote-u + commit poruka (Commit → Push). Plus `registrySize() >= 3` (procesi praćeni).
+- **Verifikovano**: test prolazi za <1s, server `tsc --noEmit` čist, vitest **167/167** (20 fajlova). Klijent netaknut ovog kruga. "Screenshot" deo plana = vizuelna UI verifikacija korisnika (preostaje uz pravi token).
+
+## Zadnji zadatak — Team Verification Gate (FAZA 8, urađeno)
+- **Cilj**: u MVP lancu (GitHub → Tim → Verification → Diff → Approval → Commit → Push) VERIFYING je bio prazna tranzicija — ništa se nije izvršavalo, run je samo prešao u WAITING_APPROVAL. Sada je to PRAVI gate: build + test moraju proći pre odobravanja.
+- **Implementacija**:
+  - `trackTeamTask` (`agent.ts`) — kad svi role job-ovi drain-uju: transition → VERIFYING → `runTeamVerification` (JEDNOM, guarded flag). `runTeamVerification`: resolvuje aktivni repo (best-effort), `ensureWorkspace`, provera `package.json` (nema manifesta → skip → WAITING_APPROVAL), `verifyWorkspace({ install: true, timeoutMs: 10min/korak, taskId })`, perzistira strukturisani rezultat na task (`verify` jsonb). Passed → WAITING_APPROVAL; failed → task FAILED sa `error: "Verifikacija nije prošla — <step> (exit N): <tail outputa>"`; infra greška → logged + treated kao "cannot verify" → WAITING_APPROVAL (platforma ne zaključava run).
+  - Migracija `0013_task_verify.sql` (`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS verify jsonb`, idempotentna) + journal entry + `verify: jsonb("verify")` u schema.ts + `verify?` u `TaskPatch`.
+  - Klijent: `team.ts` — `TeamVerifyResult`/`TeamVerifyStep` tipovi, `verify` u `TeamTask`. `TeamRunPanel.tsx` — "⏳ Verifikujem build + test…" tokom VERIFYING, zeleni/crveni blok sa per-step ✓/✗ (exit code + trajanje) kad `task.verify` postoji, crveni box sa `task.error` kad je FAILED.
+- **Verifikovano**: `agent-team-loop.test.ts` dobio 2 nova E2E testa (7 ukupno): passing fixture (package.json + node build + node --test) → VERIFYING → WAITING_APPROVAL sa `verify.passed=true` + build/test exit 0; failing fixture → FAILED sa error "Verifikacija nije prošla" + ime stepa. Server `tsc --noEmit` čist, vitest **166/166**, client build prolazi.
+
+## Zadnji zadatak — Agent Memory (FAZA 7b, urađeno)
+- **Cilj (audit FAZA 7b)**: background agent job-ovi su bili isključivo in-memory (`backgroundJobs` Map u `agent.ts`) → gubili su se na restart servera.
+- **Implementacija**:
+  - Nova tabela `agent_jobs` (`schema.ts` + migracija `0011_agent_jobs.sql` + journal entry) — id (uuid), userId, machineId, sessionId, status (running|done|error), error, finished, timeline (jsonb), timestamps. Idempotentna migracija (IF NOT EXISTS + DO $$ EXCEPTION WHEN duplicate_object).
+  - `server/src/lib/agent-jobs.ts` (novo) — CRUD (create/update/finish/get), `markStaleAgentJobsInterrupted(cutoffMs)` za pomirenje, plus čisti helperi `finalStatusForTimeline` i `isStaleAgentJob` (testirani).
+  - `routes/agent.ts`: `/background` sada generiše UUID (`randomUUID()`) umesto `bg-...` i **write-through** u `agent_jobs` pre odgovora; `runBackground` snima timeline u DB svake 3 s (periodic snapshot) i finalni `finishAgentJob` na kraju/grešci; `GET /background/:jobId` vraća in-memory job ili, ako ga nema (posle restarta), čita iz DB. Sve DB operacije best-effort (try/catch) — ako tabela još nije migrirana, stari in-memory tok i dalje radi.
+  - `index.ts`: posle `runMigrations()` na startu pomiri stale running jobove (marked error "Interrupted").
+- **Verifikovano**: server `tsc --noEmit` čist, vitest **142/142** (novih 8 testova u `agent-jobs.test.ts`), client build prolazi.
+- **Dodatno (isti krug)**: `runBackground` dobio 30-min hard timeout (`CONNECTION_TIMEOUT_MS`, kao `/send` SSE) — zaglavljeni engine više ne ostavlja job `running` zauvek; pri timeout-u abortuje remote session i perzistira "Agent turn timed out" kao error.
+
+## Zadnji zadatak — Team fan-out UI (klijent, urađeno)
+- **Cilj**: server ima `/api/agent/team` (per-slot QUEUED red + role fan-out) — nedostajao je klijentski UI koji ga zove i prikazuje per-role progres.
+- **Implementacija**:
+  - `client/src/lib/team.ts` (novo): `startTeamRun` (POST /agent/team), `fetchTeamTask` (GET /agent/team/:taskId), `approveTeamTask` (POST /agent/team/:taskId/approve) + tipovi (`TeamJob`, `TeamTask`, `TeamTaskDetail`).
+  - `client/src/components/workspace/TeamRunPanel.tsx` (novo): modal — prompt textarea, birač uloga (coding/testing/security/research/documentation), dugme "Pokreni tim", poll na 1.5s, per-role status badge + text/tool sažetak + error, task status (QUEUED→…→WAITING_APPROVAL→VERIFIED/FAILED), dugme "✓ Odobri rad tima" → approve → VERIFIED.
+  - `Workspace.tsx`: "👥 Tim" dugme u Agent headerLeft (pored RoleSelector) otvara panel; panel se renderuje uz BusHistoryPanel.
+- **Verifikovano**: client `npm run build` prolazi (226 modula, 0 grešaka). Server netaknut ovog kruga (vitest 153/153 iz prethodnog).
+
+## Zadnji zadatak — Task Queue + Team fan-out (FAZA 7b/7c, urađeno)
+- **Cilj**: `/api/agent/background` je pokretao job-ove odmah i konkurentno na jednom lokalnom engine-u; nedostajao je per-slot red zadataka (QUEUED) i fan-out na uloge.
+- **Implementacija**:
+  - **Per-slot FIFO red** (`agent.ts`): tačno JEDAN running job po (userId, machineId). Zauzet slot → novi job se perzistira kao `queued` (agent_jobs.status dobio `queued`) i čeka u redu; `releaseSlot` pokreće sledeći FIFO čim se tekući završi (setDone/catch). Payload (fullText/attachments/system) se čuva na in-memory job-u da queued job može da se izvrši kad dođe na red.
+  - **Team fan-out** (`POST /api/agent/team`): jedan prompt → N role-specific turn-ova (default coding/testing/security) preko `team-roles.ts` (čisti helperi `normalizeTeamRoles`/`buildRoleSystem`, testirani). Svaki turn ide kroz isti slot red (strogo sekvencijalno), sa role system promptom u pozadini (ne u chat). Persistentni `tasks` lifecycle: QUEUED → RUNNING → VERIFYING → WAITING_APPROVAL (ili FAILED); `POST /team/:taskId/approve` → VERIFIED. `GET /team/:taskId` vraća task + per-role job progres.
+  - `agent_jobs` dobio `task_id` + `label` kolone (migracija `0012_agent_jobs_task_label.sql`) + `listAgentJobsForTask`.
+  - `markStaleAgentJobsInterrupted` sada pomiri i `queued` job-ove (restart gubi in-memory red).
+- **Verifikovano**: server `tsc --noEmit` čist, vitest **153/153** (novih 10 testova u `team-roles.test.ts` + 1 u `agent-jobs.test.ts`).
+
 ## Zadnji zadatak — Uklanjanje sistemskog spama iz Panela 1 (Opcja A, urađeno)
 - **Uzrok**: Ask panel pokreće punoi agent turn kroz `runAgentTurn`, a sistemska uloga (`[SISTEMSKA ULOGA: Developer]` + prompts) bila je ugradjena DIREKTNO u tijelo vidljive korisničke poruke koju je model vidio i session pamti. Paralelno, server je u `agent.ts` prepend-ovao `[STRAXOR GITHUB CONTEXT]` (repo/branch/dir/slot) u isti vidljivi `fullText`. Zato se uloga i kontekst ispisuju u chatu i vraćaju pri restoru.
 - **Fix (Opcja A — uloga u pozadini kao pravi system prompt)**:
@@ -29,7 +221,7 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
 - **White screen root cause**: 15 client lib files had `const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001"`. Since `VITE_API_URL=""` (empty) is falsy, `||` fell through to `localhost`, breaking all API calls in production. Fixed by changing fallback to `""` (same‑origin).
 - **`client/.env`**: `VITE_API_URL=` empty → same‑origin `/api/*` calls. File is now tracked in git.
 - **Email**: Auth emails go through Resend HTTP API (`RESEND_API_KEY`) with console-log fallback in dev (`server/src/lib/mail.ts`). `server/.env` is gitignored; `.env.example` is tracked.
-- **Note**: Client `tsc --noEmit` still reports many pre‑existing errors (unused vars, implicit any in enterprise/scale/marketplace libs). Vite build (esbuild) does NOT type‑check, so `npm run build` passes — these are not blockers.
+- **Note**: Client `tsc --noEmit` je sada **čist (0 grešaka)** — prethodnih 97 pre-existing grešaka (unused vars) uklonjeno u FAZA 10 hardening fazi. Vite build (esbuild) i dalje ne type-check-a sam, ali `tsc --noEmit` prolazi.
 - **Lokalni engine**: `opencode-ai` npm paket (NE `opencode`) — sada je **dependency u `server/package.json` (1.18.11)** pinitan na (NE global). `resolveBin` (`server/src/runtime/local/engine.ts:76`) prvo traži `node_modules/.bin/opencode`, pa radi na Render/Linux bez global install-a. **FIX (Panel 1 visi "satima" u background mode na Renderu)**: na Renderu lokalni engine nije imao binary pa se nije mogao spawnati → background job nikad nije `finished` → klijent polla ~1h. Dodavanje `opencode-ai` kao deps rješava i streaming i background put (verifikovano: job `status=done`).
 - **OpenCode server eventi (≥1.16)**: streaming teksta = `message.part.delta` sa `properties.{messageID, field:"text", delta}`; puni snapshot = `message.part.updated` sa `properties.part`; tool parts u opencode 1.18.11 = `part.type==="tool"` sa `part.tool` (npr. "write"), `part.callID`, `part.state.status` (pending|running|completed|error), `part.state.input` (args), `part.state.output`/`part.state.error`. Stari `tool-call`/`tool-result` tipovi NE postoje u 1.18.11. Parser u `agent.ts` mapira `tool` → `tool_call`/`tool_result` SSE evente. Tačno JEDAN `session.idle` po turn-u; sessionID na `properties.sessionID`.
 - **agent.ts auth bug**: rute su čitale `(req as any).userId` (uvijek undefined); sada `router.use(requireAuth)` + `req.user!.userId`.
@@ -69,7 +261,6 @@ Definitivna arhitektura: GitHub repo konekcija = prioritet #1 (agent radi punom 
 - **(push test + puna lista repoa)** — čeka korisnikov pravi GitHub token unesen LIČNO kroz UI (GitRemotePanel → 🔑 Token → "GitHub Personal Access Token" polje; ili ⚙ PanelMenu → "GitHub token" → "+ Dodaj token"). Agent nikad ne rukuje sirovim tokenom. Nakon unosa: `/api/git-remote/github/repos` treba da vrati 200 + sve repoe (ne 401), i `POST /api/repos/push` → 200/OK → screenshot.
 
 ## Next Move
-1. **TODO #2 (memorisano, kad bude vremena)**: nadograditi `drizzle-orm` 0.36→0.45.x da reši HIGH (GHSA-gpj5-g38j-94v9). Major bump — prvo proučiti breaking changes (`relations()`, `postgres-js` binding), popraviti tipove, pa build + testovi. Stvarni rizik trenutno NIZAK (nema dinamičkih SQL identifikatora u kodu).
-2. **Korak C (kad bude vremena)**: Engine orkestracija sa više radnika — `/api/agent/send` prima JEDAN machineId, treba fan-out sloj + model-injekcija u engine spawn (trenutno samo `PORT` env u `engine.ts:137`). Odgođeno jer je jedini lokalni engine OpenCode.
-3. **FAZA 6**: Korisnik unese pravi token kroz UI (Workspace → bilo koji panel → ⚙ PanelMenu → "GitHub token" → "+ Dodaj token", ili stari put GitRemotePanel → "🔑 Token") → pokrenuti `POST /api/repos/push` (ili "↑ Push" dugme) → potvrditi 200/OK sa GitHub-a → screenshot.
-4. Per user's rule: do NOT touch tests or Swagger until password reset + email verification are confirmed working (potvrđeno radi u dev → rad na testovima otključan).
+1. **FAZA 6 pravi token (korisnik)**: korisnik unese pravi GitHub token kroz UI (⚙ PanelMenu → "GitHub token" → "+ Dodaj token") → `POST /api/repos/push` → 200/OK → screenshot.
+2. **Finalni UI screenshot (plan: "finalni test + screenshot")**: nakon unosa tokena — pokrenuti tim kroz UI na repou sa build+test, potvrditi VERIFYING → verify blok → WAITING_APPROVAL → diff → "Odobri + push" + screenshot produkcije.
+3. **drizzle-orm**: već na `^0.45.2` (HIGH GHSA-gpj5-g38j-94v9 rešen) — TODO #2 zatvoren.

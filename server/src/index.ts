@@ -46,6 +46,7 @@ import webResearchRoutes from "./routes/web-research.js";
 import acpRoutes from "./routes/acp.js";
 import gitRemoteRoutes from "./routes/git-remote.js";
 import repoRoutes from "./routes/repos.js";
+import terminalRoutes from "./routes/terminal.js";
 import githubConnectRoutes from "./routes/github-connect.js";
 import kanbanRoutes from "./routes/kanban.js";
 import mcpMarketplaceRoutes from "./routes/mcp-marketplace.js";
@@ -66,12 +67,19 @@ import modelsRouter from "./routes/models.js";
 import uploadRoutes, { UPLOADS_DIR } from "./routes/upload.js";
 import knowledgeRoutes from "./knowledge/api/routes.js";
 import { default as imageRoutes } from "./image/api/routes.js";
+import {
+  createPreviewProxyHandler,
+  createPreviewUpgradeHandler,
+} from "./runtime/local/preview-proxy.js";
 import { createMarketplaceRouter } from "./marketplace/api/routes.js";
 import { createConnectionsRouter } from "./connections/api/routes.js";
 import { imageAgentRoutes } from "./agents/image-agent/api/routes.js";
 import { verificationRoutes } from "./verification/api/routes.js";
 import appStateRoutes from "./routes/app-state.js";
 import handshakeSelfTestRoutes from "./routes/handshake-self-test.js";
+import docsRoutes from "./routes/docs.js";
+import webhookRoutes from "./routes/webhooks.js";
+import { httpRequestLogger } from "./lib/http-logger.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -86,6 +94,16 @@ app.use(cors({
   origin: (origin, cb) => cb(null, origin || true),
   credentials: true,
 }));
+
+// ── Observability: request/response logging ──
+app.use(httpRequestLogger());
+
+// ── Local preview reverse proxy ──
+// Mounted BEFORE express.json() so request bodies stream through untouched,
+// and before the /api rate limiter so a real app's asset requests are not
+// throttled. Token-protected via a short-lived httpOnly cookie (see
+// runtime/local/preview-proxy.ts).
+app.use("/api/preview/proxy", createPreviewProxyHandler());
 
 // ── Security: Rate limiting ──
 // Auth endpoints: stricter limit (20 per 15 min per IP)
@@ -104,6 +122,42 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
+});
+
+// Expensive/stateful routes get tighter per-IP budgets than the general 500.
+// These count requests (not SSE duration), which is what we want: the number
+// of agent turns / process spawns / preview boots is capped, while a single
+// long-running stream is unaffected.
+const agentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many agent requests, please slow down." },
+});
+
+const chatLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many chat requests, please slow down." },
+});
+
+const terminalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many terminal commands, please slow down." },
+});
+
+const previewLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many preview starts, please slow down." },
 });
 
 app.use(express.json({ limit: "1mb" }));
@@ -144,10 +198,10 @@ app.use("/api", apiLimiter);
 
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/projects", projectRoutes);
-app.use("/api/chat", chatRoutes);
+app.use("/api/chat", chatLimiter, chatRoutes);
 app.use("/api/machines", machineRoutes);
 app.use("/api/api-keys", apiKeyRoutes);
-app.use("/api/agent", agentRoutes);
+app.use("/api/agent", agentLimiter, agentRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/runtime", runtimeRoutes);
 app.use("/api/envs", envRoutes);
@@ -164,7 +218,7 @@ app.use("/api/browser-verify", browserVerifyRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/search", searchRoutes);
-app.use("/api/preview", previewRoutes);
+app.use("/api/preview", previewLimiter, previewRoutes);
 app.use("/api/database", databaseRoutes);
 app.use("/api/rollback", rollbackRoutes);
 app.use("/api/context", contextRoutes);
@@ -181,6 +235,7 @@ app.use("/api/web-research", webResearchRoutes);
 app.use("/api/acp", acpRoutes);
 app.use("/api/git-remote", gitRemoteRoutes);
 app.use("/api/repos", repoRoutes);
+app.use("/api/terminal", terminalLimiter, terminalRoutes);
 app.use("/api/github", githubConnectRoutes);
 app.use("/api/kanban", kanbanRoutes);
 app.use("/api/mcp-marketplace", mcpMarketplaceRoutes);
@@ -202,6 +257,8 @@ app.use("/api/knowledge", knowledgeRoutes);
 app.use("/api/image", imageRoutes);
 app.use("/api/support", supportRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/docs", docsRoutes);
+app.use("/api/webhooks", webhookRoutes);
 
 // Set up Marketplace Core (independent system)
 const marketplaceRouter = createMarketplaceRouter();
@@ -238,23 +295,47 @@ if (fs.existsSync(clientDist)) {
 // ── Run DB migrations before accepting requests ──
 import { runMigrations } from "./db/migrate.js";
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
 
+// Forward WebSocket upgrades (Vite/CRA HMR) for local previews through the
+// same proxy path so hot-reload works inside the production iframe.
+server.on("upgrade", createPreviewUpgradeHandler());
+
 runMigrations()
-  .then(() => {
+  .then(async () => {
     console.log("[migrate] Startup migrations check complete.");
+    try {
+      const { markStaleAgentJobsInterrupted } = await import("./lib/agent-jobs.js");
+      const stale = await markStaleAgentJobsInterrupted(Date.now() - 2 * 60 * 1000);
+      if (stale > 0) console.log(`[agent:memory] marked ${stale} interrupted job(s) from a previous run`);
+    } catch (err) {
+      console.log(`[agent:memory] stale-job reconciliation skipped: ${err instanceof Error ? err.message : err}`);
+    }
   })
   .catch((err) => {
     console.error("[migrate] Migration check failed:", err);
   });
 
-// ── Graceful shutdown: kill spawned local engine processes ──
+// ── Foundation janitor: orphan processes, stale tasks, task workspaces ──
+import { startCleanupScheduler, stopCleanupScheduler } from "./lib/cleanup.js";
+startCleanupScheduler();
+
+// ── Graceful shutdown: kill spawned local engine processes + stop janitor ──
 import { stopAllLocalEngines } from "./runtime/local/engine.js";
+import { stopAllPreviews } from "./runtime/local/preview.js";
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
   process.on(signal, () => {
-    stopAllLocalEngines();
+    try {
+      stopCleanupScheduler();
+    } catch {}
+    try {
+      stopAllLocalEngines();
+    } catch {}
+    try {
+      void stopAllPreviews();
+    } catch {}
     process.exit(0);
   });
 }

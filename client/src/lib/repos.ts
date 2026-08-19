@@ -77,6 +77,99 @@ export async function pushRepo() {
   });
 }
 
+export interface RepoVerifyStep {
+  name: "install" | "build" | "test";
+  command: string;
+  args: string[];
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+  passed: boolean;
+}
+
+export interface RepoVerifyResult {
+  success: boolean;
+  repo: string;
+  branch: string;
+  steps: RepoVerifyStep[];
+  passed: boolean;
+  skipped: boolean;
+}
+
+export async function verifyRepo(opts?: {
+  build?: boolean;
+  test?: boolean;
+  install?: boolean;
+  timeoutMs?: number;
+}): Promise<RepoVerifyResult> {
+  return api<RepoVerifyResult>(`/verify`, {
+    method: "POST",
+    body: JSON.stringify(opts ?? {}),
+  });
+}
+
+export interface RepoDiffResult {
+  success: boolean;
+  repo: string;
+  branch: string;
+  stat: string;
+  diff: string;
+  hash: string;
+}
+
+export async function getRepoDiff(): Promise<RepoDiffResult> {
+  return api<RepoDiffResult>(`/diff`);
+}
+
+export interface RepoApproveResult {
+  success: boolean;
+  repo: string;
+  branch: string;
+  committed: boolean;
+  hash: string;
+  message: string;
+  diffChanged: boolean;
+  empty: boolean;
+  pushed: boolean;
+  pushOutput: string;
+}
+
+export async function approveRepo(message: string, diffHash?: string, push = false): Promise<RepoApproveResult> {
+  return api<RepoApproveResult>(`/approve`, {
+    method: "POST",
+    body: JSON.stringify({ message, diffHash, push }),
+  });
+}
+
+export interface RepoWorkspaceInfo {
+  success: boolean;
+  connected: boolean;
+  repo?: string;
+  branch?: string;
+  sandboxDir?: string;
+  cloned: boolean;
+  readOnly: boolean;
+  connectionType?: string;
+  pushCapable?: boolean;
+  gitBinary?: boolean;
+}
+
+/**
+ * Clone/pull the active repo into the local sandbox so the local OpenCode
+ * engine has a real workspace to run in. Best-effort at the call site: when no
+ * repo is active the server returns 404 and the caller falls back to the bare
+ * sandbox (general-purpose agent) instead of failing the engine selection.
+ */
+export async function prepareRepo(): Promise<RepoWorkspaceInfo> {
+  return api<RepoWorkspaceInfo>(`/prepare`, { method: "POST" });
+}
+
+/** Report the active repo's local sandbox status without mutating it. */
+export async function getRepoWorkspace(): Promise<RepoWorkspaceInfo> {
+  return api<RepoWorkspaceInfo>(`/workspace`);
+}
+
 export async function connectRepoUrl(repoUrl: string) {
   const token = localStorage.getItem("token");
   const res = await fetch("/api/github/connect-url", {

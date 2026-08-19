@@ -43,7 +43,7 @@ interface SshDiagnostic {
   sshError: string;
 }
 
-export default function SshInput({ projectId, onConnected, onCancel, onStatusChange }: Props) {
+export default function SshInput({ onConnected, onCancel, onStatusChange }: Props) {
   const [host, setHost] = useState("");
   const [port, setPort] = useState("22");
   const [username, setUsername] = useState("root");
@@ -65,7 +65,7 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
   const hostValid = !!cleanHost && cleanHost !== "localhost" && cleanHost !== "127.0.0.1";
   const canSubmit = hostValid && portValid && !!cleanUsername && (authType === "key" ? !!privateKey.trim() : !!password.trim());
 
-  const handleTestSsh = async () => {
+const handleTestSsh = async () => {
     if (!canSubmit) { setError("Popuni sva polja ispravno."); return; }
     setTestLoading(true);
     setDiagnostic(null);

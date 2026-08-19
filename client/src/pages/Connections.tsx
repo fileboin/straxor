@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   listAdapters, listInstances, createInstance, deleteInstance,
-  getConnectionStats, getConnectionCategories, testConnection, executeConnection,
-  updateInstance, getAdapter,
+  getConnectionStats, testConnection, executeConnection,
 } from "../lib/connections";
 import type { AdapterInfo, ConnectionInstance } from "../lib/connections";
 
@@ -19,7 +17,6 @@ const CATEGORIES = [
 ];
 
 export default function Connections() {
-  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("browse");
   const [adapters, setAdapters] = useState<AdapterInfo[]>([]);
   const [instances, setInstances] = useState<ConnectionInstance[]>([]);
@@ -206,7 +203,7 @@ export default function Connections() {
                 ) : field.type === "select" ? (
                   <select value={formConfig[field.key] || ""} onChange={e => setFormConfig(p => ({ ...p, [field.key]: e.target.value }))}>
                     <option value="">-- Select --</option>
-                    {field.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    {field.options?.map((o: { value: string; label: string }) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 ) : (
                   <input type={field.type === "password" ? "password" : "text"} value={formConfig[field.key] || ""} onChange={e => setFormConfig(p => ({ ...p, [field.key]: e.target.value }))} placeholder={field.placeholder} />

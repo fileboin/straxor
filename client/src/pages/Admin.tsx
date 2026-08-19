@@ -308,7 +308,7 @@ export default function Admin() {
           {loading && <div className="flex items-center justify-center h-32"><div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>}
 
           {/* ── Dashboard ── */}
-          {!loading && tab === "dashboard" && dashStats && (
+          {!loading && tab === "dashboard" && dashStats && dashStats.system && dashStats.featureFlags && (
             <div className="space-y-6">
               <div className="flex items-center justify-between"><h2 className="text-[16px] font-bold text-text">System Overview</h2></div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

@@ -35,7 +35,7 @@ const COMPLIANCE_STANDARDS = [
 export default function EnterpriseSecurity({ onClose }: Props) {
   const [tab, setTab] = useState<Tab>("audit");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [, setError] = useState("");
   const [actionMsg, setActionMsg] = useState("");
 
   // Audit
@@ -420,7 +420,7 @@ export default function EnterpriseSecurity({ onClose }: Props) {
                       : compResult.findings as ComplianceFinding[];
                     return (
                       <div className="space-y-1">
-                        {findings.map((f, i) => (
+                        {findings.map((f: ComplianceFinding, i: number) => (
                           <div key={i} className="flex items-center gap-2 text-[11px]">
                             <span>{f.passed ? "✅" : "❌"}</span>
                             <span className="text-text font-medium">{f.control}</span>
