@@ -42,6 +42,31 @@ export async function runMigrations(): Promise<void> {
   );
   const drizzleDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../drizzle");
 
+  // Self-heal: an existing DB was baselined without running old journal entries,
+  // so tables added mid-lifecycle (e.g. agent_bus_events) may be missing. Check
+  // each known table and run its migration file idempotently if absent.
+  const ensureTables: Record<string, string> = {
+    agent_bus_events: "0008_agent_bus_events",
+  };
+  for (const [table, tag] of Object.entries(ensureTables)) {
+    const [exists] = await client`
+      select count(*)::int as n from information_schema.tables
+      where table_schema = 'public' and table_name = ${table}
+    `;
+    if (exists && exists.n > 0) continue;
+    const file = path.join(drizzleDir, `${tag}.sql`);
+    if (!fs.existsSync(file)) continue;
+    console.log(`[migrate] Missing table "${table}" — applying ${tag}.sql`);
+    const sqlText = fs.readFileSync(file, "utf8");
+    const statements = sqlText
+      .split("--> statement-breakpoint")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const stmt of statements) {
+      await client.unsafe(stmt);
+    }
+  }
+
   if (!fs.existsSync(journalPath)) {
     console.warn("[migrate] journal not found at", journalPath, "— skipping");
     await client.end();

@@ -166,25 +166,36 @@ router.post("/bus/transfer", async (req: Request, res: Response) => {
     targetRepo: targetRepo || null,
   };
 
-  const [event] = await db.insert(agentBusEvents).values({
-    sessionId,
-    userId,
-    chainId: resolvedChainId,
-    fromPanel: from,
-    toPanel: to,
-    action,
-    status,
-    hopCount: resolvedHopCount,
-    warning: analysis.warning || null,
-    prompt: analysis.prompt,
-    content,
-    metadata: JSON.stringify(metadata),
-    updatedAt: new Date(),
-  }).returning();
+  // Best-effort persistence: if the agent_bus_events table has not been
+  // migrated (e.g. a baselined production DB), the transfer still returns the
+  // full analysis so the bus flow works — persistence just degrades silently.
+  let event: { id: string; createdAt: Date } | null = null;
+  try {
+    const [inserted] = await db.insert(agentBusEvents).values({
+      sessionId,
+      userId,
+      chainId: resolvedChainId,
+      fromPanel: from,
+      toPanel: to,
+      action,
+      status,
+      hopCount: resolvedHopCount,
+      warning: analysis.warning || null,
+      prompt: analysis.prompt,
+      content,
+      metadata: JSON.stringify(metadata),
+      updatedAt: new Date(),
+    }).returning();
+    event = { id: inserted.id, createdAt: inserted.createdAt };
+  } catch (err) {
+    console.warn(
+      `[agent:bus] transfer persistence skipped (table not migrated?): ${err instanceof Error ? err.message : err}`
+    );
+  }
 
   res.json({
-    id: event.id,
-    createdAt: event.createdAt,
+    id: event?.id ?? null,
+    createdAt: event?.createdAt ?? new Date(),
     from,
     to,
     action,
@@ -208,11 +219,18 @@ router.get("/bus/:sessionId", async (req: Request, res: Response) => {
   const userId = String(req.user!.userId);
   const sessionId = String(req.params.sessionId);
 
-  const rows = await db
-    .select()
-    .from(agentBusEvents)
-    .where(and(eq(agentBusEvents.sessionId, sessionId), eq(agentBusEvents.userId, userId)))
-    .orderBy(desc(agentBusEvents.createdAt));
+  let rows: typeof agentBusEvents.$inferSelect[] = [];
+  try {
+    rows = await db
+      .select()
+      .from(agentBusEvents)
+      .where(and(eq(agentBusEvents.sessionId, sessionId), eq(agentBusEvents.userId, userId)))
+      .orderBy(desc(agentBusEvents.createdAt));
+  } catch (err) {
+    console.warn(
+      `[agent:bus] list skipped (table not migrated?): ${err instanceof Error ? err.message : err}`
+    );
+  }
 
   res.json(rows.map((row) => ({
     id: row.id,
@@ -242,11 +260,20 @@ router.post("/bus/:eventId/status", async (req: Request, res: Response) => {
     return;
   }
 
-  const [updated] = await db
-    .update(agentBusEvents)
-    .set({ status, updatedAt: new Date() })
-    .where(and(eq(agentBusEvents.id, eventId), eq(agentBusEvents.userId, userId)))
-    .returning();
+  // Best-effort: a missing agent_bus_events table must never crash the server.
+  let updated: typeof agentBusEvents.$inferSelect | undefined;
+  try {
+    const [row] = await db
+      .update(agentBusEvents)
+      .set({ status, updatedAt: new Date() })
+      .where(and(eq(agentBusEvents.id, eventId), eq(agentBusEvents.userId, userId)))
+      .returning();
+    updated = row;
+  } catch (err) {
+    console.warn(
+      `[agent:bus] status update skipped (table not migrated?): ${err instanceof Error ? err.message : err}`
+    );
+  }
 
   if (!updated) {
     res.status(404).json({ error: "Bus event not found" });
