@@ -249,11 +249,11 @@ export async function runAgentTurn(msg: string, attachments: Attachment[] | unde
     },
     onError: (error) => {
       if (ctx.onErrorFallback) {
-        ctx.onErrorFallback(error);
+        ctx.onErrorFallback(error || "Nepoznata greška");
         return;
       }
       ctx.setMessages((prev) =>
-        prev.map((m) => (m.id === ctx.assistantMsgId ? { ...m, content: m.content + `\n\n[Greška: ${error}]` } : m))
+        prev.map((m) => (m.id === ctx.assistantMsgId ? { ...m, content: m.content + `\n\n[Greška: ${error || "Nepoznata greška"}]` } : m))
       );
       ctx.setStreamingId(null);
       ctx.setLoading(false);

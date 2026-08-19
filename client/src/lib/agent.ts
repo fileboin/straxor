@@ -79,7 +79,7 @@ export async function streamAgentMessage(
       if (finished) return;
       finished = true;
       cleanup();
-      callbacks.onError(message);
+      callbacks.onError(message || "Nepoznata greška");
     };
     finishDone = () => {
       if (finished) return;
@@ -161,7 +161,7 @@ export async function streamAgentMessage(
               finishDone();
               return;
             case "error":
-              finishError(event.message);
+              finishError(event.message || event.content || "Agent error");
               return;
           }
         } catch {}
