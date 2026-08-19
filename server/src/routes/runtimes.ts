@@ -16,30 +16,34 @@ import type {
 const router = Router();
 
 // ── Initialize runtimes on first request ──
+// Static (non user-bound) runtimes are registered once. The OpenCode adapter is
+// user-bound (it decrypts that user's SSH creds / repo tokens), so it must be
+// (re)registered per-request with the CURRENT user's id — otherwise the first
+// caller's userId sticks forever and every other user gets "Machine not found".
 let initialized = false;
 
 function ensureInit(userId: string) {
-  if (initialized) return;
-  initialized = true;
-
   const mgr = getRuntimeManager();
 
-  // Register OpenCode
-  mgr.register(
-    {
-      id: "opencode",
-      name: "OpenCode",
-      description: "Open-source AI coding agent — SSH-based, local or remote VPS",
-      icon: "◇",
-      color: "text-blue-400",
-      repoUrl: "https://github.com/opencode-ai/opencode",
-      isInstalled: true,
-      isEnabled: true,
-    },
-    createOpenCodeUniversalAdapter(userId)
-  );
+  if (!initialized) {
+    initialized = true;
 
-  // Register Crush
+    // Register OpenCode definition once (adapter is re-registered per request)
+    mgr.register(
+      {
+        id: "opencode",
+        name: "OpenCode",
+        description: "Open-source AI coding agent — SSH-based, local or remote VPS",
+        icon: "◇",
+        color: "text-blue-400",
+        repoUrl: "https://github.com/opencode-ai/opencode",
+        isInstalled: true,
+        isEnabled: true,
+      },
+      createOpenCodeUniversalAdapter(userId)
+    );
+
+    // Register Crush
   mgr.register(
     {
       id: "crush",
@@ -133,6 +137,23 @@ function ensureInit(userId: string) {
       async executeCommand() { throw new Error("Not implemented"); },
     });
   }
+  }
+
+  // OpenCode is user-bound — rebind it to the current caller every request so
+  // health/restart/reconnect/send always decrypt the RIGHT user's machine creds.
+  mgr.register(
+    {
+      id: "opencode",
+      name: "OpenCode",
+      description: "Open-source AI coding agent — SSH-based, local or remote VPS",
+      icon: "◇",
+      color: "text-blue-400",
+      repoUrl: "https://github.com/opencode-ai/opencode",
+      isInstalled: true,
+      isEnabled: true,
+    },
+    createOpenCodeUniversalAdapter(userId)
+  );
 }
 
 // GET /api/runtimes — list all registered runtimes

@@ -198,11 +198,9 @@ function isReachable(health: RuntimeHealth | null | undefined): boolean {
  *
  * 1. Calls GET /runtimes/opencode/health.
  * 2. If it returns running → ready.
- * 3. If the check throws or reports not-running, it attempts an automatic
- *    reconnect (POST /runtimes/opencode/reconnect) so the daemon is restored
- *    without forcing the user to click connect again.
- * 4. Returns "reconnecting" while the reconnect attempt is in flight and
- *    "offline"/"error" if it could not be restored.
+ * 3. Otherwise → offline. NO automatic reconnect: reconnecting to a VPS is a
+ *    MANUAL action the user takes from the SSH form / engine menu, never a
+ *    silent background side-effect of restore or navigation.
  *
  * `machineId` is the concrete VPS machine id (never a `local:` id).
  */
@@ -226,19 +224,9 @@ export async function verifyVpsConnection(
     return { vpsStatus: "ready", health };
   }
 
-  // Not reachable → try an automatic reconnect before giving up.
-  try {
-    const reconnected = await withTimeout(
-      reconnectRuntime(machineId, "opencode"),
-      timeout
-    );
-    if (isReachable(reconnected)) {
-      return { vpsStatus: "ready", health: reconnected };
-    }
-    return { vpsStatus: "offline", health: reconnected };
-  } catch {
-    return { vpsStatus: "offline", health: null };
-  }
+  // Not reachable → report offline. The user decides whether/when to reconnect
+  // manually; the app never auto-triggers a VPS connection from the main loop.
+  return { vpsStatus: "offline", health };
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

@@ -1,13 +1,16 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
+import { requireAuth } from "../middleware/auth.js";
 import { getAdapters } from "../adapters/registry.js";
 import type { RuntimeChannel } from "../adapters/runtime/adapter.js";
 
 const router = Router();
 
+router.use(requireAuth);
+
 // GET /api/runtime/health/:machineId — health check
 router.get("/health/:machineId", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.user!.userId;
   const machineId = req.params.machineId as string;
 
   try {
@@ -22,7 +25,7 @@ router.get("/health/:machineId", async (req: Request, res: Response) => {
 
 // POST /api/runtime/restart/:machineId — restart opencode
 router.post("/restart/:machineId", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.user!.userId;
   const machineId = req.params.machineId as string;
 
   try {
@@ -37,7 +40,7 @@ router.post("/restart/:machineId", async (req: Request, res: Response) => {
 
 // POST /api/runtime/reconnect/:machineId — reconnect SSH
 router.post("/reconnect/:machineId", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.user!.userId;
   const machineId = req.params.machineId as string;
 
   try {
@@ -52,7 +55,7 @@ router.post("/reconnect/:machineId", async (req: Request, res: Response) => {
 
 // POST /api/runtime/update/:machineId — update runtime
 router.post("/update/:machineId", async (req: Request, res: Response) => {
-  const userId = (req as any).userId as string;
+  const userId = req.user!.userId;
   const machineId = req.params.machineId as string;
   const { channel, version } = req.body as {
     channel: RuntimeChannel;

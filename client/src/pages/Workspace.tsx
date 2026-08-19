@@ -987,8 +987,8 @@ export default function Workspace() {
           vpsMachineId = String(full.machineId || "").replace(/^local:/, "");
         }
         if (vpsMachineId) {
-          // Do NOT show a blind "ready" — verify the daemon is actually alive,
-          // and auto-reconnect if it silently died.
+          // Verify the daemon is actually alive; if not, report offline.
+          // No auto-reconnect — reconnecting a VPS is always a manual action.
           setVpsStatus("reconnecting");
           void verifyVpsConnection(vpsMachineId).then((result) => {
             setVpsStatus(result.vpsStatus === "ready" ? "ready" : "offline");
@@ -2836,12 +2836,12 @@ export default function Workspace() {
       keywords: ["dashboard", "pocetna", "home"],
       action: () => window.location.href = "/dashboard",
     },
-  ], [
+  ].filter((c) => !(c.id === "admin" && !isAdmin(user))), [
     navigate, theme, setAppTheme,
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     openSshModalForCurrentPanel, setShowDeployModal, setShowExportModal, setShowEnvModal,
     setShowPermissionsModal, setShowNotifications, setShowPromptLibrary,
-    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization, setShowEnterprise, setShowPlugins, setShowMarketplace, setShowScale, setShowResilience, setShowAdmin,
+    setAgentRole, setShowRollback, setShowContext, setShowGateway, setShowProviders, setShowMultiAgent, setShowHomeCenter, setShowDesignAssets, setShowUsage, setShowRuntimeManager, setShowQuickStart, setShowKanban, setShowMcpMarketplace, setShowInfrastructure, setShowTeams, setShowOrganization, setShowEnterprise, setShowPlugins, setShowMarketplace, setShowScale, setShowResilience, setShowAdmin, user, isAdmin,
   ]);
 
   return (
@@ -3735,8 +3735,8 @@ export default function Workspace() {
               } catch {}
             }
             if ((session.machineId && !session.machineId.startsWith("local:")) || askMachineId || agentMachineId) {
-              // Verify the daemon is actually alive before showing "ready",
-              // and auto-reconnect if it silently died.
+              // Verify the daemon is actually alive before showing "ready".
+              // No auto-reconnect — reconnecting a VPS is always a manual action.
               const vpsId = String(
                 (agentMachineId && !String(agentMachineId).startsWith("local:"))
                   ? agentMachineId

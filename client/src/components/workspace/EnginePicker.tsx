@@ -144,6 +144,19 @@ export default function EnginePicker({
           {mode === "vps" && <span className="ml-auto text-[9px] shrink-0" style={{ color: "#60a5fa" }}>●</span>}
         </button>
 
+        {mode === "vps" && onDisconnectVps && (
+          <button
+            onClick={() => { setOpen(false); onDisconnectVps(); }}
+            className="w-full flex items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
+          >
+            <span className="text-base leading-none mt-0.5">⏻</span>
+            <span className="min-w-0">
+              <span className="block text-[11px] font-medium" style={{ color: "var(--text)" }}>Prekini vezu</span>
+              <span className="block text-[9px]" style={{ color: "var(--text-muted)" }}>Odspoji ovaj panel sa VPS mašine</span>
+            </span>
+          </button>
+        )}
+
         <button
           onClick={() => { setOpen(false); onOpenGitRemote(); }}
           className="w-full flex items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-surface-2"

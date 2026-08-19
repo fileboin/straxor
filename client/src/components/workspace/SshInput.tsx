@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "../../lib/api.js";
-import { listMachines } from "../../lib/machines.js";
 
 interface Props {
   projectId?: string;
@@ -55,10 +54,8 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
   const [status, setStatus] = useState<ProvisionStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState("");
-  const [prefilled, setPrefilled] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
   const [diagnostic, setDiagnostic] = useState<SshDiagnostic | null>(null);
-  const [existingMachineId, setExistingMachineId] = useState<string | null>(null);
 
   // Čisti vrednosti polja — bez ikakve logike parsiranja
   const cleanHost = sanitizeField(host);
@@ -67,32 +64,6 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
   const portValid = Number.isFinite(cleanPort) && cleanPort > 0 && cleanPort <= 65535;
   const hostValid = !!cleanHost && cleanHost !== "localhost" && cleanHost !== "127.0.0.1";
   const canSubmit = hostValid && portValid && !!cleanUsername && (authType === "key" ? !!privateKey.trim() : !!password.trim());
-
-  useEffect(() => {
-    let mounted = true;
-    listMachines()
-      .then((machines) => {
-        if (!mounted || prefilled) return;
-        const sorted = [...machines]
-          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-        // Preferujemo mašinu koja je već povezana/ready za Disconnect dugme
-        const connected = sorted.find((m) => m.status === "ready" || m.status === "provisioning" || m.status === "connecting");
-        const latest = connected || sorted.filter((m) => m.status !== "error")[0];
-        if (!latest) return;
-        setHost(latest.host || "");
-        setPort(String(latest.port || 22));
-        setUsername(latest.username || "root");
-        setAuthType(latest.authType === "key" ? "key" : "password");
-        setMachineName(latest.name || "");
-        // Ako je mašina već spojena, pokažemo Disconnect dugme odmah
-        if (connected) {
-          setExistingMachineId(connected.id);
-        }
-        setPrefilled(true);
-      })
-      .catch(() => {});
-    return () => { mounted = false; };
-  }, [prefilled]);
 
   const handleTestSsh = async () => {
     if (!canSubmit) { setError("Popuni sva polja ispravno."); return; }
@@ -134,26 +105,20 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
     setDiagnostic(null);
 
     try {
-      let machineId = existingMachineId;
-
-      // Ako nema prethodno kreiranog recorda — kreiraj novi
-      if (!machineId) {
-        const machine = await api<{ id: string }>("/machines", {
-          method: "POST",
-          body: JSON.stringify({
-            // projectId se namerno ne salje — VPS masine su globalne za korisnika
-            name: machineName.trim() || `${cleanUsername}@${cleanHost}`,
-            host: cleanHost,
-            port: cleanPort,
-            username: cleanUsername,
-            authType,
-            password: authType === "password" ? password.trim() : undefined,
-            privateKey: authType === "key" ? privateKey.trim() : undefined,
-          }),
-        });
-        machineId = machine.id;
-        setExistingMachineId(machine.id);
-      }
+      const machine = await api<{ id: string }>("/machines", {
+        method: "POST",
+        body: JSON.stringify({
+          // projectId se namerno ne salje — VPS masine su globalne za korisnika
+          name: machineName.trim() || `${cleanUsername}@${cleanHost}`,
+          host: cleanHost,
+          port: cleanPort,
+          username: cleanUsername,
+          authType,
+          password: authType === "password" ? password.trim() : undefined,
+          privateKey: authType === "key" ? privateKey.trim() : undefined,
+        }),
+      });
+      const machineId = machine.id;
 
       const token = localStorage.getItem("token");
       const response = await fetch(`/api/machines/${machineId}/provision`, {
@@ -223,32 +188,6 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
     }
   };
 
-  async function handleDisconnect() {
-    if (!existingMachineId) { setError("Nema aktivne veze"); return; }
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`/api/machines/${existingMachineId}/disconnect`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Disconnect failed" }));
-        throw new Error((err as any).error || "Disconnect failed");
-      }
-      // Success: clear local state and close panel
-      setExistingMachineId(null);
-      setStatus("idle");
-      setStatusMessage("");
-      onStatusChange?.("disconnected");
-      onCancel();
-    } catch (err: any) {
-      setError(err?.message ?? "Disconnect failed");
-    }
-  }
-
   // Prikaz toka (connecting / checking / ready / error)
   if (status !== "idle") {
     return (
@@ -275,7 +214,6 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
                 setStatus("idle");
                 setStatusMessage("");
                 setError("");
-                // Ne brišemo existingMachineId — reuse istog recorda na retry
               }}
               className="flex-1 py-2 text-sm font-medium rounded-lg border border-border bg-surface-2 text-text-secondary hover:text-text transition-colors"
             >
@@ -302,12 +240,6 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
         <h3 className="text-sm font-semibold">SSH / VPS konekcija</h3>
         <button onClick={onCancel} className="text-text-muted hover:text-text text-xs transition-colors">✕</button>
       </div>
-
-      {prefilled && (
-        <div className="px-2.5 py-2 rounded-lg border border-green-500/20 bg-green-500/10 text-[11px] text-green-300">
-          Forma je popunjena iz posljednje VPS mašine.
-        </div>
-      )}
 
       {/* Naziv */}
       <div>
@@ -414,19 +346,11 @@ export default function SshInput({ projectId, onConnected, onCancel, onStatusCha
 
       {/* Dugmad */}
       <div className="flex gap-2">
-        {existingMachineId ? (
-          <button type="button" onClick={handleDisconnect}
-            className="flex-1 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:opacity-85 transition-colors">
-            Prekini vezu
-          </button>
-        ) : (
-          <button type="button" onClick={handleConnect}
-            disabled={!canSubmit}
-            className="flex-1 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:opacity-85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-            Poveži i pokreni
-          </button>
-        )}
-        
+        <button type="button" onClick={handleConnect}
+          disabled={!canSubmit}
+          className="flex-1 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:opacity-85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+          Poveži i pokreni
+        </button>
       </div>
     </div>
   );
