@@ -1615,13 +1615,32 @@ export default function Workspace() {
       } catch (error) {
         if (!isMine()) return;
         const message = error instanceof Error ? error.message : "Network error";
-        setAskMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantMsg.id
-              ? { ...m, content: m.content + `\n\n[Greška: ${message}]` }
-              : m
-          )
-        );
+        const isVpsBound = !!askMachineId && !askMachineId.startsWith("local:");
+        const timedOut = /timeout|timed out|prekoračio|vremensko/i.test(message);
+        // Graceful degradation: a VPS that does not answer within the deadline
+        // must never leave the panel spinning or show an unreadable error. Drop
+        // to the local OpenCode engine and tell the user clearly.
+        if (isVpsBound && timedOut) {
+          setAskMachineId("local:opencode:ask");
+          setAskSessionId(null);
+          setVpsStatus("offline");
+          setAskEnginePrep({ status: "ready", message: "Timeout: VPS nije odgovorio — koristi lokalni model" });
+          setAskMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsg.id
+                ? { ...m, content: m.content + `\n\n[Timeout: VPS nije odgovorio, koristi lokalni model]` }
+                : m
+            )
+          );
+        } else {
+          setAskMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsg.id
+                ? { ...m, content: m.content + `\n\n[Greška: ${message}]` }
+                : m
+            )
+          );
+        }
         setAskStreamingId(null);
         setAskLoading(false);
       }
@@ -3174,6 +3193,8 @@ export default function Workspace() {
             orchestratedModels={askOrchestratedModels}
             onOrchestratedModelsChange={setAskOrchestratedModels}
             availableModels={availableModels}
+            engineLabel={askMachineId && askMachineId.startsWith("local:") ? "Local" : (vpsStatus === "ready" ? "VPS" : "Local")}
+            uiModelLabel={askModel}
             runtimeControl={
               <EnginePicker
                 machineId={askMachineId}
@@ -3341,6 +3362,8 @@ export default function Workspace() {
              orchestratedModels={agentOrchestratedModels}
              onOrchestratedModelsChange={setAgentOrchestratedModels}
              availableModels={availableModels}
+             engineLabel={agentMachineId && agentMachineId.startsWith("local:") ? "Local" : (vpsStatus === "ready" ? "VPS" : "Local")}
+             uiModelLabel={agentModel}
              background={agentBackground}
              onBackgroundChange={setAgentBackground}
              headerContent={

@@ -138,6 +138,10 @@ interface Props {
   onFocusChange?: (focused: boolean) => void;
   /** Whether the panel menu is enabled */
   panelMenuEnabled?: boolean;
+  /** Engine layer label (VPS/Local) — the backend that executes tasks. */
+  engineLabel?: string;
+  /** UI Chat model label — the model from the panel's model dropdown. */
+  uiModelLabel?: string;
 }
 
 const ACCEPTED_EXT_RE = /\.(jpe?g|png|webp|gif|avif|mp3|wav|ogg|webm|m4a|pdf|txt|md|csv|json)$/i;
@@ -320,6 +324,8 @@ function ChatPanel({
   orbLabel,
   onFocusChange,
   panelMenuEnabled = true,
+  engineLabel,
+  uiModelLabel,
 }: Props) {  const [input, setInput] = useState(draftInput || "");
   useLang();
   const [showModelPicker, setShowModelPicker] = useState(false);
@@ -953,6 +959,28 @@ function ChatPanel({
             {headerStatus}
           </div>
           <div className="flex items-center gap-1 shrink-0 flex-wrap sm:gap-2">
+            {uiModelLabel && (
+              <span
+                className="inline-flex items-center gap-1 px-1.5 h-6 rounded-md border border-border bg-surface-3 text-[10px] font-medium text-text-secondary max-w-[160px] truncate"
+                title={`UI Model: ${uiModelLabel}`}
+              >
+                <span className="shrink-0 text-text-muted">UI</span>
+                <span className="truncate">{uiModelLabel}</span>
+              </span>
+            )}
+            {engineLabel && (
+              <span
+                className={`inline-flex items-center gap-1 px-1.5 h-6 rounded-md border text-[10px] font-medium ${
+                  engineLabel.startsWith("VPS")
+                    ? "border-blue-500/40 bg-blue-500/10 text-blue-400"
+                    : "border-accent/40 bg-accent/10 text-accent"
+                }`}
+                title={`Engine: ${engineLabel}`}
+              >
+                <span className="shrink-0 opacity-70">Engine</span>
+                <span className="truncate">{engineLabel}</span>
+              </span>
+            )}
             {runtimeControl}
             {onBackgroundChange && (
               <div className="hidden md:flex items-center gap-0.5">
