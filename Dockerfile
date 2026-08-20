@@ -6,19 +6,18 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 
-# Client first: install and build the Vite app.
+# The client imports type-only modules from server/src (marketplace types), so
+# the whole repo must be present in the build stage.
 COPY client/package.json client/package-lock.json ./client/
-RUN cd client && npm ci
-
-COPY client/ ./client/
-RUN cd client && npm run build
-
-# Server: install deps, then compile TypeScript to dist/.
 COPY server/package.json server/package-lock.json ./server/
-RUN cd server && npm ci
-
+COPY client/ ./client/
 COPY server/ ./server/
-RUN cd server && npx tsc
+
+# Build the Vite client (its source is under /app/client; server types resolve).
+RUN cd client && npm ci && npm run build
+
+# Compile the server TypeScript to dist/.
+RUN cd server && npm ci && npx tsc
 
 # ── Runtime image ──
 FROM node:22-alpine AS runtime
