@@ -12,7 +12,7 @@
 // No raw key is ever logged or returned to the client.
 
 import { getDirectProviderManager } from "../../adapters/direct-providers/manager.js";
-import { listOllamaModels, pickOllamaCodingModel, OLLAMA_DEFAULT_BASE_URL } from "../../lib/ollama.js";
+import { listOllamaModels, pickOllamaCodingModel, ollamaOpenAiBaseUrl, OLLAMA_DEFAULT_BASE_URL } from "../../lib/ollama.js";
 
 export interface OpenCodeModelConfig {
   env: Record<string, string>;
@@ -65,7 +65,9 @@ export function openCodeModelConfig(
   // Ollama first: OpenCode talks DIRECTLY to the local Ollama HTTP API (no
   // FCC, no proxy, no cloud redirect). Ollama needs no API key.
   if (ollama?.model) {
-    const baseUrl = ollama.baseUrl.replace(/\/+$/, "");
+    // OpenCode's ollama provider appends /chat/completions, so it needs the
+    // OpenAI-compatible /v1 base URL (root 11434 would 404 on that path).
+    const baseUrl = ollamaOpenAiBaseUrl(ollama.baseUrl);
     const configContent = JSON.stringify(
       {
         $schema: "https://opencode.ai/config.json",

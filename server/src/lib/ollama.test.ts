@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { pickOllamaCodingModel, OLLAMA_CODING_MODEL_PREFERENCE, type OllamaModel } from "./ollama.js";
+import { pickOllamaCodingModel, ollamaOpenAiBaseUrl, OLLAMA_CODING_MODEL_PREFERENCE, type OllamaModel } from "./ollama.js";
 import { openCodeModelConfig } from "../runtime/local/opencode-model.js";
+
+describe("ollamaOpenAiBaseUrl", () => {
+  it("appends /v1 to the root base URL", () => {
+    expect(ollamaOpenAiBaseUrl("http://localhost:11434")).toBe("http://localhost:11434/v1");
+  });
+
+  it("strips trailing slashes before appending /v1", () => {
+    expect(ollamaOpenAiBaseUrl("http://localhost:11434/")).toBe("http://localhost:11434/v1");
+  });
+
+  it("does not double-add /v1 when already present", () => {
+    expect(ollamaOpenAiBaseUrl("http://localhost:11434/v1")).toBe("http://localhost:11434/v1");
+    expect(ollamaOpenAiBaseUrl("http://localhost:11434/v1/")).toBe("http://localhost:11434/v1");
+  });
+});
 
 describe("pickOllamaCodingModel", () => {
   it("prefers a coder model from the live tag list", () => {
@@ -38,7 +53,7 @@ describe("openCodeModelConfig → Ollama", () => {
     expect(result.model).toBe("qwen-coder:7b");
     expect(result.env).toEqual({});
     expect(result.configContent).toContain('"model": "ollama/qwen-coder:7b"');
-    expect(result.configContent).toContain('"baseURL": "http://localhost:11434"');
+    expect(result.configContent).toContain('"baseURL": "http://localhost:11434/v1"');
     expect(result.configContent).not.toContain("FCC");
     expect(result.configContent).not.toContain("proxy");
   });

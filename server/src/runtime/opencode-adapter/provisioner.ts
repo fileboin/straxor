@@ -1,5 +1,5 @@
 import type { SSHClient } from "./ssh.js";
-import { pickOllamaCodingModel, type OllamaModel } from "../../lib/ollama.js";
+import { pickOllamaCodingModel, ollamaOpenAiBaseUrl, type OllamaModel } from "../../lib/ollama.js";
 
 export type ProvisionStatus =
   | "connecting"
@@ -131,7 +131,9 @@ export async function configureOpenCodeForOllama(
     small_model: `ollama/${model}`,
     provider: {
       ollama: {
-        options: { baseURL: baseUrl },
+        // OpenCode's ollama provider appends /chat/completions, so it needs
+        // the OpenAI-compatible /v1 base URL (root 11434 would 404).
+        options: { baseURL: ollamaOpenAiBaseUrl(baseUrl) },
         models: { [model]: { name: model } },
       },
     },

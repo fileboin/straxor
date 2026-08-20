@@ -5,6 +5,18 @@
 
 export const OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434";
 
+// OpenCode's built-in `ollama` provider uses the OpenAI-compatible SDK and
+// appends `/chat/completions` to the base URL. Ollama's OpenAI-compatible API
+// lives under `/v1`, so the base URL OpenCode needs is `.../v1` (not the root
+// `.../11434`, which would hit `/chat/completions` → 404).
+export function ollamaOpenAiBaseUrl(baseUrl?: string): string {
+  const base = (baseUrl || process.env.OLLAMA_BASE_URL || OLLAMA_DEFAULT_BASE_URL)
+    .trim()
+    .replace(/\/+$/, "");
+  if (/\/v1\/?$/.test(base)) return base;
+  return `${base}/v1`;
+}
+
 export interface OllamaModel {
   name: string;
   model?: string;
