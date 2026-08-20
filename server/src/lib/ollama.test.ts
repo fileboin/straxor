@@ -27,12 +27,25 @@ describe("pickOllamaCodingModel", () => {
     expect(pickOllamaCodingModel(models)).toBe("deepseek-coder:6.7b");
   });
 
-  it("falls back to the first non-embed model when no coder exists", () => {
+  it("falls back to the first tool-capable model when no coder exists", () => {
     const models: OllamaModel[] = [
       { name: "nomic-embed-text" },
       { name: "mistral:7b" },
     ];
     expect(pickOllamaCodingModel(models)).toBe("mistral:7b");
+  });
+
+  it("rejects base llama3 (no tool support) instead of silently picking it", () => {
+    const models: OllamaModel[] = [
+      { name: "nomic-embed-text" },
+      { name: "llama3:latest" },
+    ];
+    expect(pickOllamaCodingModel(models)).toBeNull();
+  });
+
+  it("accepts llama3.1+ (which supports tools)", () => {
+    const models: OllamaModel[] = [{ name: "llama3.1:8b" }];
+    expect(pickOllamaCodingModel(models)).toBe("llama3.1:8b");
   });
 
   it("returns null for an empty list", () => {

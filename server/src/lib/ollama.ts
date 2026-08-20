@@ -24,16 +24,38 @@ export interface OllamaModel {
   modified_at?: string;
 }
 
-// Coding models we prefer when present on the server, in order.
+// Coding models we prefer when present on the server, in order. These all
+// support tool/function calling, which OpenCode (an agent) requires.
 export const OLLAMA_CODING_MODEL_PREFERENCE = [
   "deepseek-coder",
+  "deepseek-r1",
   "qwen-coder",
   "qwen2.5-coder",
   "qwen3-coder",
+  "qwen2.5",
+  "qwen3",
   "codellama",
   "codegemma",
   "deepseek-coder-v2",
+  "llama3.1",
+  "llama3.2",
+  "llama3.3",
+  "mistral",
+  "gemma2",
+  "gemma3",
 ];
+
+// Model names/families known to NOT support tool calling. If every installed
+// model falls in one of these (e.g. a bare `llama3` = 3.0), the agent cannot
+// function, so we must NOT silently pick it — we return null and let the
+// caller surface a clear "install a tool-capable model" message instead.
+function supportsTools(name: string): boolean {
+  const base = name.split(":")[0].toLowerCase(); // strip tag: llama3:latest -> llama3
+  if (base === "llama3") return false; // llama 3.0 has no tool support
+  if (base === "phi2") return false;
+  if (/orca/.test(base)) return false;
+  return true;
+}
 
 function normalizeBaseUrl(baseUrl?: string): string {
   const raw = (baseUrl || process.env.OLLAMA_BASE_URL || OLLAMA_DEFAULT_BASE_URL).trim();
@@ -61,12 +83,13 @@ export async function listOllamaModels(
   return (data.models || []).filter((m) => !/embed/i.test(m.name || m.model || ""));
 }
 
-// Pick a coding model from the live Ollama tag list. Falls back to the first
-// available model (so the agent still works even without a "coder" tag).
+// Pick a coding model from the live Ollama tag list. Only returns models that
+// support tool calling. Never silently falls back to a random non-tool model
+// (that made agent turns fail with "does not support tools").
 export function pickOllamaCodingModel(models: OllamaModel[]): string | null {
   const names = models
     .map((m) => (m.model || m.name || "").trim())
-    .filter((n) => n && !/embed/i.test(n));
+    .filter((n) => n && !/embed/i.test(n) && supportsTools(n));
   for (const preferred of OLLAMA_CODING_MODEL_PREFERENCE) {
     const exact = names.find((n) => n === preferred);
     if (exact) return exact;
