@@ -907,7 +907,7 @@ function ChatPanel({
             {orbState && orbLabel && (
               <div className="flex items-center gap-2 mr-1" title={orbLabel}>
                 <ThinkingOrb state={orbState} size={64} theme="auto" aria-label={orbLabel} />
-                <span className="hidden sm:inline text-xs text-text-muted capitalize">{orbState}</span>
+                <span className="hidden sm:inline text-xs text-text-muted truncate max-w-[120px]">{orbLabel}</span>
               </div>
             )}
             {onToggleExpand && (

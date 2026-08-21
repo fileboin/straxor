@@ -268,6 +268,26 @@ export default function Workspace() {
   // retrying the (always-failing) local engine for subsequent messages.
   const agentDirectFallbackRef = useRef(false);
 
+  // Safety: a panel must never spin ("Composing") forever. If a turn is still
+  // marked loading past this cap without completing, force-release the loading
+  // state so the ThinkingOrb always clears. The server already cuts stuck turns
+  // (PROGRESS_TIMEOUT_MS); this is a client-side backstop against any missed
+  // done/error signal.
+  useEffect(() => {
+    if (!askLoading && !agentLoading) return;
+    const timer = setTimeout(() => {
+      setAskLoading((v) => {
+        if (v) setAskStreamingId(null);
+        return false;
+      });
+      setAgentLoading((v) => {
+        if (v) setAgentStreamingId(null);
+        return false;
+      });
+    }, 10 * 60 * 1000);
+    return () => clearTimeout(timer);
+  }, [askLoading, agentLoading]);
+
   // VPS state
   const [showSshModal, setShowSshModal] = useState(false);
   const [showEnvModal, setShowEnvModal] = useState(false);

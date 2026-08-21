@@ -1,15 +1,15 @@
 import type { OrbState } from "thinking-orbs";
 
 export const ORB_DEMO_LABELS: Record<OrbState, string> = {
-  working: "Processing…",
-  searching: "Reading your repository…",
-  solving: "Analyzing your request…",
-  listening: "Waiting for LLM…",
-  connecting: "Connecting…",
-  weaving: "Weaving…",
-  composing: "Generating response…",
-  breathing: "Thinking…",
-  shaping: "Formatting result…",
+  working: "Radim…",
+  searching: "Pretražujem kod…",
+  solving: "Rešavam…",
+  listening: "Čekam odgovor…",
+  connecting: "Povezujem…",
+  weaving: "Pripremam…",
+  composing: "Generišem…",
+  breathing: "Razmišljam…",
+  shaping: "Oblikujem rezultat…",
 };
 
 export function orbLabelFor(state: OrbState): string {
