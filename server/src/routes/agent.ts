@@ -93,10 +93,28 @@ const CONNECTION_TIMEOUT_MS = 30 * 60 * 1000; // 30 min hard timeout
 // A turn that produces no meaningful progress for our session (text delta, tool
 // event, part update) for this long is cut — the engine may have missed
 // `session.idle` (stuck model / tool loop) while the shared /event stream stays
-// open, which would otherwise leave the panel in "Composing" until the 30-min cap.
+// open, which would otherwise leave the panel waiting until the 30-min cap.
 const PROGRESS_TIMEOUT_MS = 240_000; // 4 min of silence
+// The GitHub workspace context is a nice-to-have system-prompt enrichment, not
+// a prerequisite for answering. Its git fetch/merge is a network op that must
+// never delay the first byte of a turn — bound it so a slow/stuck git call
+// degrades to "general chat" instead of stalling the stream for minutes.
+const WORKSPACE_CONTEXT_TIMEOUT_MS = 3_000;
 // FAZA 8 — per-step budget for the team verification gate (install/build/test).
 const TEAM_VERIFY_TIMEOUT_MS = 10 * 60 * 1000;
+
+// Bound any promise so a slow network op (git fetch, clone) can never block a
+// turn beyond the deadline. On timeout the caller degrades gracefully.
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
 const router = Router();
 
 router.use(requireAuth);
@@ -327,30 +345,6 @@ router.post("/send", async (req: Request, res: Response) => {
   // preparation with any other active agent. This context is added to the
   // session's SYSTEM prompt (not the visible user message), so the role and
   // repo context stay active in the background without spamming the chat.
-  let systemPrompt = system || "";
-  if (isLocalMachineId(machineId)) {
-    try {
-      const workspace = await withSharedWorkspace(userId, async (context) => context, slotFromMachineId(machineId));
-      const githubContext = [
-        "[STRAXOR GITHUB CONTEXT]",
-        `Active repository: ${workspace.repo}`,
-        `Active branch: ${workspace.branch}`,
-        `Workspace directory: ${workspace.dir}`,
-        `Panel slot: ${slotFromMachineId(machineId)}`,
-        `Workspace mode: ${workspace.readOnly ? "read-only" : "read-write"}`,
-        "This context is shared across Straxor OpenCode agents and GitHub integration for the active panel.",
-        "You are already running inside this workspace. Inspect its files before answering. Use this repository for all reads, edits, tests, and git operations; never use /tmp or another clone. Do not claim a repository is unavailable unless a tool call proves it.",
-        "[/STRAXOR GITHUB CONTEXT]",
-      ].join("\n");
-      systemPrompt = systemPrompt ? `${githubContext}\n\n${systemPrompt}` : githubContext;
-      console.log(`[agent:workspace] user=${userId} repo=${workspace.repo} branch=${workspace.branch}`);
-    } catch {
-      // No usable workspace (no active repo, or the repo token can't be
-      // decrypted locally). The agent is a general-purpose chat too, so carry
-      // on without the GitHub context instead of failing the whole turn.
-      console.log(`[agent:workspace] user=${userId} — no workspace, running as general chat`);
-    }
-  }
 
   // Auto-create session if none provided
   const createFreshSession = async () => {
@@ -374,7 +368,8 @@ router.post("/send", async (req: Request, res: Response) => {
   try {
     const adapter = getAdapters().runtime(userId);
 
-    // Emit session ID to client
+    // Emit session ID to client — the stream opens and the panel releases its
+    // loading state immediately, before any git/workspace work happens.
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -384,6 +379,37 @@ router.post("/send", async (req: Request, res: Response) => {
     // Subscribe before the prompt so the first tool call and its repo context
     // cannot be missed on a fast local OpenCode turn.
     const stream = await adapter.openEventStream(machineId);
+
+    // Build the optional GitHub workspace context AFTER the stream is open and
+    // bounded by a short timeout: a slow git fetch/merge must never delay the
+    // first token — it degrades to a general-chat system prompt instead.
+    let systemPrompt = system || "";
+    if (isLocalMachineId(machineId)) {
+      try {
+        const workspace = await withTimeout(
+          withSharedWorkspace(userId, async (context) => context, slotFromMachineId(machineId)),
+          WORKSPACE_CONTEXT_TIMEOUT_MS
+        );
+        const githubContext = [
+          "[STRAXOR GITHUB CONTEXT]",
+          `Active repository: ${workspace.repo}`,
+          `Active branch: ${workspace.branch}`,
+          `Workspace directory: ${workspace.dir}`,
+          `Panel slot: ${slotFromMachineId(machineId)}`,
+          `Workspace mode: ${workspace.readOnly ? "read-only" : "read-write"}`,
+          "This context is shared across Straxor OpenCode agents and GitHub integration for the active panel.",
+          "You are already running inside this workspace. Inspect its files before answering. Use this repository for all reads, edits, tests, and git operations; never use /tmp or another clone. Do not claim a repository is unavailable unless a tool call proves it.",
+          "[/STRAXOR GITHUB CONTEXT]",
+        ].join("\n");
+        systemPrompt = systemPrompt ? `${githubContext}\n\n${systemPrompt}` : githubContext;
+        console.log(`[agent:workspace] user=${userId} repo=${workspace.repo} branch=${workspace.branch}`);
+      } catch {
+        // No usable workspace or the git fetch timed out. The agent is a
+        // general-purpose chat too, so carry on without the GitHub context
+        // instead of failing or delaying the whole turn.
+        console.log(`[agent:workspace] user=${userId} — no workspace (timeout/error), running as general chat`);
+      }
+    }
 
     // Try async first (prompt_async)
     const effectiveMode = mode || "async";
@@ -932,10 +958,14 @@ async function enqueueBackgroundJob(
     notes.length > 0 ? [msgText, ...notes].filter(Boolean).join("\n\n") : msgText;
 
   // Same workspace-context-as-system-prompt behavior as the /send route.
+  // Bounded by a short timeout so a slow git fetch can never delay enqueue.
   let systemPrompt = opts.system || "";
   if (isLocalMachineId(machineId)) {
     try {
-      const workspace = await withSharedWorkspace(userId, async (context) => context, slotFromMachineId(machineId));
+      const workspace = await withTimeout(
+        withSharedWorkspace(userId, async (context) => context, slotFromMachineId(machineId)),
+        WORKSPACE_CONTEXT_TIMEOUT_MS
+      );
       const githubContext = [
         "[STRAXOR GITHUB CONTEXT]",
         `Active repository: ${workspace.repo}`,
@@ -949,7 +979,7 @@ async function enqueueBackgroundJob(
       ].join("\n");
       systemPrompt = systemPrompt ? `${githubContext}\n\n${systemPrompt}` : githubContext;
     } catch {
-      // No workspace — run as general chat.
+      // No workspace or git fetch timed out — run as general chat.
     }
   }
 
