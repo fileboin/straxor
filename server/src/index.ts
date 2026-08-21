@@ -134,6 +134,13 @@ const agentLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many agent requests, please slow down." },
+  // Read-only status polls (background job / team task) are fetched by the
+  // client every ~1.5s. The execution cap (60/15min) would be exhausted by
+  // polling alone, flooding the UI with 429s and making panels appear frozen.
+  // Exempt authenticated GET status checks; keep the cap for execution calls.
+  skip: (req) =>
+    req.method === "GET" &&
+    /^\/(?:background|team)\/[^/]+$/.test(req.path),
 });
 
 const chatLimiter = rateLimit({
@@ -158,6 +165,12 @@ const previewLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many preview starts, please slow down." },
+  // Read-only status/logs polls (PreviewPanel polls /status every ~5s) must not
+  // consume the preview start/stop execution budget — same 429-flood guard as
+  // the agent limiter.
+  skip: (req) =>
+    req.method === "GET" &&
+    /^\/(?:status|logs|framework)$/.test(req.path),
 });
 
 app.use(express.json({ limit: "1mb" }));
