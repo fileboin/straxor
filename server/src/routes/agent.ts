@@ -353,12 +353,17 @@ router.post("/send", async (req: Request, res: Response) => {
   }
 
   // Auto-create session if none provided
-  let activeSessionId = sessionId;
-  if (!activeSessionId) {
+  const createFreshSession = async () => {
+    const adapter = getAdapters().runtime(userId);
+    const result = await adapter.createSession(machineId, "Straxor Session");
+    return result.id;
+  };
+  let activeSessionId: string;
+  if (sessionId) {
+    activeSessionId = sessionId;
+  } else {
     try {
-      const adapter = getAdapters().runtime(userId);
-      const result = await adapter.createSession(machineId, "Straxor Session");
-      activeSessionId = result.id;
+      activeSessionId = await createFreshSession();
     } catch (err) {
       console.log(`[agent:session] user=${userId} machineId=${machineId} error=${err instanceof Error ? err.message : err}`);
       res.status(500).json({ error: "Failed to create session" });
@@ -382,12 +387,33 @@ router.post("/send", async (req: Request, res: Response) => {
 
     // Try async first (prompt_async)
     const effectiveMode = mode || "async";
-    let result;
+    let result: { parts?: unknown[] } | undefined;
+    // OpenCode sessions are in-memory. If the engine was restarted (or the
+    // session id was restored from the DB after an engine restart), the stored
+    // id is dead and every send against it fails with "Failed to send message".
+    // Detect that case and transparently create a fresh session + retry once,
+    // so panels recover on their own instead of erroring forever.
+    const attemptSend = async (sid: string): Promise<void> => {
+      try {
+        result = await adapter.sendMessage(machineId, sid, fullText, effectiveMode, engineAttachments, systemPrompt);
+      } catch {
+        // prompt_async may not be supported, fall back to sync
+        result = await adapter.sendMessage(machineId, sid, fullText, "sync", engineAttachments, systemPrompt);
+      }
+    };
     try {
-      result = await adapter.sendMessage(machineId, activeSessionId, fullText, effectiveMode, engineAttachments, systemPrompt);
-    } catch {
-      // prompt_async may not be supported, fall back to sync
-      result = await adapter.sendMessage(machineId, activeSessionId, fullText, "sync", engineAttachments, systemPrompt);
+      await attemptSend(activeSessionId);
+    } catch (sendErr) {
+      const errText = sendErr instanceof Error ? sendErr.message : String(sendErr);
+      const staleSession = /session|not found|404/i.test(errText);
+      if (staleSession && sessionId) {
+        console.log(`[agent:stale-session] user=${userId} machineId=${machineId} dead session ${sessionId} → recreating`);
+        activeSessionId = await createFreshSession();
+        res.write(`data: ${JSON.stringify({ type: "session", sessionId: activeSessionId })}\n\n`);
+        await attemptSend(activeSessionId);
+      } else {
+        throw sendErr;
+      }
     }
 
     // If we got parts back from sync, forward them as events
@@ -819,6 +845,9 @@ interface BackgroundJob {
   // The turn payload is kept on the queued job so it can actually run once the
   // per-slot queue drains (a queued job has no other copy of its prompt).
   payload?: { fullText: string; engineAttachments: unknown[]; systemPrompt?: string };
+  // True when the session id was provided by the client (possibly stale after
+  // an engine restart). Enables transparent session recreation on send failure.
+  restoredSession?: boolean;
 }
 
 const backgroundJobs = new Map<string, BackgroundJob>();
@@ -934,6 +963,7 @@ async function enqueueBackgroundJob(
     finished: false,
     taskId: opts.taskId ?? null,
     label: opts.label ?? null,
+    restoredSession: !!opts.sessionId,
     payload: { fullText, engineAttachments, systemPrompt },
   };
   backgroundJobs.set(job.id, job);
@@ -1007,11 +1037,28 @@ async function runBackground(job: BackgroundJob, adapter: any): Promise<void> {
 
   try {
     // Send async first, fall back to sync if unsupported.
-    let result;
+    let result: { parts?: unknown[] } | undefined;
+    // OpenCode sessions are in-memory. A restored/queued session id can be dead
+    // (engine restart between runs) — recreate the session once and retry so a
+    // background job never fails permanently against a stale id.
+    const attemptSend = async (sid: string): Promise<void> => {
+      try {
+        result = await adapter.sendMessage(machineId, sid, fullText, "async", engineAttachments, systemPrompt);
+      } catch {
+        result = await adapter.sendMessage(machineId, sid, fullText, "sync", engineAttachments, systemPrompt);
+      }
+    };
     try {
-      result = await adapter.sendMessage(machineId, sessionId, fullText, "async", engineAttachments, systemPrompt);
-    } catch {
-      result = await adapter.sendMessage(machineId, sessionId, fullText, "sync", engineAttachments, systemPrompt);
+      await attemptSend(sessionId);
+    } catch (sendErr) {
+      const errText = sendErr instanceof Error ? sendErr.message : String(sendErr);
+      if (/session|not found|404/i.test(errText) && job.restoredSession) {
+        const fresh = await adapter.createSession(machineId, "Straxor Session");
+        job.sessionId = fresh.id;
+        await attemptSend(fresh.id);
+      } else {
+        throw sendErr;
+      }
     }
     if (result?.parts) {
       for (const part of result.parts as any[]) {

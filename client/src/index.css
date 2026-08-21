@@ -1028,6 +1028,21 @@ body {
   padding: 24px;
 }
 
+/* Mobile: the app shell is h-dvh + overflow:hidden, so standalone pages must
+   scroll INSIDE their own container. Without this the Connections page (36
+   adapters, long instance list) is clipped and unreachable on a phone. */
+@media (max-width: 767px) {
+  .connections.page,
+  .marketplace.page {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 .stats-bar {
   display: flex;
   gap: 16px;

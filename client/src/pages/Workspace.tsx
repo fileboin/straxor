@@ -1504,6 +1504,31 @@ export default function Workspace() {
     []
   );
 
+  // When an agent turn reports the bound VPS engine is dead ("Machine not
+  // found / Opencode not running / Failed to create session"), fall back to the
+  // local OpenCode engine so the panel keeps working instead of erroring on
+  // every turn. Returns true when the VPS was verified alive (no fallback).
+  const recoverVpsEngine = useCallback(
+    async (machineId: string | null): Promise<boolean> => {
+      if (!machineId || machineId.startsWith("local:")) return true;
+      const result = await verifyVpsConnection(machineId);
+      if (result.vpsStatus === "ready") {
+        setVpsStatus("ready");
+        return true;
+      }
+      // VPS daemon is gone → unbind both panels to the local OpenCode engine.
+      setAskMachineId("local:opencode:ask");
+      setAgentMachineId("local:opencode");
+      setAskSessionId(null);
+      setAgentSessionId(null);
+      setVpsStatus("offline");
+      setAskEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode (radi odmah)" });
+      setAgentEnginePrep({ status: "error", message: "VPS nije dostupan — paneli prebačeni na lokalni OpenCode (radi odmah)" });
+      return false;
+    },
+    []
+  );
+
   const handleAskSend = useCallback(async (msg: string, attachments?: Attachment[]) => {
     const userMsg: ChatMessage = {
       id: `a-${Date.now()}`,
@@ -1544,9 +1569,11 @@ export default function Workspace() {
     // plain chat — run the agent turn over the local runtime instead.
     if (askAgentMachineId && !askDirectFallbackRef.current) {
       // Timeout for agent response (ms) — hard cut so the UI is never left
-      // blocked. Raised to 45s to allow real tool/git execution while still
-      // guaranteeing the process is killed and the panel is released.
-      const AGENT_RESPONSE_TIMEOUT = 45000;
+      // blocked. Matches the server's progress timeout (4 min): a real agent
+      // run (cold engine spawn, npm install, git push, build) can take minutes,
+      // and the server cuts a truly stuck turn with a clean error first. This
+      // is only a last-resort release so the panel is never stuck forever.
+      const AGENT_RESPONSE_TIMEOUT = 300000;
       // Wrap runAgentTurn with a timeout that aborts the request on expiry.
       const runWithTimeout = async () => {
         let timeoutId: number | null = null;
@@ -1598,11 +1625,26 @@ export default function Workspace() {
               setSecurityVerdict,
               checkBeforeInstall,
               onRefreshTodos: () => {},
-              // On error: do NOT automatically re-run handleAskSend (would loop).
-              onErrorFallback: (error) => {
+              // On error: check whether the bound VPS engine died; if so,
+              // fall back to the local OpenCode engine so the next turn works.
+              onErrorFallback: async (error) => {
                 if (!isMine()) return;
-                // No auto-reconnect: surface the error directly and let the
-                // user reconnect manually via SshInput.
+                const deadEngine = /machine not found|opencode not running|failed to create session|failed to send message|ECONNREFUSED|timed out|timeout|prekoračio|vremensko/i.test(error || "");
+                if (deadEngine && askMachineId && !askMachineId.startsWith("local:")) {
+                  const recovered = await recoverVpsEngine(askMachineId);
+                  if (!recovered) {
+                    setAskMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === assistantMsg.id
+                          ? { ...m, content: m.content + `\n\n[VPS nije dostupan — panel prebačen na lokalni OpenCode (radi odmah)]` }
+                          : m
+                      )
+                    );
+                    setAskStreamingId(null);
+                    setAskLoading(false);
+                    return;
+                  }
+                }
                 setAskMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMsg.id
@@ -1831,7 +1873,7 @@ export default function Workspace() {
         askAbortRef.current = null;
       },
     }, attachments, askCtl.signal);
-  }, [askProvider, askModel, askThinking, askRole, askMessages, askModelOrch, askOrchestratedModels, availableModels, askMachineId, askSessionId, askBackground, agentProvider, agentModel, agentThinking, agentRole, permissions, activePromptIds, savedPrompts, projectId, dbSessionId, proceedToolAllow, askPanelMode]);
+  }, [askProvider, askModel, askThinking, askRole, askMessages, askModelOrch, askOrchestratedModels, availableModels, askMachineId, askSessionId, askBackground, agentProvider, agentModel, agentThinking, agentRole, permissions, activePromptIds, savedPrompts, projectId, dbSessionId, proceedToolAllow, askPanelMode, recoverVpsEngine]);
 
   const handleAgentSend = useCallback(async (msg: string, attachments?: Attachment[]) => {
     const roleConfig = getRoleById(agentRole);
@@ -2085,8 +2127,12 @@ export default function Workspace() {
       const poll = async (jobId: string, _sessionId: string) => {
         let attempts = 0;
         const timer = window.setInterval(async () => {
-          // ~3 minutes (120 x 1.5s) hard cap; a longer silent job is a hang.
-          if (attempts++ > 120) {
+          // 30 min (1200 x 1.5s) hard cap — matches the server's own hard
+          // timeout; the server cuts a genuinely stuck job with status=error
+          // (4-min progress watchdog + 30-min cap), so the client only needs to
+          // stop polling once the server reports finished. A real background
+          // run (npm install, build, git) can exceed 3 minutes easily.
+          if (attempts++ > 1200) {
             window.clearInterval(timer);
             setAgentMessages((prev) =>
               prev.map((m) =>
@@ -2296,7 +2342,28 @@ export default function Workspace() {
       },
       onError: (error) => {
         // FAZA 18 — grešku prikazujemo direktno; NIKAD ne prelazimo u pasivni chat.
+        // Ako je VPS engine umro (Machine not found / Opencode not running /
+        // Failed to create session), paneli se automatski prebacuju na lokalni
+        // OpenCode engine tako da sljedeći turn RADI umjesto da ponovo prijavi grešku.
         if (!isMineAgent()) return;
+        const deadEngine = /machine not found|opencode not running|failed to create session|failed to send message|ECONNREFUSED|timed out|timeout|prekoračio|vremensko/i.test(error || "");
+        if (deadEngine && agentMachineId && !agentMachineId.startsWith("local:")) {
+          void recoverVpsEngine(agentMachineId).then((recovered) => {
+            if (!recovered) {
+              setAgentMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsg.id
+                    ? { ...m, content: m.content + `\n\n[VPS nije dostupan — panel prebačen na lokalni OpenCode (radi odmah)]` }
+                    : m
+                )
+              );
+              setAgentStreamingId(null);
+              setAgentLoading(false);
+              agentAbortRef.current = null;
+            }
+          });
+          return;
+        }
         setAgentMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsg.id
@@ -2309,7 +2376,7 @@ export default function Workspace() {
         agentAbortRef.current = null;
       },
     }, attachments, system, agentCtl.signal);
-  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch, agentOrchestratedModels, availableModels, agentBackground, agentPanelMode, transferByBus]);
+  }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch, agentOrchestratedModels, availableModels, agentBackground, agentPanelMode, transferByBus, recoverVpsEngine]);
 
   useEffect(() => {
     if (!pendingBusAutoExec) return;
@@ -2469,8 +2536,8 @@ export default function Workspace() {
   }, []);
 
   // ── Command Palette commands ──
-  const commands: Command[] = useMemo(() => [
-    // Search command
+  const commands = useMemo<Command[]>(() => {
+    const list: Command[] = ([
     {
       id: "search-project",
       label: "Pretraga projekta",
@@ -2951,7 +3018,9 @@ export default function Workspace() {
       keywords: ["dashboard", "pocetna", "home"],
       action: () => window.location.href = "/dashboard",
     },
-  ].filter((c) => !(c.id === "admin" && !isAdmin(user))), [
+  ] as Command[]).filter((c) => !(c.id === "admin" && !isAdmin(user)));
+    return list;
+  }, [
     navigate, theme, setAppTheme,
     setPanelMode, setAskProvider, setAskModel, setAgentProvider, setAgentModel,
     openSshModalForCurrentPanel, setShowDeployModal, setShowExportModal, setShowEnvModal,

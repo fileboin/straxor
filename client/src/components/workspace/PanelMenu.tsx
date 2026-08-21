@@ -134,12 +134,21 @@ export default function PanelMenu({
       }
     };
     const close = () => setOpen(false);
+    // Close when the OUTER page scrolls (the menu is position:fixed and would
+    // otherwise drift), but NEVER close when the scroll happens INSIDE the menu
+    // itself — the dropdown is scrollable (overflow-y-auto) and must stay open
+    // so the user can reach bottom options like the theme/accent pickers.
+    const onScrollCapture = (e: Event) => {
+      const t = e.target as Node | null;
+      if (menuRef.current && t && menuRef.current.contains(t)) return;
+      close();
+    };
     document.addEventListener("mousedown", handler);
-    window.addEventListener("scroll", close, true);
+    window.addEventListener("scroll", onScrollCapture, true);
     window.addEventListener("resize", close);
     return () => {
       document.removeEventListener("mousedown", handler);
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("scroll", onScrollCapture, true);
       window.removeEventListener("resize", close);
     };
   }, [open]);

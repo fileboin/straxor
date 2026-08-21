@@ -346,6 +346,11 @@ const handleTestSsh = async () => {
 
       {/* Dugmad */}
       <div className="flex gap-2">
+        <button type="button" onClick={handleTestSsh}
+          disabled={!canSubmit || testLoading}
+          className="px-3 py-2 text-sm font-medium rounded-lg border border-border bg-surface-3 text-text-secondary hover:text-text hover:border-border-light transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+          {testLoading ? "Testiram…" : "Test SSH"}
+        </button>
         <button type="button" onClick={handleConnect}
           disabled={!canSubmit}
           className="flex-1 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:opacity-85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">

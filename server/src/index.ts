@@ -130,7 +130,12 @@ const apiLimiter = rateLimit({
 // long-running stream is unaffected.
 const agentLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 60,
+  // Generous cap: a single interactive session with both panels can easily
+  // exceed the old 60/15min budget (each turn = 1 POST /send + occasional
+  // background starts), which surfaced as 429 "Too many agent requests" and
+  // made panels appear frozen. Keep a ceiling for abuse but never block normal
+  // panel use.
+  max: 400,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many agent requests, please slow down." },

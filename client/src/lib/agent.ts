@@ -41,8 +41,12 @@ export async function streamAgentMessage(
     // (text / tool event) for IDLE_MS. Server SSE heartbeats (: ping) must NOT
     // keep it alive, otherwise a stuck opencode process with no session.idle
     // would spin "Generišem odgovor…" forever. The total cap is a last resort.
-    const IDLE_MS = 15_000;
-    const TOTAL_MS = 120_000;
+    // These windows must be LARGER than the server's own progress timeout
+    // (PROGRESS_TIMEOUT_MS = 4 min): the server emits a clean {type:"error"}
+    // before this client watchdog aborts, so real agent work (cold engine
+    // spawn, long git/build/tool runs) is never cut by the browser.
+    const IDLE_MS = 300_000;
+    const TOTAL_MS = 1_800_000;
     const controller = new AbortController();
     userAbort = false;
     const onExtAbort = () => {
@@ -54,21 +58,20 @@ export async function streamAgentMessage(
       else externalSignal.addEventListener("abort", onExtAbort, { once: true });
     }
     let watchdog = window.setTimeout(() => {
-      console.error("[agent:stall] no text/tool output for 15s — aborting turn");
+      console.error("[agent:stall] no text/tool output for 5min — aborting turn");
       controller.abort();
     }, IDLE_MS);
     const totalTimer = window.setTimeout(() => {
-      console.error("[agent:stall] total 120s exceeded — aborting turn");
+      console.error("[agent:stall] total 30min exceeded — aborting turn");
       controller.abort();
     }, TOTAL_MS);
     const poke = () => {
       window.clearTimeout(watchdog);
       watchdog = window.setTimeout(() => {
-        console.error("[agent:stall] no text/tool output for 15s — aborting turn");
+        console.error("[agent:stall] no text/tool output for 5min — aborting turn");
         controller.abort();
       }, IDLE_MS);
     };
-    poke();
     let finished = false;
     const cleanup = () => {
       window.clearTimeout(watchdog);
