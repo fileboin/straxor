@@ -176,39 +176,50 @@ export default function ProviderModelDropdown({
             {/* Provider list */}
             {view === "providers" && (
               <div className="overflow-y-auto flex-1">
-                {providers.map((p) => {
-                  const hasKey = !needsApiKey(p.id) || providerKeys[p.id] || false;
+                {(["cloud", "local"] as const).map((source) => {
+                  const group = providers.filter((p) => (p.source || "cloud") === source);
+                  if (group.length === 0) return null;
                   return (
-                    <button
-                      key={p.id}
-                      onClick={() => handleProviderClick(p)}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-left hover:bg-surface-2 transition-colors ${
-                        p.id === providerId ? "bg-surface-2" : ""
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[13px] text-text">{p.name}</span>
-                        {hasKey && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
-                        )}
+                    <div key={source}>
+                      <div className="sticky top-0 z-10 bg-surface px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider text-text-muted border-b border-border/40">
+                        {source === "cloud" ? "☁️ Cloud API" : "🖥️ Lokalni / VPS"}
                       </div>
-                      <div className="flex items-center gap-2">
-                        {p.status === "needs-setup" && !hasKey && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-yellow-500/10 text-yellow-500 transition-colors">
-                            Dodaj key
-                          </span>
-                        )}
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
-                            p.status === "ready" || hasKey
-                              ? "bg-green-500/10 text-green-500"
-                              : "bg-yellow-500/10 text-yellow-500"
-                          }`}
-                        >
-                          {p.status === "ready" || hasKey ? "Ready" : "Needs Setup"}
-                        </span>
-                      </div>
-                    </button>
+                      {group.map((p) => {
+                        const hasKey = !needsApiKey(p.id) || providerKeys[p.id] || false;
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => handleProviderClick(p)}
+                            className={`w-full flex items-center justify-between px-3 py-2 text-left hover:bg-surface-2 transition-colors ${
+                              p.id === providerId ? "bg-surface-2" : ""
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-[13px] text-text">{p.name}</span>
+                              {hasKey && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {p.status === "needs-setup" && !hasKey && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-yellow-500/10 text-yellow-500 transition-colors">
+                                  Dodaj key
+                                </span>
+                              )}
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
+                                  p.status === "ready" || hasKey
+                                    ? "bg-green-500/10 text-green-500"
+                                    : "bg-yellow-500/10 text-yellow-500"
+                                }`}
+                              >
+                                {p.status === "ready" || hasKey ? "Ready" : "Needs Setup"}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   );
                 })}
               </div>

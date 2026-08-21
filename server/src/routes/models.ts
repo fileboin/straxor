@@ -20,6 +20,9 @@ export interface CatalogProvider {
   name: string;
   status: string;
   models: CatalogModel[];
+  // Model source: "cloud" = uses a stored per-user API key; "local" = keyless
+  // / engine-managed (Ollama, OpenCode Zen, custom local endpoint).
+  source?: "cloud" | "local";
 }
 
 // Full current Anthropic catalog. Every Claude 4.5+ model does support thinking,
@@ -188,6 +191,18 @@ const MINIMAX_MODELS: CatalogModel[] = [
   { id: "abab6.5s", name: "ABAB 6.5S" },
 ];
 
+const TOGETHER_MODELS: CatalogModel[] = [
+  { id: "meta-llama/Llama-3.3-70B-Instruct-Turbo", name: "Llama 3.3 70B Instruct" },
+  { id: "meta-llama/Llama-3.1-405B-Instruct-Turbo", name: "Llama 3.1 405B Instruct" },
+  { id: "meta-llama/Llama-3.1-70B-Instruct-Turbo", name: "Llama 3.1 70B Instruct" },
+  { id: "meta-llama/Llama-3.1-8B-Instruct-Turbo", name: "Llama 3.1 8B Instruct" },
+  { id: "Qwen/Qwen2.5-72B-Instruct-Turbo", name: "Qwen2.5 72B Instruct" },
+  { id: "Qwen/Qwen2.5-Coder-32B-Instruct", name: "Qwen2.5 Coder 32B Instruct", vision: true },
+  { id: "deepseek-ai/DeepSeek-V3", name: "DeepSeek V3" },
+  { id: "deepseek-ai/DeepSeek-R1", name: "DeepSeek R1", thinking: true },
+  { id: "mistralai/Mixtral-8x7B-Instruct-v0.1", name: "Mixtral 8x7B Instruct" },
+];
+
 const VERTEX_MODELS: CatalogModel[] = [
   { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (preview)", thinking: true },
   { id: "gemini-3-pro-preview", name: "Gemini 3 Pro (preview)", thinking: true },
@@ -279,20 +294,21 @@ const OPENROUTER_FALLBACK: CatalogModel[] = [
 ];
 
 const STATIC_PROVIDERS: CatalogProvider[] = [
-  { id: "anthropic", name: "Anthropic", status: "ready", models: ANTHROPIC_MODELS },
-  { id: "openai", name: "OpenAI", status: "ready", models: OPENAI_MODELS },
-  { id: "google", name: "Google Gemini", status: "ready", models: GEMINI_MODELS },
-  { id: "deepseek", name: "DeepSeek", status: "ready", models: DEEPSEEK_MODELS },
-  { id: "opencode-zen", name: "OpenCode Zen", status: "ready", models: OPENCODE_ZEN_MODELS },
-  { id: "openrouter", name: "OpenRouter", status: "needs-setup", models: OPENROUTER_FALLBACK },
-  { id: "ollama", name: "Ollama", status: "needs-setup", models: OLLAMA_MODELS },
-  { id: "qwen", name: "Qwen", status: "needs-setup", models: QWEN_MODELS },
-  { id: "moonshot", name: "Moonshot Kimi", status: "needs-setup", models: MOONSHOT_MODELS },
-  { id: "minimax", name: "MiniMax", status: "needs-setup", models: MINIMAX_MODELS },
-  { id: "vertex", name: "Google Vertex AI", status: "needs-setup", models: VERTEX_MODELS },
-  { id: "bedrock", name: "AWS Bedrock", status: "needs-setup", models: BEDROCK_MODELS },
-  { id: "azure", name: "Azure OpenAI", status: "needs-setup", models: AZURE_MODELS },
-  { id: "custom", name: "Custom (OpenAI-compat.)", status: "needs-setup", models: CUSTOM_MODELS },
+  { id: "anthropic", name: "Anthropic", status: "ready", models: ANTHROPIC_MODELS, source: "cloud" },
+  { id: "openai", name: "OpenAI", status: "ready", models: OPENAI_MODELS, source: "cloud" },
+  { id: "google", name: "Google Gemini", status: "ready", models: GEMINI_MODELS, source: "cloud" },
+  { id: "deepseek", name: "DeepSeek", status: "ready", models: DEEPSEEK_MODELS, source: "cloud" },
+  { id: "opencode-zen", name: "OpenCode Zen", status: "ready", models: OPENCODE_ZEN_MODELS, source: "local" },
+  { id: "openrouter", name: "OpenRouter", status: "needs-setup", models: OPENROUTER_FALLBACK, source: "cloud" },
+  { id: "ollama", name: "Ollama", status: "needs-setup", models: OLLAMA_MODELS, source: "local" },
+  { id: "qwen", name: "Qwen", status: "needs-setup", models: QWEN_MODELS, source: "cloud" },
+  { id: "moonshot", name: "Moonshot Kimi", status: "needs-setup", models: MOONSHOT_MODELS, source: "cloud" },
+  { id: "minimax", name: "MiniMax", status: "needs-setup", models: MINIMAX_MODELS, source: "cloud" },
+  { id: "together", name: "Together AI", status: "needs-setup", models: TOGETHER_MODELS, source: "cloud" },
+  { id: "vertex", name: "Google Vertex AI", status: "needs-setup", models: VERTEX_MODELS, source: "cloud" },
+  { id: "bedrock", name: "AWS Bedrock", status: "needs-setup", models: BEDROCK_MODELS, source: "cloud" },
+  { id: "azure", name: "Azure OpenAI", status: "needs-setup", models: AZURE_MODELS, source: "cloud" },
+  { id: "custom", name: "Custom (OpenAI-compat.)", status: "needs-setup", models: CUSTOM_MODELS, source: "local" },
 ];
 
 const OPENROUTER_CACHE_MS = 10 * 60 * 1000;

@@ -172,6 +172,7 @@ const REGISTRY_PRESETS = [
   { type: "ai-provider", key: "openai", name: "OpenAI", icon: "🤖", isBuiltin: true },
   { type: "ai-provider", key: "anthropic", name: "Anthropic", icon: "🔮", isBuiltin: true },
   { type: "ai-provider", key: "openrouter", name: "OpenRouter", icon: "🔀", isBuiltin: true },
+  { type: "ai-provider", key: "together", name: "Together AI", icon: "🤝", isBuiltin: true },
   { type: "ai-provider", key: "google", name: "Google Gemini", icon: "🔍", isBuiltin: true },
   { type: "ai-provider", key: "ollama", name: "Ollama", icon: "🦙", isBuiltin: true },
   { type: "ai-provider", key: "deepseek", name: "DeepSeek", icon: "🧊", isBuiltin: true },

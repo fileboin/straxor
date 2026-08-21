@@ -3,12 +3,25 @@ import { useEffect, useState } from "react";
 
 export type ProviderStatus = "ready" | "needs-setup";
 
+// Model source — "cloud" uses a stored per-user API key (Together, OpenRouter,
+// Anthropic, ...); "local" is keyless / engine-managed (Ollama, OpenCode Zen,
+// custom local endpoint).
+export type ModelSource = "cloud" | "local";
+
 // Providers that work without an API key (e.g. local Ollama). The picker must
 // not gate model selection on a stored key, and chat must not require one.
 export const KEYLESS_PROVIDERS: ReadonlySet<string> = new Set(["ollama"]);
 
+// Local / VPS model sources (no cloud key needed). Used for UI grouping and
+// the header source badge.
+export const LOCAL_SOURCE_PROVIDERS: ReadonlySet<string> = new Set(["ollama", "opencode-zen", "custom"]);
+
 export function needsApiKey(providerId: string): boolean {
   return !KEYLESS_PROVIDERS.has(providerId);
+}
+
+export function isLocalSource(providerId: string): boolean {
+  return LOCAL_SOURCE_PROVIDERS.has(providerId);
 }
 
 export interface Provider {
@@ -16,6 +29,7 @@ export interface Provider {
   name: string;
   status: ProviderStatus;
   models: Model[];
+  source?: ModelSource;
 }
 
 export interface Model {
@@ -33,6 +47,7 @@ export const PROVIDERS: Provider[] = [
     id: "anthropic",
     name: "Anthropic",
     status: "ready",
+    source: "cloud",
     models: [
       { id: "claude-fable-5", name: "Claude Fable 5", thinking: true, thinkingMode: "always-on", vision: true },
       { id: "claude-opus-5", name: "Claude Opus 5", thinking: true, thinkingMode: "adaptive", vision: true },
@@ -53,6 +68,7 @@ export const PROVIDERS: Provider[] = [
     id: "openai",
     name: "OpenAI",
     status: "ready",
+    source: "cloud",
     models: [
       { id: "gpt-4o", name: "GPT-4o" },
       { id: "gpt-4o-mini", name: "GPT-4o Mini" },
@@ -64,6 +80,7 @@ export const PROVIDERS: Provider[] = [
     id: "google",
     name: "Google Gemini",
     status: "ready",
+    source: "cloud",
     models: [
       { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", thinking: true },
       { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", thinking: true },
@@ -74,6 +91,7 @@ export const PROVIDERS: Provider[] = [
     id: "deepseek",
     name: "DeepSeek",
     status: "ready",
+    source: "cloud",
     models: [
       { id: "deepseek-r1", name: "DeepSeek R1", thinking: true },
       { id: "deepseek-v3", name: "DeepSeek V3" },
@@ -84,6 +102,7 @@ export const PROVIDERS: Provider[] = [
     id: "opencode-zen",
     name: "OpenCode Zen",
     status: "ready",
+    source: "local",
     models: [
       { id: "opencode/big-pickle", name: "Big Pickle", free: true },
       { id: "opencode/deepseek-v4-flash-free", name: "DeepSeek V4 Flash Free", free: true },
@@ -98,6 +117,7 @@ export const PROVIDERS: Provider[] = [
     id: "openrouter",
     name: "OpenRouter",
     status: "needs-setup",
+    source: "cloud",
     models: [
       { id: "meta-llama/llama-4-maverick", name: "Llama 4 Maverick" },
       { id: "qwen/qwen3-235b-a22b", name: "Qwen3 235B" },
@@ -108,6 +128,7 @@ export const PROVIDERS: Provider[] = [
     id: "ollama",
     name: "Ollama",
     status: "needs-setup",
+    source: "local",
     models: [
       { id: "llama3.1:70b", name: "Llama 3.1 70B" },
       { id: "codellama:34b", name: "CodeLlama 34B" },
@@ -118,6 +139,7 @@ export const PROVIDERS: Provider[] = [
     id: "qwen",
     name: "Qwen",
     status: "needs-setup",
+    source: "cloud",
     models: [
       { id: "qwen3-235b-a22b", name: "Qwen3 235B", thinking: true },
       { id: "qwen-turbo", name: "Qwen Turbo" },
@@ -128,6 +150,7 @@ export const PROVIDERS: Provider[] = [
     id: "moonshot",
     name: "Moonshot Kimi",
     status: "needs-setup",
+    source: "cloud",
     models: [
       { id: "kimi-k2", name: "Kimi K2" },
       { id: "moonshot-v1-128k", name: "Moonshot v1 128K" },
@@ -137,15 +160,31 @@ export const PROVIDERS: Provider[] = [
     id: "minimax",
     name: "MiniMax",
     status: "needs-setup",
+    source: "cloud",
     models: [
       { id: "minimax-m1", name: "MiniMax M1" },
       { id: "abab6.5s", name: "ABAB 6.5S" },
     ],
   },
   {
+    id: "together",
+    name: "Together AI",
+    status: "needs-setup",
+    source: "cloud",
+    models: [
+      { id: "meta-llama/Llama-3.3-70B-Instruct-Turbo", name: "Llama 3.3 70B Instruct" },
+      { id: "meta-llama/Llama-3.1-405B-Instruct-Turbo", name: "Llama 3.1 405B Instruct" },
+      { id: "Qwen/Qwen2.5-72B-Instruct-Turbo", name: "Qwen2.5 72B Instruct" },
+      { id: "Qwen/Qwen2.5-Coder-32B-Instruct", name: "Qwen2.5 Coder 32B Instruct" },
+      { id: "deepseek-ai/DeepSeek-V3", name: "DeepSeek V3" },
+      { id: "deepseek-ai/DeepSeek-R1", name: "DeepSeek R1", thinking: true },
+    ],
+  },
+  {
     id: "vertex",
     name: "Google Vertex AI",
     status: "needs-setup",
+    source: "cloud",
     models: [
       { id: "gemini-2.5-pro-preview", name: "Gemini 2.5 Pro Preview" },
       { id: "gemini-2.0-flash-preview", name: "Gemini 2.0 Flash Preview" },
@@ -155,6 +194,7 @@ export const PROVIDERS: Provider[] = [
     id: "bedrock",
     name: "AWS Bedrock",
     status: "needs-setup",
+    source: "cloud",
     models: [
       { id: "anthropic.claude-opus-4-6", name: "Claude Opus 4.6" },
       { id: "anthropic.claude-sonnet-4", name: "Claude Sonnet 4" },
@@ -165,6 +205,7 @@ export const PROVIDERS: Provider[] = [
     id: "azure",
     name: "Azure OpenAI",
     status: "needs-setup",
+    source: "cloud",
     models: [
       { id: "gpt-4o", name: "GPT-4o" },
       { id: "gpt-4o-mini", name: "GPT-4o Mini" },
@@ -174,6 +215,7 @@ export const PROVIDERS: Provider[] = [
     id: "custom",
     name: "Custom (OpenAI-compat.)",
     status: "needs-setup",
+    source: "local",
     models: [
       { id: "custom-model", name: "Custom Model" },
     ],

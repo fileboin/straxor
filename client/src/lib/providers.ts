@@ -11,6 +11,7 @@ export type DirectProviderId =
   | "deepseek"
   | "xai"
   | "groq"
+  | "together"
   | "ollama";
 
 export interface DirectProviderDef {
@@ -46,6 +47,7 @@ export const PROVIDER_ICONS: Record<string, string> = {
   deepseek: "🐋",
   xai: "⚡",
   groq: "⚙",
+  together: "🤝",
   ollama: "🦙",
 };
 
@@ -58,6 +60,7 @@ export const PROVIDER_COLORS: Record<string, string> = {
   deepseek: "text-cyan-400",
   xai: "text-yellow-300",
   groq: "text-amber-400",
+  together: "text-pink-400",
   ollama: "text-emerald-400",
 };
 

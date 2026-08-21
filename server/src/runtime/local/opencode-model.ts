@@ -33,6 +33,7 @@ const PROVIDER_ENV: Record<string, string> = {
   xai: "XAI_API_KEY",
   mistral: "MISTRAL_API_KEY",
   moonshot: "MOONSHOT_API_KEY",
+  together: "TOGETHER_API_KEY",
 };
 
 // Priority order for choosing which provider's key to feed OpenCode.
@@ -46,6 +47,7 @@ const PROVIDER_DEFAULT_MODEL: Record<string, string> = {
   deepseek: "deepseek-chat",
   openai: "gpt-4o",
   google: "gemini-2.5-pro",
+  together: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
 };
 
 // A deployment may supply a platform-owned key through the environment. This

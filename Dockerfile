@@ -20,9 +20,24 @@ RUN cd client && npm ci && npm run build
 RUN cd server && npm ci && npx tsc
 
 # ── Runtime image ──
-FROM node:22-alpine AS runtime
+# Debian-based (glibc) so opencode-ai's prebuilt binaries run, and so we can
+# apt-install git (Alpine has neither glibc nor git, both required at runtime:
+# the local engine binary and the workspace clone/commit/push flow).
+FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+
+# Runtime system deps: git (clone/commit/push sandbox), git-lfs (large repos),
+# ca-certificates (TLS for GitHub/Ollama/API calls), openssh-client (VPS SSH),
+# curl (health checks / Ollama detection on VPS), tini (PID 1 signal handling).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git \
+      git-lfs \
+      ca-certificates \
+      openssh-client \
+      curl \
+      tini \
+    && rm -rf /var/lib/apt/lists/*
 
 # Server runtime deps only (no dev deps needed to run).
 COPY server/package.json server/package-lock.json ./server/
@@ -35,4 +50,4 @@ COPY --from=build /app/client/dist ./client/dist
 # opencode-ai is a runtime dependency of the server (local engine fallback).
 WORKDIR /app/server
 EXPOSE 3001
-CMD ["node", "dist/index.js"]
+CMD ["tini", "--", "node", "dist/index.js"]

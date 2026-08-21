@@ -242,7 +242,7 @@ const PROVIDER_CONFIG: Record<string, ProviderConfig> = {
   },
 };
 
-const OPENAI_COMPATIBLE = ["openrouter", "qwen", "moonshot", "minimax", "mistral", "xai", "groq", "ollama", "custom", "opencode-zen"];
+const OPENAI_COMPATIBLE = ["openrouter", "qwen", "moonshot", "minimax", "mistral", "xai", "groq", "ollama", "custom", "opencode-zen", "together"];
 
 const COMPAT_BASE_URLS: Record<string, string> = {
   "opencode-zen": "https://opencode.ai/zen/v1/chat/completions",
@@ -253,6 +253,7 @@ const COMPAT_BASE_URLS: Record<string, string> = {
   mistral: "https://api.mistral.ai/v1/chat/completions",
   xai: "https://api.x.ai/v1/chat/completions",
   groq: "https://api.groq.com/openai/v1/chat/completions",
+  together: "https://api.together.xyz/v1/chat/completions",
   ollama: "http://localhost:11434/v1/chat/completions",
   custom: "http://localhost:11434/v1/chat/completions",
 };

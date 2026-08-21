@@ -140,65 +140,76 @@ export default function ModelPickerModal({
         <div className="flex-1 min-h-0 flex">
           {/* Provider sidebar */}
           <div className="w-52 shrink-0 border-r border-border overflow-y-auto bg-surface">
-            {filteredProviders.map((p) => {
-              const hasKey = !needsApiKey(p.id) || providerKeys[p.id] || false;
+            {(["cloud", "local"] as const).map((source) => {
+              const group = filteredProviders.filter((p) => (p.source || "cloud") === source);
+              if (group.length === 0) return null;
               return (
-                <div key={p.id}>
-                  <div
-                    onClick={() => {
-                      setSelectedProviderId(p.id);
-                      setShowKeyInput(false);
-                      setInlineKeyFor(null);
-                      setPendingModelId(null);
-                    }}
-                    className={`w-full flex items-center justify-between gap-1 px-3 py-2 text-left hover:bg-surface-2 transition-colors cursor-pointer ${
-                      selectedProviderId === p.id ? "bg-surface-2" : ""
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-[12px] text-text truncate">{p.name}</span>
-                      {p.id === "openrouter" && (
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-accent-dim text-accent font-medium shrink-0">
-                          {p.models.length}
-                        </span>
-                      )}
-                    </div>
-                    {hasKey ? (
-                      <span
-                        className="text-green-500 text-[12px] shrink-0"
-                        title={t("models.keyReady")}
-                      >
-                        ✓
-                      </span>
-                    ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedProviderId(p.id);
-                          setShowKeyInput(false);
-                          setInlineKeyFor((cur) => (cur === p.id ? null : p.id));
-                        }}
-                        className="text-[10px] px-1.5 py-0.5 rounded-md bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 font-medium shrink-0"
-                        title={t("models.addApiKey")}
-                      >
-                        {t("models.addKey")}
-                      </button>
-                    )}
+                <div key={source}>
+                  <div className="sticky top-0 z-10 bg-surface px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider text-text-muted border-b border-border/40">
+                    {source === "cloud" ? "☁️ Cloud API" : "🖥️ Lokalni / VPS"}
                   </div>
-                  {inlineKeyFor === p.id && !hasKey && (
-                    <InlineApiKeyForm
-                      providerId={p.id}
-                      providerName={p.name}
-                      autoFocus
-                      onSaved={() => {
-                        setProviderKeys((prev) => ({ ...prev, [p.id]: true }));
-                        setInlineKeyFor(null);
-                        setPendingModelId(null);
-                        onApiKeyChange?.();
-                      }}
-                      onCancel={() => setInlineKeyFor(null)}
-                    />
-                  )}
+                  {group.map((p) => {
+                    const hasKey = !needsApiKey(p.id) || providerKeys[p.id] || false;
+                    return (
+                      <div key={p.id}>
+                        <div
+                          onClick={() => {
+                            setSelectedProviderId(p.id);
+                            setShowKeyInput(false);
+                            setInlineKeyFor(null);
+                            setPendingModelId(null);
+                          }}
+                          className={`w-full flex items-center justify-between gap-1 px-3 py-2 text-left hover:bg-surface-2 transition-colors cursor-pointer ${
+                            selectedProviderId === p.id ? "bg-surface-2" : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-[12px] text-text truncate">{p.name}</span>
+                            {p.id === "openrouter" && (
+                              <span className="text-[9px] px-1 py-0.5 rounded bg-accent-dim text-accent font-medium shrink-0">
+                                {p.models.length}
+                              </span>
+                            )}
+                          </div>
+                          {hasKey ? (
+                            <span
+                              className="text-green-500 text-[12px] shrink-0"
+                              title={t("models.keyReady")}
+                            >
+                              ✓
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedProviderId(p.id);
+                                setShowKeyInput(false);
+                                setInlineKeyFor((cur) => (cur === p.id ? null : p.id));
+                              }}
+                              className="text-[10px] px-1.5 py-0.5 rounded-md bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 font-medium shrink-0"
+                              title={t("models.addApiKey")}
+                            >
+                              {t("models.addKey")}
+                            </button>
+                          )}
+                        </div>
+                        {inlineKeyFor === p.id && !hasKey && (
+                          <InlineApiKeyForm
+                            providerId={p.id}
+                            providerName={p.name}
+                            autoFocus
+                            onSaved={() => {
+                              setProviderKeys((prev) => ({ ...prev, [p.id]: true }));
+                              setInlineKeyFor(null);
+                              setPendingModelId(null);
+                              onApiKeyChange?.();
+                            }}
+                            onCancel={() => setInlineKeyFor(null)}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}

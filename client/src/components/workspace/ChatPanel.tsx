@@ -10,7 +10,7 @@ import { FormattedContent } from "./FormattedContent.js";
 import PanelMenu from "./PanelMenu.js";
 import ThinkingOrbStatus from "./ThinkingOrbStatus.js";
 import InlineApiKeyForm from "./InlineApiKeyForm.js";
-import { useModelCatalog, type ThinkingBudget } from "../../lib/models.js";
+import { useModelCatalog, isLocalSource, type ThinkingBudget } from "../../lib/models.js";
 import type { AgentRole } from "../../lib/roles.js";
 import { t, useLang } from "../../lib/i18n.js";
 import { estimatePlan, formatCost, formatTokens } from "../../lib/plan-preview.js";
@@ -1021,6 +1021,18 @@ function ChatPanel({
                 <InfoTip text={modelOrchHint || "Model orkestracija — task se automatski rutira na najbolji model prema težini"} placement="bottom" />
               </div>
             )}
+            <span
+              className={`hidden sm:inline-flex items-center gap-1 px-1.5 h-6 rounded-md border text-[9px] font-medium shrink-0 ${
+                isLocalSource(providerId)
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                  : "border-sky-500/30 bg-sky-500/10 text-sky-400"
+              }`}
+              title={isLocalSource(providerId)
+                ? "Lokalni / VPS model — bez cloud ključa"
+                : "Cloud model — koristi sačuvani API ključ iz baze"}
+            >
+              {isLocalSource(providerId) ? "🖥 Lokalno" : "☁️ Cloud"}
+            </span>
             <ProviderModelDropdown
               providerId={providerId}
               modelId={modelId}

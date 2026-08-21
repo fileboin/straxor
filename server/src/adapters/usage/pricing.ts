@@ -30,6 +30,13 @@ export const MODEL_PRICING: ModelPricing[] = [
   // xAI
   { provider: "xai", model: "grok-3", inputCostPer1M: 3, outputCostPer1M: 15, label: "Grok 3" },
   { provider: "xai", model: "grok-3-mini", inputCostPer1M: 0.30, outputCostPer1M: 0.50, label: "Grok 3 Mini" },
+
+  // Together AI
+  { provider: "together", model: "meta-llama/Llama-3.3-70B-Instruct-Turbo", inputCostPer1M: 0.88, outputCostPer1M: 0.88, label: "Llama 3.3 70B" },
+  { provider: "together", model: "meta-llama/Llama-3.1-405B-Instruct-Turbo", inputCostPer1M: 3.50, outputCostPer1M: 3.50, label: "Llama 3.1 405B" },
+  { provider: "together", model: "Qwen/Qwen2.5-72B-Instruct-Turbo", inputCostPer1M: 0.90, outputCostPer1M: 0.90, label: "Qwen2.5 72B" },
+  { provider: "together", model: "Qwen/Qwen2.5-Coder-32B-Instruct", inputCostPer1M: 0.18, outputCostPer1M: 0.18, label: "Qwen2.5 Coder 32B" },
+  { provider: "together", model: "deepseek-ai/DeepSeek-V3", inputCostPer1M: 0.90, outputCostPer1M: 0.90, label: "DeepSeek V3" },
 ];
 
 export function getPricingForModel(provider: string, model: string): ModelPricing | undefined {

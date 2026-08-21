@@ -9,6 +9,7 @@ export type DirectProviderId =
   | "deepseek"
   | "xai"
   | "groq"
+  | "together"
   | "ollama";
 
 export type AuthMethod = "api-key" | "none";
@@ -154,6 +155,25 @@ export const DIRECT_PROVIDERS: DirectProviderDef[] = [
       { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B" },
       { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B" },
       { id: "gemma2-9b-it", name: "Gemma 2 9B" },
+    ],
+  },
+  {
+    id: "together",
+    name: "Together AI",
+    icon: "🤝",
+    baseUrl: "https://api.together.xyz/v1/chat/completions",
+    authMethod: "api-key",
+    healthEndpoint: "https://api.together.xyz/v1/models",
+    description: "Llama, Qwen, DeepSeek — open-source modeli u cloudu",
+    models: [
+      { id: "meta-llama/Llama-3.3-70B-Instruct-Turbo", name: "Llama 3.3 70B Instruct" },
+      { id: "meta-llama/Llama-3.1-405B-Instruct-Turbo", name: "Llama 3.1 405B Instruct" },
+      { id: "meta-llama/Llama-3.1-8B-Instruct-Turbo", name: "Llama 3.1 8B Instruct" },
+      { id: "Qwen/Qwen2.5-72B-Instruct-Turbo", name: "Qwen2.5 72B Instruct" },
+      { id: "Qwen/Qwen2.5-Coder-32B-Instruct", name: "Qwen2.5 Coder 32B Instruct" },
+      { id: "deepseek-ai/DeepSeek-V3", name: "DeepSeek V3" },
+      { id: "deepseek-ai/DeepSeek-R1", name: "DeepSeek R1", thinking: true },
+      { id: "mistralai/Mixtral-8x7B-Instruct-v0.1", name: "Mixtral 8x7B Instruct" },
     ],
   },
   {
