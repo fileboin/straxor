@@ -849,7 +849,7 @@ function ChatPanel({
       tabIndex={-1}
       onFocus={() => handleFocusChange(true)}
       onBlur={() => handleFocusChange(false)}
-      className={`flex flex-col h-full min-h-0 overflow-hidden rounded-2xl panel-glass outline-none ${isEmpty ? "border border-white/10" : "border border-border shadow-lg shadow-black/30"}`}
+      className={`flex flex-col h-full min-h-0 overflow-hidden rounded-2xl panel-glass panel-metal outline-none ${isEmpty ? "border border-white/10" : "border border-border shadow-lg shadow-black/30"}`}
       data-panel-accent={panelAccent ? "true" : undefined}
       style={panelBgStyle}
     >

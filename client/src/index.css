@@ -336,6 +336,47 @@
   background: var(--panel-bg-light, var(--surface));
   border-color: rgba(0, 0, 0, 0.08);
 }
+
+/* ── Suptilan iridescent "metal" okvir na glavnim panelima ──
+   GPU-ekonomican (CSS-only): 1px prsten sa blagim shimmer-om preko mask trick-a,
+   samo tanak prsten se iscrtava. Poštuje prefers-reduced-motion. */
+.panel-metal::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+          mask-composite: exclude;
+  background: linear-gradient(120deg,
+    transparent 0%,
+    rgba(120, 140, 255, 0.10) 18%,
+    rgba(255, 120, 180, 0.09) 30%,
+    rgba(80, 220, 200, 0.07) 42%,
+    rgba(255, 120, 180, 0.09) 54%,
+    rgba(120, 140, 255, 0.10) 66%,
+    transparent 85%);
+  background-size: 300% 100%;
+  animation: panel-metal-shimmer 11s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+@keyframes panel-metal-shimmer {
+  0%   { background-position: 0% 0; }
+  100% { background-position: 300% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-metal::after {
+    animation: none;
+    background-position: 30% 0;
+  }
+}
 [data-theme="light"] .panel-glass::before {
   opacity: 0.06;
 }
