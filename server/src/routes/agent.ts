@@ -90,6 +90,11 @@ function buildAgentBusPrompt(input: {
 }
 
 const CONNECTION_TIMEOUT_MS = 30 * 60 * 1000; // 30 min hard timeout
+// A turn that produces no meaningful progress for our session (text delta, tool
+// event, part update) for this long is cut — the engine may have missed
+// `session.idle` (stuck model / tool loop) while the shared /event stream stays
+// open, which would otherwise leave the panel in "Composing" until the 30-min cap.
+const PROGRESS_TIMEOUT_MS = 240_000; // 4 min of silence
 // FAZA 8 — per-step budget for the team verification gate (install/build/test).
 const TEAM_VERIFY_TIMEOUT_MS = 10 * 60 * 1000;
 const router = Router();
@@ -401,11 +406,12 @@ router.post("/send", async (req: Request, res: Response) => {
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
     let idleHandle: ReturnType<typeof setTimeout> | undefined;
-    // If the OpenCode process produces nothing for this long, the server cuts
-    // the turn (aborts the process + ends the stream) instead of leaving the
-    // client polling a stuck job. Generous enough for a cold engine spawn or a
-    // long tool run, but guarantees a stuck process is killed.
-    const IDLE_TIMEOUT_MS = 120_000;
+    // If the OpenCode process produces nothing meaningful for this long, the
+    // server cuts the turn (aborts the process + ends the stream) instead of
+    // leaving the client polling a stuck job. Reset only on real per-session
+    // progress (text delta / part update / tool event), so event-stream noise
+    // or other sessions' events cannot keep a stuck turn alive forever.
+    const IDLE_TIMEOUT_MS = PROGRESS_TIMEOUT_MS;
 
     // Guarded SSE write — never throws, silently no-ops once the response is gone.
     const send = (payload: unknown) => {
@@ -504,7 +510,6 @@ router.post("/send", async (req: Request, res: Response) => {
 
     stream.on("data", (chunk: Buffer) => {
       if (finished) return;
-      kickIdle();
       buffer += chunk.toString();
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
@@ -537,6 +542,7 @@ router.post("/send", async (req: Request, res: Response) => {
             if (p.field === "text" && typeof p.delta === "string" && p.delta.length > 0) {
               sawDelta = true;
               outputText += p.delta;
+              kickIdle();
               send({ type: "text", content: p.delta });
             }
             continue;
@@ -546,6 +552,7 @@ router.post("/send", async (req: Request, res: Response) => {
             if (!isOurEvent(event)) continue;
             const part = event.properties?.part || event.properties?.properties;
             if (!part) continue;
+            kickIdle();
 
             if (part?.type === "text" && part?.text) {
               // Full snapshot — only use as fallback when this session never
@@ -1032,6 +1039,27 @@ async function runBackground(job: BackgroundJob, adapter: any): Promise<void> {
       return !sid || sid === sessionId;
     };
 
+    // No-progress watchdog: if the engine stops producing meaningful events for
+    // OUR session (missed `session.idle` while the shared /event stream stays
+    // open), the job would hang until the 30-min cap. Cut it after a generous
+    // silence window so the panel releases its loading state.
+    let progressHandle: ReturnType<typeof setTimeout> | undefined;
+    const kickProgress = () => {
+      if (finished) return;
+      if (progressHandle) clearTimeout(progressHandle);
+      progressHandle = setTimeout(() => {
+        if (finished) return;
+        job.timeline.push({
+          t: "error",
+          content: "OpenCode je prestao da odgovara — prekidam turn",
+        });
+        adapter.abortSession(machineId, sessionId).catch(() => {});
+        setDone();
+      }, PROGRESS_TIMEOUT_MS);
+      progressHandle.unref?.();
+    };
+    kickProgress();
+
     const setDone = () => {
       if (finished) return;
       finished = true;
@@ -1040,6 +1068,7 @@ async function runBackground(job: BackgroundJob, adapter: any): Promise<void> {
       job.error = job.timeline.find((e) => e.t === "error")?.content;
       if (snapshotTimer) clearInterval(snapshotTimer);
       if (hardTimeout) clearTimeout(hardTimeout);
+      if (progressHandle) clearTimeout(progressHandle);
       try { stream.destroy(); } catch {}
       void persistJob(job, { final: true });
       releaseSlot(job);
@@ -1088,6 +1117,7 @@ async function runBackground(job: BackgroundJob, adapter: any): Promise<void> {
             const p = event.properties || {};
             if (p.field === "text" && typeof p.delta === "string" && p.delta.length > 0) {
               sawDelta = true;
+              kickProgress();
               job.timeline.push({ t: "text", content: p.delta });
             }
             continue;
@@ -1097,6 +1127,7 @@ async function runBackground(job: BackgroundJob, adapter: any): Promise<void> {
             if (!ourSession(event)) continue;
             const part = event.properties?.part || event.properties?.properties;
             if (!part) continue;
+            kickProgress();
             if (part?.type === "text" && part?.text && !sawDelta) {
               job.timeline.push({ t: "text", content: part.text });
             } else if (part?.type === "tool-call") {
