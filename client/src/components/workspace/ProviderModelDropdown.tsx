@@ -176,13 +176,17 @@ export default function ProviderModelDropdown({
             {/* Provider list */}
             {view === "providers" && (
               <div className="overflow-y-auto flex-1">
-                {(["cloud", "local"] as const).map((source) => {
+                {(["cloud", "local", "vps"] as const).map((source) => {
                   const group = providers.filter((p) => (p.source || "cloud") === source);
                   if (group.length === 0) return null;
+                  const header =
+                    source === "cloud" ? "☁️ Cloud API"
+                    : source === "local" ? "🧠 Lokalni (Zen/Go)"
+                    : "🖥️ VPS (Ollama)";
                   return (
                     <div key={source}>
                       <div className="sticky top-0 z-10 bg-surface px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider text-text-muted border-b border-border/40">
-                        {source === "cloud" ? "☁️ Cloud API" : "🖥️ Lokalni / VPS"}
+                        {header}
                       </div>
                       {group.map((p) => {
                         const hasKey = !needsApiKey(p.id) || providerKeys[p.id] || false;

@@ -37,6 +37,7 @@ import {
 import { randomUUID } from "node:crypto";
 import path from "path";
 import { dispatchWebhook } from "../lib/webhooks.js";
+import { estimateTokenCount, estimateUsageCost, insertUsageEvent } from "../lib/usage-store.js";
 
 type AgentBusAction = "help" | "review" | "warn";
 type PanelSlot = "ask" | "agent";
@@ -395,6 +396,7 @@ router.post("/send", async (req: Request, res: Response) => {
 
     let buffer = "";
     let sawDelta = false;
+    let outputText = "";
     let finished = false;
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
@@ -440,6 +442,28 @@ router.post("/send", async (req: Request, res: Response) => {
 
       const flush = opts.flush !== false;
       const abort = opts.abort === true;
+
+      // Best-effort usage tracking (Phase 3): record the agent turn in the
+      // Usage & Cost dashboard. The OpenCode engine picks the provider/model
+      // internally, so we tag by machine; cost is estimated via the pricing
+      // table (0 for unknown). Never blocks the stream.
+      try {
+        const inTokens = estimateTokenCount(fullText);
+        const outTokens = estimateTokenCount(outputText);
+        void insertUsageEvent({
+          timestamp: new Date().toISOString(),
+          userId,
+          machineId,
+          provider: "opencode",
+          model: machineId,
+          inputTokens: inTokens,
+          outputTokens: outTokens,
+          totalTokens: inTokens + outTokens,
+          costUsd: estimateUsageCost("opencode", machineId, inTokens, outTokens),
+          success: !abort,
+          errorMessage: abort ? "Agent turn aborted" : undefined,
+        });
+      } catch {}
 
       if (flush && buffer.trim()) {
         send({
@@ -512,6 +536,7 @@ router.post("/send", async (req: Request, res: Response) => {
             const p = event.properties || {};
             if (p.field === "text" && typeof p.delta === "string" && p.delta.length > 0) {
               sawDelta = true;
+              outputText += p.delta;
               send({ type: "text", content: p.delta });
             }
             continue;
@@ -525,7 +550,10 @@ router.post("/send", async (req: Request, res: Response) => {
             if (part?.type === "text" && part?.text) {
               // Full snapshot — only use as fallback when this session never
               // emitted a delta (older opencode versions stream via part.updated).
-              if (!sawDelta) send({ type: "text", content: part.text });
+              if (!sawDelta) {
+                outputText += part.text;
+                send({ type: "text", content: part.text });
+              }
             } else if (part?.type === "tool-call") {
               send({
                 type: "tool_call",

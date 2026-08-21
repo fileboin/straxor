@@ -3,18 +3,21 @@ import { useEffect, useState } from "react";
 
 export type ProviderStatus = "ready" | "needs-setup";
 
-// Model source — "cloud" uses a stored per-user API key (Together, OpenRouter,
-// Anthropic, ...); "local" is keyless / engine-managed (Ollama, OpenCode Zen,
-// custom local endpoint).
-export type ModelSource = "cloud" | "local";
+// Model source for UI grouping & key handling:
+//   "cloud" = paid cloud API (uses a stored per-user API key)
+//   "local" = OpenCode Zen/Go via the OpenCode gateway (OPENCODE_API_KEY)
+//   "vps"   = VPS / local Ollama (keyless, free)
+export type ModelSource = "cloud" | "local" | "vps";
 
 // Providers that work without an API key (e.g. local Ollama). The picker must
 // not gate model selection on a stored key, and chat must not require one.
 export const KEYLESS_PROVIDERS: ReadonlySet<string> = new Set(["ollama"]);
 
-// Local / VPS model sources (no cloud key needed). Used for UI grouping and
-// the header source badge.
-export const LOCAL_SOURCE_PROVIDERS: ReadonlySet<string> = new Set(["ollama", "opencode-zen", "custom"]);
+// OpenCode Zen / Go — local-billable via the OpenCode gateway (OPENCODE_API_KEY).
+export const LOCAL_SOURCE_PROVIDERS: ReadonlySet<string> = new Set(["opencode-zen", "opencode-go"]);
+
+// VPS / local Ollama (free, keyless) — for on-the-go / phone work.
+export const VPS_SOURCE_PROVIDERS: ReadonlySet<string> = new Set(["ollama", "custom"]);
 
 export function needsApiKey(providerId: string): boolean {
   return !KEYLESS_PROVIDERS.has(providerId);
@@ -22,6 +25,16 @@ export function needsApiKey(providerId: string): boolean {
 
 export function isLocalSource(providerId: string): boolean {
   return LOCAL_SOURCE_PROVIDERS.has(providerId);
+}
+
+export function isVpsSource(providerId: string): boolean {
+  return VPS_SOURCE_PROVIDERS.has(providerId);
+}
+
+export function providerSource(providerId: string): ModelSource {
+  if (isLocalSource(providerId)) return "local";
+  if (isVpsSource(providerId)) return "vps";
+  return "cloud";
 }
 
 export interface Provider {
@@ -111,6 +124,23 @@ export const PROVIDERS: Provider[] = [
       { id: "opencode/mimo-v2.5-free", name: "MiMo-V2.5 Free", free: true, vision: true },
       { id: "opencode/nemotron-3-ultra-free", name: "Nemotron 3 Ultra Free", free: true },
       { id: "opencode/north-mini-code-free", name: "North Mini Code Free", free: true },
+      { id: "opencode/gpt-5.3-codex", name: "GPT-5.3 Codex", thinking: true },
+      { id: "opencode/gpt-5.5", name: "GPT-5.5", thinking: true },
+      { id: "opencode/claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true },
+      { id: "opencode/claude-opus-4-6", name: "Claude Opus 4.6", thinking: true },
+    ],
+  },
+  {
+    id: "opencode-go",
+    name: "OpenCode Go",
+    status: "needs-setup",
+    source: "local",
+    models: [
+      { id: "opencode_go/minimax-m2.7", name: "MiniMax M2.7", thinking: true },
+      { id: "opencode_go/gpt-5.5", name: "GPT-5.5", thinking: true },
+      { id: "opencode_go/gpt-5.3-codex", name: "GPT-5.3 Codex", thinking: true },
+      { id: "opencode_go/deepseek-v4-pro", name: "DeepSeek V4 Pro", thinking: true },
+      { id: "opencode_go/claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true },
     ],
   },
   {
@@ -128,7 +158,7 @@ export const PROVIDERS: Provider[] = [
     id: "ollama",
     name: "Ollama",
     status: "needs-setup",
-    source: "local",
+    source: "vps",
     models: [
       { id: "llama3.1:70b", name: "Llama 3.1 70B" },
       { id: "codellama:34b", name: "CodeLlama 34B" },
@@ -215,7 +245,7 @@ export const PROVIDERS: Provider[] = [
     id: "custom",
     name: "Custom (OpenAI-compat.)",
     status: "needs-setup",
-    source: "local",
+    source: "vps",
     models: [
       { id: "custom-model", name: "Custom Model" },
     ],

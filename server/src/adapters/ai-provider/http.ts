@@ -242,10 +242,11 @@ const PROVIDER_CONFIG: Record<string, ProviderConfig> = {
   },
 };
 
-const OPENAI_COMPATIBLE = ["openrouter", "qwen", "moonshot", "minimax", "mistral", "xai", "groq", "ollama", "custom", "opencode-zen", "together"];
+const OPENAI_COMPATIBLE = ["openrouter", "qwen", "moonshot", "minimax", "mistral", "xai", "groq", "ollama", "custom", "opencode-zen", "opencode-go", "together"];
 
 const COMPAT_BASE_URLS: Record<string, string> = {
   "opencode-zen": "https://opencode.ai/zen/v1/chat/completions",
+  "opencode-go": "https://opencode.ai/zen/v1/chat/completions",
   openrouter: "https://openrouter.ai/api/v1/chat/completions",
   qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
   moonshot: "https://api.moonshot.cn/v1/chat/completions",

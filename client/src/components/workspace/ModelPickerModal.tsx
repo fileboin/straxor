@@ -140,13 +140,17 @@ export default function ModelPickerModal({
         <div className="flex-1 min-h-0 flex">
           {/* Provider sidebar */}
           <div className="w-52 shrink-0 border-r border-border overflow-y-auto bg-surface">
-            {(["cloud", "local"] as const).map((source) => {
+            {(["cloud", "local", "vps"] as const).map((source) => {
               const group = filteredProviders.filter((p) => (p.source || "cloud") === source);
               if (group.length === 0) return null;
+              const header =
+                source === "cloud" ? "☁️ Cloud API"
+                : source === "local" ? "🧠 Lokalni (Zen/Go)"
+                : "🖥️ VPS (Ollama)";
               return (
                 <div key={source}>
                   <div className="sticky top-0 z-10 bg-surface px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider text-text-muted border-b border-border/40">
-                    {source === "cloud" ? "☁️ Cloud API" : "🖥️ Lokalni / VPS"}
+                    {header}
                   </div>
                   {group.map((p) => {
                     const hasKey = !needsApiKey(p.id) || providerKeys[p.id] || false;

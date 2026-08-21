@@ -20,9 +20,11 @@ export interface CatalogProvider {
   name: string;
   status: string;
   models: CatalogModel[];
-  // Model source: "cloud" = uses a stored per-user API key; "local" = keyless
-  // / engine-managed (Ollama, OpenCode Zen, custom local endpoint).
-  source?: "cloud" | "local";
+  // Model source for UI grouping & key handling:
+  //   "cloud" = paid cloud API (uses a stored per-user API key)
+  //   "local" = OpenCode Zen/Go via the OpenCode gateway (OPENCODE_API_KEY)
+  //   "vps"   = VPS / local Ollama (keyless, free)
+  source?: "cloud" | "local" | "vps";
 }
 
 // Full current Anthropic catalog. Every Claude 4.5+ model does support thinking,
@@ -104,9 +106,9 @@ const DEEPSEEK_MODELS: CatalogModel[] = [
   { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", thinking: true },
 ];
 
-// OpenCode Zen — free OpenAI-compatible models (base: https://opencode.ai/zen/v1).
-// Model IDs follow the `opencode/<id>` convention used by OpenCode configs.
-// MiMo-V2.5 is multimodal (vision); flagged so the UI can gate image uploads.
+// OpenCode Zen — OpenCode's hosted gateway (base: https://opencode.ai/zen/v1).
+// Model IDs follow the `opencode/<id>` convention. Free tier + paid models
+// (billed via the user's OPENCODE_API_KEY). MiMo-V2.5 is multimodal (vision).
 const OPENCODE_ZEN_MODELS: CatalogModel[] = [
   { id: "opencode/big-pickle", name: "Big Pickle", free: true },
   { id: "opencode/deepseek-v4-flash-free", name: "DeepSeek V4 Flash Free", free: true },
@@ -115,6 +117,19 @@ const OPENCODE_ZEN_MODELS: CatalogModel[] = [
   { id: "opencode/mimo-v2.5-free", name: "MiMo-V2.5 Free", free: true, vision: true },
   { id: "opencode/nemotron-3-ultra-free", name: "Nemotron 3 Ultra Free", free: true },
   { id: "opencode/north-mini-code-free", name: "North Mini Code Free", free: true },
+  { id: "opencode/gpt-5.3-codex", name: "GPT-5.3 Codex", thinking: true },
+  { id: "opencode/gpt-5.5", name: "GPT-5.5", thinking: true },
+  { id: "opencode/claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true },
+  { id: "opencode/claude-opus-4-6", name: "Claude Opus 4.6", thinking: true },
+];
+
+// OpenCode Go — same hosted gateway, `opencode_go/<id>` model convention.
+const OPENCODE_GO_MODELS: CatalogModel[] = [
+  { id: "opencode_go/minimax-m2.7", name: "MiniMax M2.7", thinking: true },
+  { id: "opencode_go/gpt-5.5", name: "GPT-5.5", thinking: true },
+  { id: "opencode_go/gpt-5.3-codex", name: "GPT-5.3 Codex", thinking: true },
+  { id: "opencode_go/deepseek-v4-pro", name: "DeepSeek V4 Pro", thinking: true },
+  { id: "opencode_go/claude-sonnet-4-6", name: "Claude Sonnet 4.6", thinking: true },
 ];
 
 const OLLAMA_MODELS: CatalogModel[] = [
@@ -299,8 +314,9 @@ const STATIC_PROVIDERS: CatalogProvider[] = [
   { id: "google", name: "Google Gemini", status: "ready", models: GEMINI_MODELS, source: "cloud" },
   { id: "deepseek", name: "DeepSeek", status: "ready", models: DEEPSEEK_MODELS, source: "cloud" },
   { id: "opencode-zen", name: "OpenCode Zen", status: "ready", models: OPENCODE_ZEN_MODELS, source: "local" },
+  { id: "opencode-go", name: "OpenCode Go", status: "needs-setup", models: OPENCODE_GO_MODELS, source: "local" },
   { id: "openrouter", name: "OpenRouter", status: "needs-setup", models: OPENROUTER_FALLBACK, source: "cloud" },
-  { id: "ollama", name: "Ollama", status: "needs-setup", models: OLLAMA_MODELS, source: "local" },
+  { id: "ollama", name: "Ollama", status: "needs-setup", models: OLLAMA_MODELS, source: "vps" },
   { id: "qwen", name: "Qwen", status: "needs-setup", models: QWEN_MODELS, source: "cloud" },
   { id: "moonshot", name: "Moonshot Kimi", status: "needs-setup", models: MOONSHOT_MODELS, source: "cloud" },
   { id: "minimax", name: "MiniMax", status: "needs-setup", models: MINIMAX_MODELS, source: "cloud" },
@@ -308,7 +324,7 @@ const STATIC_PROVIDERS: CatalogProvider[] = [
   { id: "vertex", name: "Google Vertex AI", status: "needs-setup", models: VERTEX_MODELS, source: "cloud" },
   { id: "bedrock", name: "AWS Bedrock", status: "needs-setup", models: BEDROCK_MODELS, source: "cloud" },
   { id: "azure", name: "Azure OpenAI", status: "needs-setup", models: AZURE_MODELS, source: "cloud" },
-  { id: "custom", name: "Custom (OpenAI-compat.)", status: "needs-setup", models: CUSTOM_MODELS, source: "local" },
+  { id: "custom", name: "Custom (OpenAI-compat.)", status: "needs-setup", models: CUSTOM_MODELS, source: "vps" },
 ];
 
 const OPENROUTER_CACHE_MS = 10 * 60 * 1000;

@@ -10,7 +10,7 @@ import { FormattedContent } from "./FormattedContent.js";
 import PanelMenu from "./PanelMenu.js";
 import ThinkingOrbStatus from "./ThinkingOrbStatus.js";
 import InlineApiKeyForm from "./InlineApiKeyForm.js";
-import { useModelCatalog, isLocalSource, type ThinkingBudget } from "../../lib/models.js";
+import { useModelCatalog, providerSource, type ThinkingBudget } from "../../lib/models.js";
 import type { AgentRole } from "../../lib/roles.js";
 import { t, useLang } from "../../lib/i18n.js";
 import { estimatePlan, formatCost, formatTokens } from "../../lib/plan-preview.js";
@@ -1023,15 +1023,25 @@ function ChatPanel({
             )}
             <span
               className={`hidden sm:inline-flex items-center gap-1 px-1.5 h-6 rounded-md border text-[9px] font-medium shrink-0 ${
-                isLocalSource(providerId)
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-                  : "border-sky-500/30 bg-sky-500/10 text-sky-400"
+                providerSource(providerId) === "cloud"
+                  ? "border-sky-500/30 bg-sky-500/10 text-sky-400"
+                  : providerSource(providerId) === "local"
+                  ? "border-violet-500/30 bg-violet-500/10 text-violet-400"
+                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
               }`}
-              title={isLocalSource(providerId)
-                ? "Lokalni / VPS model — bez cloud ključa"
-                : "Cloud model — koristi sačuvani API ključ iz baze"}
+              title={
+                providerSource(providerId) === "cloud"
+                  ? "Cloud model — koristi sačuvani API ključ iz baze"
+                  : providerSource(providerId) === "local"
+                  ? "Lokalni model (OpenCode Zen/Go) — naplaćuje se preko OpenCode gateway-a"
+                  : "VPS / lokalni Ollama — besplatno, bez cloud ključa"
+              }
             >
-              {isLocalSource(providerId) ? "🖥 Lokalno" : "☁️ Cloud"}
+              {providerSource(providerId) === "cloud"
+                ? "☁️ Cloud"
+                : providerSource(providerId) === "local"
+                ? "🧠 Zen/Go"
+                : "🖥 Ollama"}
             </span>
             <ProviderModelDropdown
               providerId={providerId}
