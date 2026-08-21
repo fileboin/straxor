@@ -451,6 +451,55 @@ body {
     min-height: 0;
   }
 
+  /* On mobile html/body overflow is hidden, so the app shell's content
+     wrapper becomes the single vertical scroll surface. This makes every
+     standalone page (Connections, Marketplace, Admin, Help, Knowledge, …)
+     reachable end-to-end — without it a page taller than the viewport is
+     clipped and unscrollable. */
+  .app-shell .app-scroll {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  /* Standalone pages that use min-h-screen must match the shell height (not
+     100vh, which exceeds the container below the status bar) so their internal
+     overflow-y-auto content scrolls correctly without a double-scrollbar. */
+  .app-shell .app-scroll > .min-h-screen {
+    min-height: 100%;
+  }
+  /* Inside Workspace the panels manage their own scroll; the wrapper must not
+     fight them by scrolling again. */
+  .app-shell .app-scroll:has(> [data-workspace-root]) {
+    overflow: hidden;
+  }
+  /* Sidebar pages (Help, Knowledge, DeployManager, Admin, ImageStudio, …):
+     on a phone a fixed 176px left sidebar eats most of the width, so stack the
+     sidebar above the content and turn its nav into a horizontal strip. */
+  .app-shell .min-h-screen > .flex-1.flex {
+    flex-direction: column;
+  }
+  .app-shell .min-h-screen aside.w-44,
+  .app-shell .min-h-screen aside.w-48 {
+    width: 100%;
+    flex: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .app-shell .min-h-screen aside.w-44 nav,
+  .app-shell .min-h-screen aside.w-48 nav {
+    display: flex;
+    gap: 2px;
+    padding: 6px;
+  }
+  .app-shell .min-h-screen aside.w-44 nav > button,
+  .app-shell .min-h-screen aside.w-48 nav > button {
+    width: auto;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
   /* Paneli: zabrani horizontalni overflow, garantuj komposer u kadru */
   .panel-glass {
     min-height: 0;
@@ -536,11 +585,20 @@ body {
   /* Dropdown/menu unutar bilo kog panela — uvijek iznad i skrolabilan */
   .z-\[50\],
   .z-\[70\],
-  .z-\[100\] {
+  .z-\[100\],
+  .z-\[120\],
+  .z-\[1000\] {
     max-width: calc(100vw - 16px);
     max-height: 80dvh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Svi fixed portal meniji — garantovan scroll i bez isijecanja (teme,
+     role, engine picker, provider/model dropdown, input toolbar) */
+  [style*="position: fixed"] {
+    max-width: calc(100vw - 16px);
   }
 
   /* Modal kontejneri (bez fixed) — prirodna visina, skrol unutra */
@@ -1028,18 +1086,33 @@ body {
   padding: 24px;
 }
 
-/* Mobile: the app shell is h-dvh + overflow:hidden, so standalone pages must
-   scroll INSIDE their own container. Without this the Connections page (36
-   adapters, long instance list) is clipped and unreachable on a phone. */
+/* Connections on phones: the stats row wraps (not clipped), the adapter grid
+   goes single-column, and the page keeps its own bottom padding for the
+   fixed bottom nav / home indicator. */
 @media (max-width: 767px) {
-  .connections.page,
-  .marketplace.page {
-    height: 100%;
-    min-height: 0;
-    overflow-y: auto;
+  .connections.page {
+    padding: 16px 12px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+  .connections.page .stats-bar {
+    flex-wrap: wrap;
+  }
+  .connections.page .stat-item {
+    flex: 1 1 40%;
+    min-width: 0;
+  }
+  .connections.page .category-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 4px;
+  }
+  .connections.page .category-tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .connections.page .adapter-grid {
+    grid-template-columns: 1fr;
   }
 }
 

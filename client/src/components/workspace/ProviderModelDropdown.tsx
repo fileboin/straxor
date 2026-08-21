@@ -39,6 +39,7 @@ export default function ProviderModelDropdown({
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { providers } = useModelCatalog();
 
   const currentProvider = providers.find((p) => p.id === providerId);
@@ -70,12 +71,20 @@ export default function ProviderModelDropdown({
       setOpen(false);
       setView("providers");
     };
+    // Close only when the OUTER page scrolls — never when scrolling inside the
+    // dropdown itself (its provider/model lists are overflow-y-auto and must
+    // stay open so every entry is reachable).
+    const onScrollCapture = (e: Event) => {
+      const t = e.target as Node | null;
+      if (menuRef.current && t && menuRef.current.contains(t)) return;
+      close();
+    };
     document.addEventListener("mousedown", handler);
-    window.addEventListener("scroll", close, true);
+    window.addEventListener("scroll", onScrollCapture, true);
     window.addEventListener("resize", close);
     return () => {
       document.removeEventListener("mousedown", handler);
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("scroll", onScrollCapture, true);
       window.removeEventListener("resize", close);
     };
   }, [open]);
@@ -144,6 +153,7 @@ export default function ProviderModelDropdown({
         pos &&
         createPortal(
           <div
+            ref={menuRef}
             className="z-[100] w-[288px] max-w-[calc(100vw-16px)] max-h-[50vh] rounded-xl border border-border bg-surface shadow-2xl shadow-black/50 overflow-hidden flex flex-col"
             style={{ position: "fixed", top: pos.top, left: pos.left }}
           >

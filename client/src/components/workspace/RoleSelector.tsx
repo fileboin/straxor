@@ -50,12 +50,19 @@ export default function RoleSelector({ role, onChange }: Props) {
       if (!insideBtn && !insideDrop) setOpen(false);
     };
     const close = () => setOpen(false);
+    // Close only when the OUTER page scrolls — never when scrolling inside the
+    // dropdown itself (its role list is overflow-y-auto and must stay open).
+    const onScrollCapture = (e: Event) => {
+      const t = e.target as Node | null;
+      if (dropRef.current && t && dropRef.current.contains(t)) return;
+      close();
+    };
     document.addEventListener("mousedown", handler);
-    window.addEventListener("scroll", close, true);
+    window.addEventListener("scroll", onScrollCapture, true);
     window.addEventListener("resize", close);
     return () => {
       document.removeEventListener("mousedown", handler);
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("scroll", onScrollCapture, true);
       window.removeEventListener("resize", close);
     };
   }, [open]);
