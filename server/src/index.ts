@@ -82,7 +82,7 @@ import webhookRoutes from "./routes/webhooks.js";
 import { httpRequestLogger } from "./lib/http-logger.js";
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = Number(process.env.PORT) || 3001;
 
 // Behind a reverse proxy (Render) that sets X-Forwarded-For. Required for
 // express-rate-limit to resolve the real client IP instead of throwing
@@ -295,8 +295,13 @@ if (fs.existsSync(clientDist)) {
 // ── Run DB migrations before accepting requests ──
 import { runMigrations } from "./db/migrate.js";
 
-const server = app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+// Bind explicitly to all interfaces (HOST default 0.0.0.0) so the Docker
+// container accepts traffic from Coolify's proxy / the external network.
+// The `localhost` below is only the log label — the bind is on 0.0.0.0.
+const HOST = process.env.HOST || "0.0.0.0";
+
+const server = app.listen(PORT, HOST, () => {
+  console.log(`Server running on http://${HOST}:${PORT}`);
 });
 
 // Forward WebSocket upgrades (Vite/CRA HMR) for local previews through the
