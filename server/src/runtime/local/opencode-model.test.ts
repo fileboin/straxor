@@ -1,5 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { openCodeModelConfig, buildOpenCodeModelConfigForSelection } from "./opencode-model";
+
+// The DB path (user-entered key stored in user_api_keys) must work for OpenCode
+// gateway models. Mock the direct-provider manager so getKey returns a saved key
+// for "opencode-go" without touching Postgres.
+vi.mock("../../adapters/direct-providers/manager.js", () => {
+  const saved: Record<string, string> = { "opencode-go": "db-saved-gateway-key" };
+  return {
+    getDirectProviderManager: () => ({
+      async getKey(_userId: string, providerId: string): Promise<string | null> {
+        return saved[providerId] ?? null;
+      },
+    }),
+  };
+});
 
 describe("openCodeModelConfig", () => {
   it("injects OpenRouter's key reference and pins DeepSeek V3", () => {
@@ -63,7 +77,23 @@ describe("buildOpenCodeModelConfigForSelection", () => {
     }
   });
 
-  it("falls back to cloud-key resolution when no gateway key is set", async () => {
+  it("falls back to cloud-key resolution for non-gateway selections", async () => {
+    const prev = process.env.OPENCODE_API_KEY;
+    delete process.env.OPENCODE_API_KEY;
+    try {
+      // A cloud model id (not opencode*) goes through the normal key resolution.
+      const result = await buildOpenCodeModelConfigForSelection(
+        "user-x",
+        "deepseek/deepseek-chat"
+      );
+      expect(["none", "openrouter", "anthropic", "deepseek", "opencode-go", "opencode-zen"]).toContain(result.provider);
+    } finally {
+      if (prev === undefined) delete process.env.OPENCODE_API_KEY;
+      else process.env.OPENCODE_API_KEY = prev;
+    }
+  });
+
+  it("uses the user's DB-saved gateway key when env is not set (UI-entered key)", async () => {
     const prev = process.env.OPENCODE_API_KEY;
     delete process.env.OPENCODE_API_KEY;
     try {
@@ -71,9 +101,12 @@ describe("buildOpenCodeModelConfigForSelection", () => {
         "user-x",
         "opencode_go/deepseek-v4-pro"
       );
-      // Without a gateway key and with no stored cloud keys, it degrades to
-      // "none" instead of throwing — the panel reports the real state.
-      expect(["none", "openrouter", "anthropic", "deepseek"]).toContain(result.provider);
+      // The mocked manager returns "db-saved-gateway-key" for providerId
+      // "opencode-go" — the engine must pin to the gateway model with it.
+      expect(result.provider).toBe("opencode_go");
+      expect(result.model).toBe("opencode_go/deepseek-v4-pro");
+      expect(result.env.OPENCODE_API_KEY).toBe("db-saved-gateway-key");
+      expect(result.configContent).toContain('"model": "opencode_go/deepseek-v4-pro"');
     } finally {
       if (prev === undefined) delete process.env.OPENCODE_API_KEY;
       else process.env.OPENCODE_API_KEY = prev;

@@ -52,6 +52,10 @@ const PROVIDER_DEFAULT_MODEL: Record<string, string> = {
   openai: "gpt-4o",
   google: "gemini-2.5-pro",
   together: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+  opencode: "opencode/gpt-5.3-codex",
+  opencode_go: "opencode_go/deepseek-v4-pro",
+  "opencode-zen": "opencode/gpt-5.3-codex",
+  "opencode-go": "opencode_go/deepseek-v4-pro",
 };
 
 // A deployment may supply a platform-owned key through the environment. This
@@ -202,7 +206,13 @@ export async function buildOpenCodeModelConfigForSelection(
 ): Promise<OpenCodeModelConfig> {
   const sel = (selected || "").trim();
   if (sel && /^(opencode|opencode_go)[/:]/.test(sel)) {
-    const gatewayKey = process.env.OPENCODE_API_KEY?.trim() || "";
+    // The gateway key can come from the deployment env (platform-wide) OR from
+    // the user's own saved key (entered through the panel picker UI and stored
+    // encrypted in user_api_keys under providerId "opencode-zen"/"opencode-go").
+    // Both must work — a UI-entered key must never be ignored.
+    const gatewayKey =
+      process.env.OPENCODE_API_KEY?.trim() ||
+      (await readOpenCodeGatewayKey(userId));
     if (gatewayKey) {
       const [prefix, model] = sel.includes("/") ? sel.split("/") : ["opencode", sel];
       const configContent = JSON.stringify(
@@ -228,8 +238,22 @@ export async function buildOpenCodeModelConfigForSelection(
         reason: `using OpenCode gateway ${sel} (${prefix})`,
       };
     }
-    // No OPENCODE_API_KEY — fall through to normal key resolution so the panel
-    // still works (reports the actual provider used instead of hanging).
+    // No gateway key anywhere — fall through to normal key resolution so the
+    // panel still works (reports the actual provider used instead of hanging).
   }
   return buildOpenCodeModelConfig(userId);
+}
+
+// Read the user's saved OpenCode gateway key from user_api_keys. The UI stores
+// it under providerId "opencode-zen" / "opencode-go"; accept either plus the
+// raw "opencode" / "opencode_go" forms so no matter how it was entered it works.
+async function readOpenCodeGatewayKey(userId: string): Promise<string> {
+  const manager = getDirectProviderManager();
+  for (const pid of ["opencode-zen", "opencode-go", "opencode", "opencode_go"]) {
+    try {
+      const key = await manager.getKey(userId, pid);
+      if (key) return key;
+    } catch {}
+  }
+  return "";
 }
