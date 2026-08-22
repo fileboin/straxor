@@ -51,6 +51,9 @@ describe("openCodeModelConfig", () => {
     expect(result.env.OPENCODE_API_KEY).toBe("zen-gateway-key");
     expect(result.configContent).toContain('"model": "opencode/gpt-5.3-codex"');
     expect(result.configContent).toContain('"apiKey": "{env:OPENCODE_API_KEY}"');
+    // The gateway needs an explicit baseURL or opencode builds
+    // "undefined/chat/completions" (the "undefined URL" bug from the panel).
+    expect(result.configContent).toContain('"baseURL": "https://opencode.ai/zen/v1"');
     // The exhausted OpenRouter key must never be selected.
     expect(result.configContent).not.toContain("openrouter");
   });
@@ -92,15 +95,15 @@ describe("buildOpenCodeModelConfigForSelection", () => {
     const prev = process.env.OPENCODE_API_KEY;
     process.env.OPENCODE_API_KEY = "oc-gateway-secret";
     try {
-      const result = await buildOpenCodeModelConfigForSelection(
+const result = await buildOpenCodeModelConfigForSelection(
         "user-x",
         "opencode_go/deepseek-v4-pro"
       );
-      expect(result.provider).toBe("opencode_go");
+expect(result.provider).toBe("opencode_go");
       expect(result.model).toBe("opencode_go/deepseek-v4-pro");
       expect(result.env.OPENCODE_API_KEY).toBe("oc-gateway-secret");
       expect(result.configContent).toContain('"model": "opencode_go/deepseek-v4-pro"');
-      expect(result.configContent).not.toContain("oc-gateway-secret");
+      expect(result.configContent).toContain('"baseURL": "https://opencode.ai/zen/go/v1"');
     } finally {
       if (prev === undefined) delete process.env.OPENCODE_API_KEY;
       else process.env.OPENCODE_API_KEY = prev;
@@ -156,6 +159,7 @@ describe("buildOpenCodeModelConfigForSelection", () => {
       expect(result.model).toBe("opencode_go/deepseek-v4-pro");
       expect(result.env.OPENCODE_API_KEY).toBe("db-saved-gateway-key");
       expect(result.configContent).toContain('"model": "opencode_go/deepseek-v4-pro"');
+      expect(result.configContent).toContain('"baseURL": "https://opencode.ai/zen/go/v1"');
     } finally {
       if (prev === undefined) delete process.env.OPENCODE_API_KEY;
       else process.env.OPENCODE_API_KEY = prev;

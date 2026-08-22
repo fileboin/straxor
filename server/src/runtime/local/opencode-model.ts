@@ -40,6 +40,23 @@ const PROVIDER_ENV: Record<string, string> = {
   "opencode-go": "OPENCODE_API_KEY",
 };
 
+// The OpenCode Zen/Go hosted gateways are OpenAI-compatible and need an
+// explicit baseURL — without it OpenCode builds "undefined/chat/completions".
+const OPENCODE_GATEWAY_BASE_URL: Record<string, string> = {
+  opencode: "https://opencode.ai/zen/v1",
+  opencode_zen: "https://opencode.ai/zen/v1",
+  opencode_go: "https://opencode.ai/zen/go/v1",
+};
+
+function opencodeGatewayBaseUrl(providerId: string): string {
+  const normalized = providerId.replace(/-/g, "_");
+  return (
+    OPENCODE_GATEWAY_BASE_URL[normalized] ||
+    OPENCODE_GATEWAY_BASE_URL[providerId] ||
+    "https://opencode.ai/zen/v1"
+  );
+}
+
 // Priority order for choosing which provider's key to feed OpenCode.
 // OpenRouter first (can reach DeepSeek + everything), then native Anthropic.
 const PROVIDER_PRIORITY = ["openrouter", "anthropic", "deepseek", "openai", "google"];
@@ -124,7 +141,10 @@ export function openCodeModelConfig(
         small_model: `${prefix}/${model}`,
         provider: {
           [prefix]: {
-            options: { apiKey: "{env:OPENCODE_API_KEY}" },
+            options: {
+              baseURL: opencodeGatewayBaseUrl(prefix),
+              apiKey: "{env:OPENCODE_API_KEY}",
+            },
             models: { [model]: { name: model } },
           },
         },
@@ -261,7 +281,10 @@ export async function buildOpenCodeModelConfigForSelection(
           small_model: sel,
           provider: {
             [prefix]: {
-              options: { apiKey: `{env:OPENCODE_API_KEY}` },
+              options: {
+                baseURL: opencodeGatewayBaseUrl(prefix),
+                apiKey: "{env:OPENCODE_API_KEY}",
+              },
               models: { [model]: { name: model } },
             },
           },
