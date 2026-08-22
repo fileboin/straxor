@@ -110,7 +110,16 @@ export default function EnginePicker({
     if (!open) return;
     const raf = requestAnimationFrame(place);
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+      // The menu is portaled to document.body, so it is NOT inside rootRef.
+      // Only close when clicking OUTSIDE both the toggle button (rootRef) AND
+      // the menu (menuRef). Without the menuRef guard, React 18 flushes
+      // setOpen(false) synchronously on mousedown — unmounting the portal
+      // before the click event fires — and menu-item onClick never runs,
+      // leaving every option (Lokalni engine, VPS, GitHub, Runtime Manager)
+      // completely non-functional.
+      const inTrigger = rootRef.current && rootRef.current.contains(e.target as Node);
+      const inMenu = menuRef.current && menuRef.current.contains(e.target as Node);
+      if (!inTrigger && !inMenu) {
         setOpen(false);
       }
     };

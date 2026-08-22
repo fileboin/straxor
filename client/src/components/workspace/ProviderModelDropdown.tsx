@@ -62,7 +62,13 @@ export default function ProviderModelDropdown({
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+      // The dropdown is portaled to document.body, so it is NOT inside rootRef.
+      // Only close when clicking OUTSIDE both the trigger and the menu —
+      // otherwise React 18 unmounts the portal on mousedown before the menu
+      // item's click event fires and provider/model selection never works.
+      const inTrigger = rootRef.current && rootRef.current.contains(e.target as Node);
+      const inMenu = menuRef.current && menuRef.current.contains(e.target as Node);
+      if (!inTrigger && !inMenu) {
         setOpen(false);
         setView("providers");
       }
