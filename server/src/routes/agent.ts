@@ -103,6 +103,16 @@ const WORKSPACE_CONTEXT_TIMEOUT_MS = 3_000;
 // FAZA 8 — per-step budget for the team verification gate (install/build/test).
 const TEAM_VERIFY_TIMEOUT_MS = 10 * 60 * 1000;
 
+// Map a picker model id to the usage-dashboard provider bucket.
+//   "opencode_go/deepseek-v4-pro" -> "opencode-go"
+//   "opencode/gpt-5.3-codex"      -> "opencode-zen"
+//   anything else (incl. machine ids) -> "opencode"
+export function usageProviderForModel(model?: string | null): string {
+  if (model && /^opencode_go\//.test(model)) return "opencode-go";
+  if (model && /^opencode\//.test(model)) return "opencode-zen";
+  return "opencode";
+}
+
 // Bound any promise so a slow network op (git fetch, clone) can never block a
 // turn beyond the deadline. On timeout the caller degrades gracefully.
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -509,18 +519,36 @@ router.post("/send", async (req: Request, res: Response) => {
       try {
         const inTokens = estimateTokenCount(fullText);
         const outTokens = estimateTokenCount(outputText);
+        const totalTokens = inTokens + outTokens;
+        // Resolve the real provider/model from the picker selection when known
+        // (e.g. "opencode_go/deepseek-v4-pro" -> opencode-go), otherwise fall
+        // back to the machine id so cost/tokens still show up in the dashboard.
+        const usageProvider = usageProviderForModel(model);
+        const usageModel = model || machineId;
+        const costUsd = estimateUsageCost(usageProvider, usageModel, inTokens, outTokens);
         void insertUsageEvent({
           timestamp: new Date().toISOString(),
           userId,
           machineId,
-          provider: "opencode",
-          model: machineId,
+          provider: usageProvider,
+          model: usageModel,
           inputTokens: inTokens,
           outputTokens: outTokens,
-          totalTokens: inTokens + outTokens,
-          costUsd: estimateUsageCost("opencode", machineId, inTokens, outTokens),
+          totalTokens,
+          costUsd,
           success: !abort,
           errorMessage: abort ? "Agent turn aborted" : undefined,
+        });
+        // Emit a live usage event to the panel so Tokens / Context % / Cost
+        // update in real time on every sent query and model response.
+        send({
+          type: "usage",
+          provider: usageProvider,
+          model: usageModel,
+          inputTokens: inTokens,
+          outputTokens: outTokens,
+          totalTokens,
+          costUsd,
         });
       } catch {}
 
@@ -1152,6 +1180,27 @@ async function runBackground(job: BackgroundJob, adapter: any): Promise<void> {
       if (hardTimeout) clearTimeout(hardTimeout);
       if (progressHandle) clearTimeout(progressHandle);
       try { stream.destroy(); } catch {}
+      // Best-effort usage tracking for background turns (Phase 3).
+      try {
+        const inTokens = estimateTokenCount(fullText);
+        const outText = job.timeline.filter((e) => e.t === "text").map((e) => e.content || "").join("");
+        const outTokens = estimateTokenCount(outText);
+        const usageProvider = usageProviderForModel(model);
+        const usageModel = model || machineId;
+        void insertUsageEvent({
+          timestamp: new Date().toISOString(),
+          userId: job.userId,
+          machineId,
+          provider: usageProvider,
+          model: usageModel,
+          inputTokens: inTokens,
+          outputTokens: outTokens,
+          totalTokens: inTokens + outTokens,
+          costUsd: estimateUsageCost(usageProvider, usageModel, inTokens, outTokens),
+          success: job.status !== "error",
+          errorMessage: job.error,
+        });
+      } catch {}
       void persistJob(job, { final: true });
       releaseSlot(job);
     };

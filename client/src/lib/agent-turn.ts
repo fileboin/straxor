@@ -3,7 +3,7 @@ import type { ChatMessage, ToolCall } from "../components/workspace/ChatPanel.js
 import type { ThinkingBudget } from "./models.js";
 import type { AgentRole } from "./roles.js";
 import type { PermissionConfig } from "./permissions.js";
-import { streamAgentMessage, startAgentBackground, fetchBackgroundStatus, type BackgroundTimelineEntry } from "./agent.js";
+import { streamAgentMessage, startAgentBackground, fetchBackgroundStatus, type BackgroundTimelineEntry, type UsageInfo } from "./agent.js";
 import { getRoleById } from "./roles.js";
 
 export interface AgentTurnCtx {
@@ -21,6 +21,7 @@ export interface AgentTurnCtx {
   setStreamingId: (id: string | null) => void;
   setLoading: (v: boolean) => void;
   setPrefill: (v: string) => void;
+  setUsage?: (usage: UsageInfo) => void;
   permissions: PermissionConfig;
   activePromptIds: Set<string>;
   savedPrompts: { id: string; name: string; content: string }[];
@@ -226,6 +227,12 @@ export async function runAgentTurn(msg: string, attachments: Attachment[] | unde
           return { ...m, toolCalls: updated };
         })
       );
+    },
+    onUsage: (usage) => {
+      ctx.setMessages((prev) =>
+        prev.map((m) => (m.id === ctx.assistantMsgId ? { ...m, usage } : m))
+      );
+      ctx.setUsage?.(usage);
     },
     onDone: () => {
       ctx.setStreamingId(null);

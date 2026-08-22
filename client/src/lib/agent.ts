@@ -15,11 +15,21 @@ export interface TodoItem {
   status: "pending" | "in_progress" | "completed";
 }
 
+export interface UsageInfo {
+  provider?: string;
+  model?: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  costUsd: number;
+}
+
 interface AgentStreamCallbacks {
   onSession: (sessionId: string) => void;
   onText: (content: string, messageID?: string) => void;
   onToolCall: (id: string, name: string, args: Record<string, unknown> | string) => void;
   onToolResult: (id: string, result: string, status: "completed" | "error") => void;
+  onUsage?: (usage: UsageInfo) => void;
   onDone: () => void;
   onError: (error: string) => void;
 }
@@ -161,6 +171,17 @@ export async function streamAgentMessage(
             case "tool_result":
               poke();
               callbacks.onToolResult(event.id, event.result || "", event.status);
+              break;
+            case "usage":
+              poke();
+              callbacks.onUsage?.({
+                provider: event.provider,
+                model: event.model,
+                inputTokens: event.inputTokens ?? 0,
+                outputTokens: event.outputTokens ?? 0,
+                totalTokens: event.totalTokens ?? 0,
+                costUsd: event.costUsd ?? 0,
+              });
               break;
             case "done":
               finishDone();

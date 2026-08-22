@@ -66,6 +66,7 @@ export interface ChatMessage {
   toolCalls?: ToolCall[];
   attachments?: Attachment[];
   orchestrated?: OrchestratedResult[];
+  usage?: { provider?: string; model?: string; inputTokens: number; outputTokens: number; totalTokens: number; costUsd: number };
 }
 
 interface Props {
@@ -1137,6 +1138,10 @@ function ChatPanel({
                 )}
               </div>
             )}
+            {/* Live usage metrics (ShipStudio standard): Tokens / Context % / Cost */}
+            {msg.role === "assistant" && msg.usage && (
+              <UsageChip usage={msg.usage} />
+            )}
             {/* Bus — send this answer to the other panel (always visible, accent) */}
             {msg.role === "assistant" && onCopyTo && copyLabel && msg.content && (
               <button
@@ -1296,6 +1301,35 @@ function ChatPanel({
           </div>,
           document.body
         )}
+    </div>
+  );
+}
+
+// Live usage metrics for an assistant message (ShipStudio standard).
+// Context % is a rough estimate of input tokens vs a 200K context window.
+function UsageChip({ usage }: { usage: NonNullable<ChatMessage["usage"]> }) {
+  const ctxPct = usage.inputTokens > 0
+    ? Math.min(100, Math.round((usage.inputTokens / 200_000) * 100))
+    : 0;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-text-muted border-t border-border/40 pt-1.5">
+      <span className="inline-flex items-center gap-1" title="Ukupno tokena (input + output)">
+        <span className="opacity-70">◈</span>
+        <span>{formatTokens(usage.totalTokens)} tok</span>
+      </span>
+      <span className="inline-flex items-center gap-1" title="Procenat konteksta (~200K window)">
+        <span className="opacity-70">◎</span>
+        <span>{ctxPct}% ctx</span>
+      </span>
+      <span className="inline-flex items-center gap-1" title="Procena cene upita">
+        <span className="opacity-70">$</span>
+        <span>{formatCost(usage.costUsd)}</span>
+      </span>
+      {usage.model && (
+        <span className="truncate max-w-[140px] opacity-60" title={usage.model}>
+          {usage.model}
+        </span>
+      )}
     </div>
   );
 }
