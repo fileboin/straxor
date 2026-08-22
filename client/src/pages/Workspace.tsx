@@ -2118,7 +2118,7 @@ export default function Workspace() {
       };
 
       try {
-        const started = await startAgentBackground(agentMachineId || "local:opencode", fullMsg, agentSessionId, attachments, system);
+        const started = await startAgentBackground(agentMachineId || "local:opencode", fullMsg, agentSessionId, attachments, system, agentModel);
         setAgentSessionId(started.sessionId);
         statusRef.timeline = [];
         await poll(started.jobId, started.sessionId);
@@ -2325,7 +2325,7 @@ export default function Workspace() {
         setAgentLoading(false);
         agentAbortRef.current = null;
       },
-    }, attachments, system, agentCtl.signal);
+    }, attachments, system, agentCtl.signal, agentModel);
   }, [agentMachineId, agentSessionId, agentModel, refreshTodos, permissions, agentRole, savedPrompts, activePromptIds, dbSessionId, agentProvider, agentThinking, askProvider, askModel, askThinking, agentMessages, agentModelOrch, agentOrchestratedModels, availableModels, agentBackground, agentPanelMode, transferByBus, recoverVpsEngine]);
 
   useEffect(() => {

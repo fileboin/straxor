@@ -40,12 +40,13 @@ export interface RuntimeAdapter {
     text: string,
     mode?: "sync" | "async",
     attachments?: EngineAttachment[],
-    system?: string
+    system?: string,
+    model?: string
   ): Promise<{ parts?: unknown[] }>;
   listSessions(machineId: string): Promise<unknown[]>;
   getTodos(machineId: string, sessionId: string): Promise<TodoItem[]>;
   getDiff(machineId: string, sessionId: string): Promise<FileDiff[]>;
-  openEventStream(machineId: string): Promise<Duplex>;
+  openEventStream(machineId: string, model?: string): Promise<Duplex>;
   abortSession(machineId: string, sessionId: string): Promise<boolean>;
   healthCheck(machineId: string): Promise<RuntimeHealth>;
   restart(machineId: string): Promise<RuntimeHealth>;

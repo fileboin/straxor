@@ -40,16 +40,29 @@ export const MODEL_PRICING: ModelPricing[] = [
 
   // OpenCode Zen (hosted gateway; free models are $0)
   { provider: "opencode-zen", model: "opencode/gpt-5.3-codex", inputCostPer1M: 3, outputCostPer1M: 12, label: "OpenCode Zen GPT-5.3 Codex" },
+  { provider: "opencode-zen", model: "opencode/gpt-5.2-codex", inputCostPer1M: 3, outputCostPer1M: 12, label: "OpenCode Zen GPT-5.2 Codex" },
+  { provider: "opencode-zen", model: "opencode/gpt-5.1-codex", inputCostPer1M: 3, outputCostPer1M: 12, label: "OpenCode Zen GPT-5.1 Codex" },
+  { provider: "opencode-zen", model: "opencode/gpt-5-codex", inputCostPer1M: 3, outputCostPer1M: 12, label: "OpenCode Zen GPT-5 Codex" },
   { provider: "opencode-zen", model: "opencode/gpt-5.5", inputCostPer1M: 2.5, outputCostPer1M: 10, label: "OpenCode Zen GPT-5.5" },
+  { provider: "opencode-zen", model: "opencode/gpt-5.4", inputCostPer1M: 2.5, outputCostPer1M: 10, label: "OpenCode Zen GPT-5.4" },
   { provider: "opencode-zen", model: "opencode/claude-sonnet-4-6", inputCostPer1M: 3, outputCostPer1M: 15, label: "OpenCode Zen Claude Sonnet 4.6" },
   { provider: "opencode-zen", model: "opencode/claude-opus-4-6", inputCostPer1M: 15, outputCostPer1M: 75, label: "OpenCode Zen Claude Opus 4.6" },
+  { provider: "opencode-zen", model: "opencode/deepseek-v4-pro", inputCostPer1M: 0.30, outputCostPer1M: 1.50, label: "OpenCode Zen DeepSeek V4 Pro" },
+  { provider: "opencode-zen", model: "opencode/deepseek-v4-flash", inputCostPer1M: 0.20, outputCostPer1M: 1.20, label: "OpenCode Zen DeepSeek V4 Flash" },
 
   // OpenCode Go (same gateway, opencode_go/<id> models)
   { provider: "opencode-go", model: "opencode_go/minimax-m2.7", inputCostPer1M: 0.60, outputCostPer1M: 2.50, label: "OpenCode Go MiniMax M2.7" },
+  { provider: "opencode-go", model: "opencode_go/minimax-m2.5", inputCostPer1M: 0.40, outputCostPer1M: 1.80, label: "OpenCode Go MiniMax M2.5" },
   { provider: "opencode-go", model: "opencode_go/gpt-5.5", inputCostPer1M: 2.5, outputCostPer1M: 10, label: "OpenCode Go GPT-5.5" },
+  { provider: "opencode-go", model: "opencode_go/gpt-5.4", inputCostPer1M: 2.5, outputCostPer1M: 10, label: "OpenCode Go GPT-5.4" },
   { provider: "opencode-go", model: "opencode_go/gpt-5.3-codex", inputCostPer1M: 3, outputCostPer1M: 12, label: "OpenCode Go GPT-5.3 Codex" },
+  { provider: "opencode-go", model: "opencode_go/gpt-5.2-codex", inputCostPer1M: 3, outputCostPer1M: 12, label: "OpenCode Go GPT-5.2 Codex" },
+  { provider: "opencode-go", model: "opencode_go/gpt-5-codex", inputCostPer1M: 3, outputCostPer1M: 12, label: "OpenCode Go GPT-5 Codex" },
   { provider: "opencode-go", model: "opencode_go/deepseek-v4-pro", inputCostPer1M: 0.30, outputCostPer1M: 1.50, label: "OpenCode Go DeepSeek V4 Pro" },
+  { provider: "opencode-go", model: "opencode_go/deepseek-v4-flash", inputCostPer1M: 0.20, outputCostPer1M: 1.20, label: "OpenCode Go DeepSeek V4 Flash" },
+  { provider: "opencode-go", model: "opencode_go/deepseek-r1", inputCostPer1M: 0.55, outputCostPer1M: 2.19, label: "OpenCode Go DeepSeek R1" },
   { provider: "opencode-go", model: "opencode_go/claude-sonnet-4-6", inputCostPer1M: 3, outputCostPer1M: 15, label: "OpenCode Go Claude Sonnet 4.6" },
+  { provider: "opencode-go", model: "opencode_go/claude-opus-4-6", inputCostPer1M: 15, outputCostPer1M: 75, label: "OpenCode Go Claude Opus 4.6" },
 ];
 
 export function getPricingForModel(provider: string, model: string): ModelPricing | undefined {

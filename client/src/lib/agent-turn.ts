@@ -128,7 +128,7 @@ export async function runAgentTurn(msg: string, attachments: Attachment[] | unde
     };
 
     try {
-      const started = await startAgentBackground(ctx.machineId, fullMsg, ctx.sessionId, attachments, system);
+      const started = await startAgentBackground(ctx.machineId, fullMsg, ctx.sessionId, attachments, system, ctx.model);
       ctx.setSessionId(started.sessionId);
       statusRef.timeline = [];
       await poll(started.jobId);
@@ -258,5 +258,5 @@ export async function runAgentTurn(msg: string, attachments: Attachment[] | unde
       ctx.setStreamingId(null);
       ctx.setLoading(false);
     },
-  }, attachments, system, ctx.signal);
+  }, attachments, system, ctx.signal, ctx.model);
 }

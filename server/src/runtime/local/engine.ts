@@ -15,7 +15,7 @@ import { repoConnections } from "../../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import { getGitRemoteToken } from "../../adapters/git/remote/registry.js";
 import { ensureWorkspace } from "./workspace.js";
-import { buildOpenCodeModelConfig } from "./opencode-model.js";
+import { buildOpenCodeModelConfig, buildOpenCodeModelConfigForSelection } from "./opencode-model.js";
 import { normalizeSlot, type RepoSlot } from "./shared-workspace.js";
 import type { GitPlatformId } from "../../adapters/git/remote/adapter.js";
 
@@ -131,10 +131,15 @@ export async function getLocalEngineKey(userId: string, engine: string, slot?: s
   return `${userId}:${engine}:${normalized}:${fullName}`;
 }
 
-export async function ensureLocalEngine(userId: string, engine: string, slot?: string | null): Promise<LocalEngineHandle> {
+export async function ensureLocalEngine(userId: string, engine: string, slot?: string | null, model?: string | null): Promise<LocalEngineHandle> {
   const normalized = (engine || "opencode").toLowerCase() as LocalEngineId;
   const panelSlot = normalizeSlot(slot);
-  const key = await getLocalEngineKey(userId, normalized, panelSlot);
+  // Include the requested model in the engine key so switching the panel's
+  // model picker restarts the engine with the new model instead of reusing an
+  // already-spawned process pinned to an old model.
+  const modelTrimmed = (model || "").trim();
+  const modelKey = modelTrimmed ? `:m:${modelTrimmed}` : "";
+  const key = `${await getLocalEngineKey(userId, normalized, panelSlot)}${modelKey}`;
   const existing = handles.get(key);
   if (existing && existing.process.exitCode === null) {
     const alive = await isPortOpen(existing.port);
@@ -183,10 +188,12 @@ export async function ensureLocalEngine(userId: string, engine: string, slot?: s
 
   // Feed the OpenCode engine an active AI model from the user's stored keys.
   // Without this the engine is spawned with NO provider -> "empty gap".
-  const modelCfg = await buildOpenCodeModelConfig(userId);
+  const modelCfg = model
+    ? await buildOpenCodeModelConfigForSelection(userId, model)
+    : await buildOpenCodeModelConfig(userId);
   if (normalized === "opencode" && modelCfg.provider === "none") {
     throw new Error(
-      "No AI provider key configured for this account. Add an OpenRouter, DeepSeek, Anthropic, OpenAI, or Google key before starting the agent."
+      "No AI provider key configured for this account. Add an OpenRouter, DeepSeek, Anthropic, OpenAI, Google, or OpenCode gateway key before starting the agent."
     );
   }
   const modelEnv = {

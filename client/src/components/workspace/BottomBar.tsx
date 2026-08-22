@@ -4,52 +4,9 @@ import ConsolePanel from "./ConsolePanel";
 import EditorContainer from "./EditorContainer";
 import PreviewPanel from "./PreviewPanel";
 import DatabasePanel from "./DatabasePanel";
+import TerminalPanel from "./TerminalPanel";
 
 type Tab = "terminal" | "files" | "logs" | "console" | "preview" | "database";
-
-const MOCK_TERMINAL = [
-  { type: "cmd" as const, text: "~/straxor-landing $ npm create vite@latest . -- --template react-ts" },
-  { type: "output" as const, text: "✓ Scaffolding project in ..." },
-  { type: "success" as const, text: "✓ Done." },
-  { type: "blank" as const, text: "" },
-  { type: "cmd" as const, text: "~/straxor-landing $ npm install && npm install -D tailwindcss" },
-  { type: "output" as const, text: "added 145 packages in 9s" },
-  { type: "blank" as const, text: "" },
-  { type: "cmd" as const, text: "~/straxor-landing $ npm run build" },
-  { type: "output" as const, text: "vite v6.0.0 building for production..." },
-  { type: "success" as const, text: "✓ built in 1.24s" },
-  { type: "blank" as const, text: "" },
-  { type: "cursor" as const, text: "~/straxor-landing $" },
-];
-
-function TerminalContent() {
-  return (
-    <div className="h-full overflow-y-auto font-mono text-[11.5px] leading-[1.8] text-text-secondary bg-bg p-3">
-      {MOCK_TERMINAL.map((line, i) => {
-        if (line.type === "blank") return <div key={i}>&nbsp;</div>;
-        if (line.type === "cursor")
-          return (
-            <div key={i}>
-              <span className="text-accent">{line.text} </span>
-              <span className="inline-block w-[7px] h-[13px] bg-accent animate-pulse align-middle" />
-            </div>
-          );
-        return (
-          <div key={i} className="whitespace-pre-wrap">
-            {line.type === "cmd" && (
-              <>
-                <span className="text-accent">$ </span>
-                <span className="text-text">{line.text.replace("~/straxor-landing $ ", "")}</span>
-              </>
-            )}
-            {line.type === "output" && <span className="text-text-muted">{line.text}</span>}
-            {line.type === "success" && <span className="text-accent">{line.text}</span>}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function TabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   return (
@@ -157,7 +114,7 @@ export default function BottomBar({ machineId, owner, name, taskId }: BottomBarP
 
         {!collapsed && (
           <div className={`${tab === "preview" || tab === "database" ? "h-80" : "h-40"} overflow-hidden transition-all`}>
-            {tab === "terminal" && <TerminalContent />}
+            {tab === "terminal" && <div className="h-full"><TerminalPanel machineId={machineId || null} owner={owner || null} name={name || null} taskId={taskId || null} /></div>}
             {tab === "files" && <div className="h-full"><EditorContainer machineId={machineId || null} /></div>}
             {tab === "logs" && <LogViewer />}
             {tab === "console" && <ConsolePanel />}
@@ -207,7 +164,7 @@ export default function BottomBar({ machineId, owner, name, taskId }: BottomBarP
 
             {/* Content */}
             <div className="flex-1 min-h-0 overflow-hidden">
-              {tab === "terminal" && <TerminalContent />}
+              {tab === "terminal" && <div className="h-full"><TerminalPanel machineId={machineId || null} owner={owner || null} name={name || null} taskId={taskId || null} /></div>}
               {tab === "files" && <div className="h-full"><EditorContainer machineId={machineId || null} /></div>}
               {tab === "logs" && <LogViewer />}
               {tab === "console" && <ConsolePanel />}

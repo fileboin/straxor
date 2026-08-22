@@ -31,7 +31,8 @@ export async function streamAgentMessage(
   callbacks: AgentStreamCallbacks,
   attachments?: Attachment[],
   system?: string,
-  externalSignal?: AbortSignal
+  externalSignal?: AbortSignal,
+  model?: string
 ): Promise<void> {
   let userAbort = false;
   let finishDone: () => void = () => {};
@@ -103,6 +104,7 @@ export async function streamAgentMessage(
         message,
         sessionId: sessionId || undefined,
         ...(system !== undefined && system !== "" ? { system } : {}),
+        ...(model !== undefined && model !== "" ? { model } : {}),
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
       }),
     });
@@ -294,7 +296,8 @@ export async function startAgentBackground(
   message: string,
   sessionId: string | null,
   attachments?: Attachment[],
-  system?: string
+  system?: string,
+  model?: string
 ): Promise<{ jobId: string; sessionId: string }> {
   const token = localStorage.getItem("token");
   const res = await fetch("/api/agent/background", {
@@ -308,6 +311,7 @@ export async function startAgentBackground(
       message,
       sessionId: sessionId || undefined,
       ...(system !== undefined && system !== "" ? { system } : {}),
+      ...(model !== undefined && model !== "" ? { model } : {}),
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
     }),
   });

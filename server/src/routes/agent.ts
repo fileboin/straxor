@@ -309,7 +309,7 @@ router.post("/bus/:eventId/status", async (req: Request, res: Response) => {
 
 router.post("/send", async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  const { machineId, sessionId, text, message, mode, attachments, system } = req.body as {
+  const { machineId, sessionId, text, message, mode, attachments, system, model } = req.body as {
     machineId: string;
     sessionId?: string;
     text?: string;
@@ -317,6 +317,7 @@ router.post("/send", async (req: Request, res: Response) => {
     mode?: "sync" | "async";
     attachments?: AttachmentRef[];
     system?: string;
+    model?: string;
   };
 
   // Support both `text` and `message` field names
@@ -378,7 +379,7 @@ router.post("/send", async (req: Request, res: Response) => {
 
     // Subscribe before the prompt so the first tool call and its repo context
     // cannot be missed on a fast local OpenCode turn.
-    const stream = await adapter.openEventStream(machineId);
+    const stream = await adapter.openEventStream(machineId, model);
 
     // Build the optional GitHub workspace context AFTER the stream is open and
     // bounded by a short timeout: a slow git fetch/merge must never delay the
@@ -421,10 +422,10 @@ router.post("/send", async (req: Request, res: Response) => {
     // so panels recover on their own instead of erroring forever.
     const attemptSend = async (sid: string): Promise<void> => {
       try {
-        result = await adapter.sendMessage(machineId, sid, fullText, effectiveMode, engineAttachments, systemPrompt);
+        result = await adapter.sendMessage(machineId, sid, fullText, effectiveMode, engineAttachments, systemPrompt, model);
       } catch {
         // prompt_async may not be supported, fall back to sync
-        result = await adapter.sendMessage(machineId, sid, fullText, "sync", engineAttachments, systemPrompt);
+        result = await adapter.sendMessage(machineId, sid, fullText, "sync", engineAttachments, systemPrompt, model);
       }
     };
     try {
@@ -870,7 +871,7 @@ interface BackgroundJob {
   label?: string | null;
   // The turn payload is kept on the queued job so it can actually run once the
   // per-slot queue drains (a queued job has no other copy of its prompt).
-  payload?: { fullText: string; engineAttachments: unknown[]; systemPrompt?: string };
+  payload?: { fullText: string; engineAttachments: unknown[]; systemPrompt?: string; model?: string };
   // True when the session id was provided by the client (possibly stale after
   // an engine restart). Enables transparent session recreation on send failure.
   restoredSession?: boolean;
@@ -894,13 +895,14 @@ function slotKeyOf(userId: string, machineId: string): string {
 // the tab is backgrounded because the work happens entirely server-side.
 router.post("/background", async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  const { machineId, message, text, sessionId, attachments, system } = req.body as {
+  const { machineId, message, text, sessionId, attachments, system, model } = req.body as {
     machineId: string;
     sessionId?: string;
     message?: string;
     text?: string;
     attachments?: AttachmentRef[];
     system?: string;
+    model?: string;
   };
 
   const msgText = message || text;
@@ -916,6 +918,7 @@ router.post("/background", async (req: Request, res: Response) => {
       sessionId,
       attachments,
       system,
+      model,
     });
     res.json({ jobId, sessionId: activeSessionId, status });
   } catch (error) {
@@ -938,6 +941,7 @@ async function enqueueBackgroundJob(
     sessionId?: string;
     attachments?: AttachmentRef[];
     system?: string;
+    model?: string;
     taskId?: string | null;
     label?: string | null;
   }
@@ -994,7 +998,7 @@ async function enqueueBackgroundJob(
     taskId: opts.taskId ?? null,
     label: opts.label ?? null,
     restoredSession: !!opts.sessionId,
-    payload: { fullText, engineAttachments, systemPrompt },
+    payload: { fullText, engineAttachments, systemPrompt, model: opts.model },
   };
   backgroundJobs.set(job.id, job);
 
@@ -1048,10 +1052,11 @@ function releaseSlot(job: BackgroundJob): void {
 
 async function runBackground(job: BackgroundJob, adapter: any): Promise<void> {
   const { machineId, sessionId } = job;
-  const { fullText, engineAttachments, systemPrompt } = job.payload ?? {
+  const { fullText, engineAttachments, systemPrompt, model } = job.payload ?? {
     fullText: "",
     engineAttachments: [],
     systemPrompt: undefined,
+    model: undefined,
   };
 
   // A queued job becomes running the moment it is dequeued.
@@ -1073,9 +1078,9 @@ async function runBackground(job: BackgroundJob, adapter: any): Promise<void> {
     // background job never fails permanently against a stale id.
     const attemptSend = async (sid: string): Promise<void> => {
       try {
-        result = await adapter.sendMessage(machineId, sid, fullText, "async", engineAttachments, systemPrompt);
+        result = await adapter.sendMessage(machineId, sid, fullText, "async", engineAttachments, systemPrompt, model);
       } catch {
-        result = await adapter.sendMessage(machineId, sid, fullText, "sync", engineAttachments, systemPrompt);
+        result = await adapter.sendMessage(machineId, sid, fullText, "sync", engineAttachments, systemPrompt, model);
       }
     };
     try {
@@ -1098,7 +1103,7 @@ async function runBackground(job: BackgroundJob, adapter: any): Promise<void> {
 
     // Watch the event stream to capture real-time progress until the session
     // goes idle. Reuses the same parsing as the SSE /send route.
-    const stream = await adapter.openEventStream(machineId);
+    const stream = await adapter.openEventStream(machineId, model);
     let buffer = "";
     let sawDelta = false;
     let finished = false;

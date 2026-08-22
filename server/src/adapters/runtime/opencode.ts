@@ -170,10 +170,11 @@ async function httpCall(
 async function withTransport<T>(
   machineId: string,
   userId: string,
-  fn: (port: number, ssh: SSHClient | null) => Promise<T>
+  fn: (port: number, ssh: SSHClient | null) => Promise<T>,
+  model?: string | null
 ): Promise<T> {
   if (isLocalMachineId(machineId)) {
-    const handle = await ensureLocalEngine(userId, engineFromMachineId(machineId), slotFromMachineId(machineId));
+    const handle = await ensureLocalEngine(userId, engineFromMachineId(machineId), slotFromMachineId(machineId), model);
     return fn(handle.port, null);
   }
   return withSSH(machineId, userId, async (ssh, port) => fn(port, ssh));
@@ -333,7 +334,8 @@ export function createBoundAdapter(userId: string) {
       text: string,
       mode: "sync" | "async" = "async",
       attachments?: EngineAttachment[],
-      system?: string
+      system?: string,
+      model?: string
     ) {
       return withTransport(machineId, userId, async (port, ssh) => {
         const endpoint = mode === "async"
@@ -357,7 +359,7 @@ export function createBoundAdapter(userId: string) {
           }
         }
         return {};
-      });
+      }, model);
     },
 
     async listSessions(machineId: string) {
@@ -384,9 +386,9 @@ export function createBoundAdapter(userId: string) {
       });
     },
 
-    async openEventStream(machineId: string) {
+    async openEventStream(machineId: string, model?: string) {
       if (isLocalMachineId(machineId)) {
-        const handle = await ensureLocalEngine(userId, engineFromMachineId(machineId), slotFromMachineId(machineId));
+        const handle = await ensureLocalEngine(userId, engineFromMachineId(machineId), slotFromMachineId(machineId), model);
         return localEventStream(handle.port);
       }
 

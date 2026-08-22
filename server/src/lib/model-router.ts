@@ -44,6 +44,7 @@ const LADDER: Record<TaskDifficulty, ModelOption[]> = {
     { providerId: "together", modelId: "meta-llama/Llama-3.1-8B-Instruct-Turbo", reason: "Brzo i jeftino za jednostavne upite" },
     { providerId: "opencode-zen", modelId: "opencode/deepseek-v4-flash-free", reason: "Besplatno za jednostavne upite" },
     { providerId: "opencode-zen", modelId: "opencode/big-pickle", reason: "Besplatno za jednostavne upite" },
+    { providerId: "opencode-go", modelId: "opencode_go/deepseek-v4-flash", reason: "Jeftino za jednostavne upite" },
   ],
   moderate: [
     { providerId: "anthropic", modelId: "claude-sonnet-5", reason: "Balans brzine i kvaliteta" },
@@ -52,12 +53,14 @@ const LADDER: Record<TaskDifficulty, ModelOption[]> = {
     { providerId: "deepseek", modelId: "deepseek-coder", reason: "Dobar za kodiranje" },
     { providerId: "together", modelId: "Qwen/Qwen2.5-Coder-32B-Instruct", reason: "Odličan za kodiranje" },
     { providerId: "opencode-zen", modelId: "opencode/laguna-s-2.1-free", reason: "Besplatno za srednje zadatke" },
+    { providerId: "opencode-go", modelId: "opencode_go/deepseek-v4-pro", reason: "Dobar za kodiranje" },
   ],
   complex: [
     { providerId: "anthropic", modelId: "claude-opus-5", reason: "Najsnažniji model za složene zadatke" },
     { providerId: "openai", modelId: "o3", reason: "Dubok reasoning za složene zadatke" },
     { providerId: "google", modelId: "gemini-2.5-pro", reason: "Napredni reasoning" },
     { providerId: "deepseek", modelId: "deepseek-r1", reason: "Dubok reasoning" },
+    { providerId: "opencode-go", modelId: "opencode_go/deepseek-r1", reason: "Dubok reasoning" },
   ],
 };
 

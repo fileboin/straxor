@@ -34,6 +34,10 @@ const PROVIDER_ENV: Record<string, string> = {
   mistral: "MISTRAL_API_KEY",
   moonshot: "MOONSHOT_API_KEY",
   together: "TOGETHER_API_KEY",
+  opencode: "OPENCODE_API_KEY",
+  opencode_go: "OPENCODE_API_KEY",
+  "opencode-zen": "OPENCODE_API_KEY",
+  "opencode-go": "OPENCODE_API_KEY",
 };
 
 // Priority order for choosing which provider's key to feed OpenCode.
@@ -184,4 +188,48 @@ export async function buildOpenCodeModelConfig(
     }
   }
   return openCodeModelConfig(available);
+}
+
+// Resolve a config that honors the model the user selected in the panel picker.
+// `selected` is the catalog id, e.g. "opencode_go/deepseek-v4-pro",
+// "opencode/gpt-5.3-codex", "deepseek/deepseek-chat" or a bare model id.
+// When the selection is an OpenCode Zen/Go gateway model (opencode*, billed via
+// OPENCODE_API_KEY) we pin the engine directly to it; otherwise fall back to
+// the normal cloud-key resolution so every picker choice actually executes.
+export async function buildOpenCodeModelConfigForSelection(
+  userId: string,
+  selected?: string | null,
+): Promise<OpenCodeModelConfig> {
+  const sel = (selected || "").trim();
+  if (sel && /^(opencode|opencode_go)[/:]/.test(sel)) {
+    const gatewayKey = process.env.OPENCODE_API_KEY?.trim() || "";
+    if (gatewayKey) {
+      const [prefix, model] = sel.includes("/") ? sel.split("/") : ["opencode", sel];
+      const configContent = JSON.stringify(
+        {
+          $schema: "https://opencode.ai/config.json",
+          model: sel,
+          small_model: sel,
+          provider: {
+            [prefix]: {
+              options: { apiKey: `{env:OPENCODE_API_KEY}` },
+              models: { [model]: { name: model } },
+            },
+          },
+        },
+        null,
+        2,
+      );
+      return {
+        env: { OPENCODE_API_KEY: gatewayKey },
+        configContent,
+        provider: prefix,
+        model: sel,
+        reason: `using OpenCode gateway ${sel} (${prefix})`,
+      };
+    }
+    // No OPENCODE_API_KEY — fall through to normal key resolution so the panel
+    // still works (reports the actual provider used instead of hanging).
+  }
+  return buildOpenCodeModelConfig(userId);
 }

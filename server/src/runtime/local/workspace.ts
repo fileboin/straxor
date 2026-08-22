@@ -45,6 +45,14 @@ export function getRepoWorkspaceDir(userId: string, owner: string, name: string)
   return path.join(getWorkspaceRoot(), safeUser, `${safeOwner}__${safeName}`);
 }
 
+// Bare per-user sandbox used when there is no connected repo — the interactive
+// Terminal tab runs here (npm/git/build) so it is usable without a GitHub repo.
+export function getBareWorkspaceDir(userId: string, slot: string = "agent"): string {
+  const safeUser = userId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeSlot = slot.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return path.join(getWorkspaceRoot(), safeUser, `__${safeSlot}`);
+}
+
 // Per-task workspace lives OUTSIDE the repo clone (under <root>/<userId>/tasks/)
 // so an agent working in a task workspace never pollutes the project repo's
 // `git status` (workspace isolation, Iteration 0).

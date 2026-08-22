@@ -3,6 +3,7 @@
 // stream stdout/stderr of commands running in a repo sandbox.
 
 import { Router } from "express";
+import fs from "fs";
 import { requireAuth } from "../middleware/auth.js";
 import {
   TerminalBusyError,
@@ -14,16 +15,18 @@ import {
   subscribeToTerminal,
   type TerminalEvent,
 } from "../lib/terminal.js";
-import { getRepoWorkspaceDir } from "../runtime/local/workspace.js";
+import { getBareWorkspaceDir, getRepoWorkspaceDir } from "../runtime/local/workspace.js";
 
 const router = Router();
 
 router.use(requireAuth);
 
 // POST /api/terminal/start — start a command in a repo sandbox (owner/name).
+// When owner/name are omitted it runs in the user's bare sandbox, so the
+// interactive Terminal tab works even without a connected GitHub repo.
 router.post("/start", (req, res) => {
   const userId = req.user!.userId;
-  const { owner, name, command, args, taskId, timeoutMs, env } = req.body as {
+  const { owner, name, command, args, taskId, timeoutMs, env, cwd, slot } = req.body as {
     owner?: string;
     name?: string;
     command?: string;
@@ -31,22 +34,31 @@ router.post("/start", (req, res) => {
     taskId?: string | null;
     timeoutMs?: number;
     env?: Record<string, string>;
+    cwd?: string;
+    slot?: string;
   };
 
   if (!command || typeof command !== "string") {
     res.status(400).json({ error: "command is required" });
     return;
   }
-  if (!owner || !name) {
-    res.status(400).json({ error: "owner and name are required to target a repo sandbox" });
-    return;
-  }
 
-  const cwd = getRepoWorkspaceDir(userId, owner, name);
+  // Explicit cwd wins (used by advanced callers); otherwise target the repo
+  // sandbox, and fall back to the bare per-user sandbox when no repo is bound.
+  const workspaceCwd = cwd
+    ? String(cwd)
+    : owner && name
+      ? getRepoWorkspaceDir(userId, owner, name)
+      : getBareWorkspaceDir(userId, slot);
+
   try {
+    // Ensure the target directory exists before spawning a child there.
+    try {
+      fs.mkdirSync(workspaceCwd, { recursive: true });
+    } catch {}
     const result = startTerminalProcess({
       userId,
-      cwd,
+      cwd: workspaceCwd,
       command,
       args: Array.isArray(args) ? args : [],
       taskId: taskId ?? null,
