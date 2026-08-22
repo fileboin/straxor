@@ -1,6 +1,5 @@
 import { memo, useState, useRef, useEffect, type FormEvent, type ChangeEvent } from "react";
 import { createPortal } from "react-dom";
-import { ThinkingOrb, type OrbState } from "thinking-orbs";
 import ProviderModelDropdown from "./ProviderModelDropdown.js";
 import ModelPickerModal from "./ModelPickerModal.js";
 import InputToolbar from "./InputToolbar.js";
@@ -8,7 +7,6 @@ import InfoTip from "./InfoTip.js";
 import WelcomeHero from "./WelcomeHero.js";
 import { FormattedContent } from "./FormattedContent.js";
 import PanelMenu from "./PanelMenu.js";
-import ThinkingOrbStatus from "./ThinkingOrbStatus.js";
 import InlineApiKeyForm from "./InlineApiKeyForm.js";
 import { useModelCatalog, providerSource, type ThinkingBudget } from "../../lib/models.js";
 import type { AgentRole } from "../../lib/roles.js";
@@ -130,10 +128,6 @@ interface Props {
   orchestratedModels?: { providerId: string; modelId: string }[];
   onOrchestratedModelsChange?: (models: { providerId: string; modelId: string }[]) => void;
   availableModels?: { providerId: string; name: string; models: { id: string; name: string }[] }[];
-  /** ThinkingOrb state shown in the inline status bar (null hides the orb). */
-  orbState?: OrbState | null;
-  /** Text label rendered next to the orb. */
-  orbLabel?: string;
   /** Reports panel container focus so the Ask beam can light on focus. */
   onFocusChange?: (focused: boolean) => void;
   /** Whether the panel menu is enabled */
@@ -320,8 +314,6 @@ function ChatPanel({
   orchestratedModels = [],
   onOrchestratedModelsChange,
   availableModels = [],
-  orbState = null,
-  orbLabel,
   onFocusChange,
   panelMenuEnabled = true,
   engineLabel,
@@ -904,12 +896,6 @@ function ChatPanel({
             </span>
           </div>
           <div className="flex items-center gap-1 shrink-0 sm:gap-1.5">
-            {orbState && orbLabel && (
-              <div className="flex items-center gap-2 mr-1" title={orbLabel}>
-                <ThinkingOrb state={orbState} size={64} theme="auto" aria-label={orbLabel} />
-                <span className="hidden sm:inline text-xs text-text-muted truncate max-w-[120px]">{orbLabel}</span>
-              </div>
-            )}
             {onToggleExpand && (
               <div className="flex items-center gap-0.5">
                 <button
@@ -1061,9 +1047,6 @@ function ChatPanel({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-4 flex flex-col gap-2.5 sm:gap-3 min-h-0">
-        {orbState && messages.length === 0 && (
-          <ThinkingOrbStatus state={orbState} label={orbLabel} />
-        )}
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -1169,14 +1152,6 @@ function ChatPanel({
         ))}
         <div ref={messagesEndRef} />
       </div>
-
-      {/* ThinkingOrb status bar — functional indicator while the panel works */}
-      {orbState && orbLabel && (
-        <div className="px-3 py-1.5 border-t border-border bg-surface-2 flex items-center gap-2 shrink-0">
-          <ThinkingOrb state={orbState} size={20} theme="auto" aria-label={orbLabel} />
-          <span className="text-[11px] text-text-muted">{orbLabel}</span>
-        </div>
-      )}
 
       {/* Steer status bar */}
       {isSteerable && (
