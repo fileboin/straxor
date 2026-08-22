@@ -320,12 +320,12 @@ export function createBoundAdapter(userId: string) {
   }
 
   return {
-    async createSession(machineId: string, title: string) {
+    async createSession(machineId: string, title: string, model?: string) {
       return withTransport(machineId, userId, async (port, ssh) => {
         const res = await httpCall(port, ssh, "POST", "/session", { title });
         if (res.status !== 200) throw new Error(`Failed to create session: ${res.data}`);
         return JSON.parse(res.data) as { id: string };
-      });
+      }, model);
     },
 
     async sendMessage(

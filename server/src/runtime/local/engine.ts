@@ -30,6 +30,8 @@ export interface LocalEngineHandle {
   cwd: string;
   process: ChildProcess;
   startedAt: number;
+  /** The model id this engine was spawned with (empty = auto/cloud resolution). */
+  model: string;
 }
 
 const LOCAL_PREFIX = "local:";
@@ -134,17 +136,26 @@ export async function getLocalEngineKey(userId: string, engine: string, slot?: s
 export async function ensureLocalEngine(userId: string, engine: string, slot?: string | null, model?: string | null): Promise<LocalEngineHandle> {
   const normalized = (engine || "opencode").toLowerCase() as LocalEngineId;
   const panelSlot = normalizeSlot(slot);
-  // Include the requested model in the engine key so switching the panel's
-  // model picker restarts the engine with the new model instead of reusing an
-  // already-spawned process pinned to an old model.
+  // ONE engine per user/slot/repo (NOT per model). Sessions are created on the
+  // engine for the slot, and createSession/openEventStream/sendMessage all
+  // resolve the SAME handle — otherwise the session id created on one engine
+  // process would be sent to a different one and every turn would fail.
+  // A requested model switch instead restarts this single engine so the new
+  // model actually takes effect.
+  const key = await getLocalEngineKey(userId, normalized, panelSlot);
   const modelTrimmed = (model || "").trim();
-  const modelKey = modelTrimmed ? `:m:${modelTrimmed}` : "";
-  const key = `${await getLocalEngineKey(userId, normalized, panelSlot)}${modelKey}`;
   const existing = handles.get(key);
   if (existing && existing.process.exitCode === null) {
     const alive = await isPortOpen(existing.port);
-    if (alive) return existing;
-    stopHandle(existing);
+    if (alive) {
+      // Same model already running → reuse. Model changed → restart so the
+      // picker selection takes effect (sessions on the old engine are dropped,
+      // which is expected — a new model is a new engine instance).
+      if (existing.model === modelTrimmed) return existing;
+      stopHandle(existing);
+    } else {
+      stopHandle(existing);
+    }
   }
 
   const repo = await getActiveRepo(userId, panelSlot).catch(() => null);
@@ -230,6 +241,7 @@ export async function ensureLocalEngine(userId: string, engine: string, slot?: s
     cwd: wsDir,
     process: child,
     startedAt: Date.now(),
+    model: modelTrimmed,
   };
   handles.set(key, handle);
 

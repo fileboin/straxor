@@ -360,7 +360,7 @@ router.post("/send", async (req: Request, res: Response) => {
   // Auto-create session if none provided
   const createFreshSession = async () => {
     const adapter = getAdapters().runtime(userId);
-    const result = await adapter.createSession(machineId, "Straxor Session");
+    const result = await adapter.createSession(machineId, "Straxor Session", model);
     return result.id;
   };
   let activeSessionId: string;
@@ -981,7 +981,7 @@ async function enqueueBackgroundJob(
   // Auto-create session if none provided.
   let activeSessionId = opts.sessionId;
   if (!activeSessionId) {
-    const created = await adapter.createSession(machineId, "Straxor Session");
+    const created = await adapter.createSession(machineId, "Straxor Session", opts.model);
     activeSessionId = created.id;
   }
 
@@ -1116,7 +1116,7 @@ async function runBackground(job: BackgroundJob, adapter: any): Promise<void> {
     } catch (sendErr) {
       const errText = sendErr instanceof Error ? sendErr.message : String(sendErr);
       if (/session|not found|404/i.test(errText) && job.restoredSession) {
-        const fresh = await adapter.createSession(machineId, "Straxor Session");
+        const fresh = await adapter.createSession(machineId, "Straxor Session", model);
         job.sessionId = fresh.id;
         await attemptSend(fresh.id);
       } else {

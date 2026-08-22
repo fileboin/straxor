@@ -33,7 +33,7 @@ export interface RuntimeHealth {
 }
 
 export interface RuntimeAdapter {
-  createSession(machineId: string, title: string): Promise<{ id: string }>;
+  createSession(machineId: string, title: string, model?: string): Promise<{ id: string }>;
   sendMessage(
     machineId: string,
     sessionId: string,
