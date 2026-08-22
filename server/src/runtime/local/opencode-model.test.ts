@@ -39,6 +39,52 @@ describe("openCodeModelConfig", () => {
 
     expect(openCodeModelConfig([]).provider).toBe("none");
   });
+
+  it("prefers a user-saved OpenCode gateway key over OpenRouter priority", () => {
+    const result = openCodeModelConfig([
+      { providerId: "openrouter", key: "openrouter-key-that-hit-its-limit" },
+      { providerId: "opencode-zen", key: "zen-gateway-key" },
+    ]);
+
+    expect(result.provider).toBe("opencode");
+    expect(result.model).toBe("opencode/gpt-5.3-codex");
+    expect(result.env.OPENCODE_API_KEY).toBe("zen-gateway-key");
+    expect(result.configContent).toContain('"model": "opencode/gpt-5.3-codex"');
+    expect(result.configContent).toContain('"apiKey": "{env:OPENCODE_API_KEY}"');
+    // The exhausted OpenRouter key must never be selected.
+    expect(result.configContent).not.toContain("openrouter");
+  });
+
+  it("uses the platform OPENCODE_API_KEY env var when no DB gateway key is saved", () => {
+    const prev = process.env.OPENCODE_API_KEY;
+    process.env.OPENCODE_API_KEY = "env-gateway-key";
+    try {
+      const result = openCodeModelConfig([
+        { providerId: "openrouter", key: "openrouter-key" },
+        { providerId: "anthropic", key: "anthropic-key" },
+      ]);
+      expect(result.provider).toBe("opencode");
+      expect(result.env.OPENCODE_API_KEY).toBe("env-gateway-key");
+    } finally {
+      if (prev === undefined) delete process.env.OPENCODE_API_KEY;
+      else process.env.OPENCODE_API_KEY = prev;
+    }
+  });
+
+  it("still picks OpenRouter when no OpenCode gateway key exists anywhere", () => {
+    const prev = process.env.OPENCODE_API_KEY;
+    delete process.env.OPENCODE_API_KEY;
+    try {
+      const result = openCodeModelConfig([
+        { providerId: "openrouter", key: "openrouter-key" },
+      ]);
+      expect(result.provider).toBe("openrouter");
+      expect(result.model).toBe("deepseek/deepseek-chat-v3-0324");
+    } finally {
+      if (prev === undefined) delete process.env.OPENCODE_API_KEY;
+      else process.env.OPENCODE_API_KEY = prev;
+    }
+  });
 });
 
 describe("buildOpenCodeModelConfigForSelection", () => {
@@ -77,16 +123,19 @@ describe("buildOpenCodeModelConfigForSelection", () => {
     }
   });
 
-  it("falls back to cloud-key resolution for non-gateway selections", async () => {
+  it("uses the saved OpenCode gateway key even for a non-gateway selection", async () => {
     const prev = process.env.OPENCODE_API_KEY;
     delete process.env.OPENCODE_API_KEY;
     try {
-      // A cloud model id (not opencode*) goes through the normal key resolution.
+      // A cloud model id selection still resolves to the user's saved OpenCode
+      // gateway key (db-saved-gateway-key) instead of ignoring it.
       const result = await buildOpenCodeModelConfigForSelection(
         "user-x",
         "deepseek/deepseek-chat"
       );
-      expect(["none", "openrouter", "anthropic", "deepseek", "opencode-go", "opencode-zen"]).toContain(result.provider);
+      expect(result.provider).toBe("opencode_go");
+      expect(result.model).toBe("opencode_go/deepseek-v4-pro");
+      expect(result.env.OPENCODE_API_KEY).toBe("db-saved-gateway-key");
     } finally {
       if (prev === undefined) delete process.env.OPENCODE_API_KEY;
       else process.env.OPENCODE_API_KEY = prev;

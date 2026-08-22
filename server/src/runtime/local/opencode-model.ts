@@ -102,6 +102,45 @@ export function openCodeModelConfig(
     };
   }
 
+  // A saved OpenCode gateway key (opencode-zen / opencode-go / opencode /
+  // opencode_go) is an EXPLICIT user choice to bill through the OpenCode
+  // gateway. It must win over cloud providers (openrouter priority #1) —
+  // otherwise a stale/exhausted OpenRouter key silently overrides the key the
+  // user just entered in the panel, and every turn fails with a 403.
+  const gatewayProvider = availableProviders.find(
+    (p) => p.key && /^(opencode|opencode-zen|opencode_go|opencode-go)$/.test(p.providerId)
+  );
+  const envGatewayKey = environmentKey("opencode");
+  const gatewayKey = gatewayProvider?.key || envGatewayKey;
+  if (gatewayKey) {
+    const providerId = gatewayProvider?.providerId || "opencode";
+    const [prefix, model] = (
+      PROVIDER_DEFAULT_MODEL[providerId] || "opencode/gpt-5.3-codex"
+    ).split("/");
+    const configContent = JSON.stringify(
+      {
+        $schema: "https://opencode.ai/config.json",
+        model: `${prefix}/${model}`,
+        small_model: `${prefix}/${model}`,
+        provider: {
+          [prefix]: {
+            options: { apiKey: "{env:OPENCODE_API_KEY}" },
+            models: { [model]: { name: model } },
+          },
+        },
+      },
+      null,
+      2,
+    );
+    return {
+      env: { OPENCODE_API_KEY: gatewayKey },
+      configContent,
+      provider: prefix,
+      model: `${prefix}/${model}`,
+      reason: `using OpenCode gateway ${prefix}/${model} (saved key)`,
+    };
+  }
+
   const env: Record<string, string> = {};
   const set: { providerId: string; model: string }[] = [];
 
